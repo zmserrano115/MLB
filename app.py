@@ -1,9 +1,12 @@
 # app.py
 
 from datetime import date
+from pathlib import Path
+import json
 
 import pandas as pd
 import streamlit as st
+from pandas.errors import EmptyDataError
 
 from src.mlb_schedule import get_daily_schedule
 from src.stat_data import (
@@ -23,6 +26,10 @@ st.set_page_config(
     page_title="MLB Matchup Finder",
     layout="wide"
 )
+
+
+PRECOMPUTED_DIR = Path("data") / "precomputed"
+
 
 st.markdown(
     """
@@ -89,10 +96,19 @@ st.markdown(
         border-color: rgba(125, 211, 252, 0.50);
         color: white;
     }
+
+    .cloud-box {
+        background: rgba(12, 20, 35, 0.75);
+        border: 1px solid rgba(125, 211, 252, 0.22);
+        border-radius: 14px;
+        padding: 14px 18px;
+        margin-bottom: 18px;
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
+
 
 st.title("MLB Daily Matchup Finder")
 
@@ -102,10 +118,70 @@ st.write(
 )
 
 
+def read_precomputed_csv(file_name):
+    """
+    Reads a precomputed CSV file if it exists.
+    Returns an empty DataFrame if missing or empty.
+    """
+    file_path = PRECOMPUTED_DIR / file_name
+
+    if not file_path.exists():
+        return pd.DataFrame()
+
+    try:
+        return pd.read_csv(file_path)
+    except EmptyDataError:
+        return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+def read_precomputed_metadata():
+    """
+    Reads latest refresh metadata if it exists.
+    """
+    file_path = PRECOMPUTED_DIR / "latest_metadata.json"
+
+    if not file_path.exists():
+        return {}
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+    except Exception:
+        return {}
+
+
+def precomputed_files_available():
+    """
+    Checks whether the main precomputed cloud data files exist.
+    """
+    required_files = [
+        PRECOMPUTED_DIR / "latest_schedule.csv",
+        PRECOMPUTED_DIR / "latest_batter_vs_pitcher.csv",
+        PRECOMPUTED_DIR / "latest_batter_vs_hand.csv",
+        PRECOMPUTED_DIR / "latest_pitcher_k_matchups.csv"
+    ]
+
+    return all(file.exists() for file in required_files)
+
+
+def load_precomputed_data():
+    """
+    Loads all precomputed data files.
+    """
+    schedule_df = read_precomputed_csv("latest_schedule.csv")
+    bvp_matchups = read_precomputed_csv("latest_batter_vs_pitcher.csv")
+    hand_matchups = read_precomputed_csv("latest_batter_vs_hand.csv")
+    pitcher_k_matchups = read_precomputed_csv("latest_pitcher_k_matchups.csv")
+    metadata = read_precomputed_metadata()
+
+    return schedule_df, bvp_matchups, hand_matchups, pitcher_k_matchups, metadata
+
+
 def row_color_by_grade(row):
     """
     Color-codes the entire row based on matchup grade.
-    These colors are brighter and easier to read with black text.
     """
     grade = ""
 
@@ -217,24 +293,25 @@ def style_matchup_table(df):
 
 def display_bvp_game_log(selected_row, season):
     """
-    Shows individual game log for selected batter-vs-pitcher matchup.
+    Shows individual career game log for selected batter-vs-pitcher matchup.
     """
     batter_name = selected_row.get("batter")
     pitcher_name = selected_row.get("opposing_pitcher")
     batter_id = selected_row.get("batter_id")
     pitcher_id = selected_row.get("opposing_pitcher_id")
 
-    st.subheader(f"Game Log: {batter_name} vs {pitcher_name}")
+    st.subheader(f"Career Game Log: {batter_name} vs {pitcher_name}")
 
-    game_log_df = get_batter_vs_pitcher_game_log(
-        int(batter_id),
-        int(pitcher_id),
-        int(season)
-    )
+    with st.spinner("Loading career batter-vs-pitcher game log..."):
+        game_log_df = get_batter_vs_pitcher_game_log(
+            int(batter_id),
+            int(pitcher_id),
+            int(season)
+        )
 
     if game_log_df.empty:
         st.warning(
-            "No individual game-log history was found for this matchup."
+            "No individual career game-log history was found for this matchup."
         )
         return
 
@@ -271,9 +348,17 @@ def display_bvp_game_log(selected_row, season):
 
 
 current_year = date.today().year
+has_precomputed = precomputed_files_available()
+
 
 with st.sidebar:
     st.header("Filters")
+
+    use_precomputed = st.checkbox(
+        "Use cloud precomputed data",
+        value=has_precomputed,
+        help="Uses data refreshed by GitHub Actions instead of rebuilding live."
+    )
 
     selected_date = st.date_input("Game Date", value=date.today())
 
@@ -321,15 +406,69 @@ def load_pitcher_stats(season, force_refresh):
     return get_pitcher_stats(season, force_refresh=force_refresh)
 
 
-schedule_df = load_schedule(selected_date)
+if use_precomputed and has_precomputed:
+    schedule_df, bvp_matchups, hand_matchups, pitcher_k_matchups, metadata = load_precomputed_data()
+
+    season = int(metadata.get("season", season))
+
+    st.markdown(
+        f"""
+        <div class="cloud-box">
+            <b>Cloud Data Mode:</b> Using precomputed GitHub Actions data.<br>
+            <b>Last refreshed:</b> {metadata.get("last_refreshed", "Unknown")}<br>
+            <b>Game date:</b> {metadata.get("game_date", "Unknown")} |
+            <b>Season:</b> {metadata.get("season", "Unknown")} |
+            <b>Minimum PA:</b> {metadata.get("minimum_pa", "Unknown")}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+else:
+    if use_precomputed and not has_precomputed:
+        st.warning(
+            "Precomputed cloud data files were not found. The app will build live data instead."
+        )
+
+    schedule_df = load_schedule(selected_date)
+
+    if schedule_df.empty:
+        st.warning("No MLB games found for this date.")
+        st.stop()
+
+    batters_df = load_batter_stats(season, force_refresh)
+    pitchers_df = load_pitcher_stats(season, force_refresh)
+
+    st.info("Live Data Mode: Building data directly from MLB sources.")
+
+    with st.spinner("Building batter vs pitcher matchups... first run may take a few minutes."):
+        bvp_matchups = build_batter_vs_pitcher_matchups(
+            schedule_df=schedule_df,
+            batters_df=batters_df,
+            season=season,
+            min_pa=min_pa
+        )
+
+    with st.spinner("Building batter vs pitcher hand matchups..."):
+        hand_matchups = build_batter_vs_hand_matchups(
+            schedule_df=schedule_df,
+            batters_df=batters_df,
+            season=season,
+            min_pa=min_pa
+        )
+
+    with st.spinner("Building pitcher strikeout matchups..."):
+        pitcher_k_matchups = build_pitcher_k_matchups(
+            schedule_df=schedule_df,
+            batters_df=batters_df,
+            pitchers_df=pitchers_df,
+            min_pa=min_pa
+        )
+
 
 if schedule_df.empty:
-    st.warning("No MLB games found for this date.")
+    st.warning("No schedule data available.")
     st.stop()
-
-
-batters_df = load_batter_stats(season, force_refresh)
-pitchers_df = load_pitcher_stats(season, force_refresh)
 
 
 st.header("Today's Games and Probable Pitchers")
@@ -355,30 +494,6 @@ st.dataframe(
 
 
 st.header("Final Answer Area")
-
-with st.spinner("Building batter vs pitcher matchups... first run may take a few minutes."):
-    bvp_matchups = build_batter_vs_pitcher_matchups(
-        schedule_df=schedule_df,
-        batters_df=batters_df,
-        season=season,
-        min_pa=min_pa
-    )
-
-with st.spinner("Building batter vs pitcher hand matchups..."):
-    hand_matchups = build_batter_vs_hand_matchups(
-        schedule_df=schedule_df,
-        batters_df=batters_df,
-        season=season,
-        min_pa=min_pa
-    )
-
-with st.spinner("Building pitcher strikeout matchups..."):
-    pitcher_k_matchups = build_pitcher_k_matchups(
-        schedule_df=schedule_df,
-        batters_df=batters_df,
-        pitchers_df=pitchers_df,
-        min_pa=min_pa
-    )
 
 
 batter_cols = [
@@ -439,7 +554,7 @@ with tab1:
 
         filtered_bvp = filtered_bvp.head(int(top_n))
 
-        st.write("Click one row below to view its individual game-log history.")
+        st.write("Click one row below to view its career matchup game log.")
 
         bvp_event = st.dataframe(
             style_matchup_table(filtered_bvp[available_cols]),
@@ -551,9 +666,13 @@ st.header("How the Matchup Tables Work")
 
 st.markdown(
     """
+    **Cloud Precomputed Data**
+    - GitHub Actions can refresh the data every morning.
+    - The public website reads saved CSV files instead of rebuilding everything for each user.
+
     **Batter vs Opposing Pitcher**
     - Direct hitter history against today's probable pitcher.
-    - Click a row to see the individual game-log history.
+    - Click a row to see the career matchup game log.
 
     **Batter vs Pitcher Hand**
     - Hitter split against right-handed or left-handed pitchers.

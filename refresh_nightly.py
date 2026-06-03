@@ -1,3 +1,5 @@
+# refresh_nightly.py
+
 from datetime import date, datetime
 from pathlib import Path
 import argparse
@@ -47,14 +49,22 @@ def save_dataframe(df, file_name):
     file_path = PRECOMPUTED_DIR / file_name
 
     if df is None or df.empty:
-        pd_text = ""
-        file_path.write_text(pd_text, encoding="utf-8")
+        file_path.write_text("", encoding="utf-8")
         return
 
     df.to_csv(file_path, index=False)
 
 
-def save_metadata(game_date, season, min_pa, schedule_rows, bvp_rows, hand_rows, k_rows):
+def save_metadata(
+    game_date,
+    season,
+    min_pa,
+    schedule_rows,
+    bvp_rows,
+    hand_rows,
+    k_rows,
+    game_logs_built
+):
     """
     Saves refresh information so the app/user can see when data was last updated.
     """
@@ -66,7 +76,8 @@ def save_metadata(game_date, season, min_pa, schedule_rows, bvp_rows, hand_rows,
         "schedule_rows": schedule_rows,
         "batter_vs_pitcher_rows": bvp_rows,
         "batter_vs_hand_rows": hand_rows,
-        "pitcher_k_rows": k_rows
+        "pitcher_k_rows": k_rows,
+        "game_logs_preloaded": game_logs_built
     }
 
     metadata_path = PRECOMPUTED_DIR / "latest_metadata.json"
@@ -75,11 +86,91 @@ def save_metadata(game_date, season, min_pa, schedule_rows, bvp_rows, hand_rows,
         json.dump(metadata, file, indent=4)
 
 
-def run_nightly_refresh(game_date, season, min_pa=100, rebuild_game_logs=False):
+def build_precomputed_game_logs(bvp_matchups, season, max_game_logs):
+    """
+    Preloads career game logs for Batter vs Pitcher matchups with history.
+
+    This makes the Streamlit Cloud app faster because clicked game logs
+    can load from data/matchup_cache.json instead of pulling live.
+    """
+    if bvp_matchups is None or bvp_matchups.empty:
+        write_log("No BvP matchups available for game-log preloading.")
+        return 0
+
+    required_cols = [
+        "batter",
+        "batter_id",
+        "opposing_pitcher",
+        "opposing_pitcher_id",
+        "PA"
+    ]
+
+    missing_cols = [
+        col for col in required_cols if col not in bvp_matchups.columns
+    ]
+
+    if missing_cols:
+        write_log(f"Skipping game-log preload. Missing columns: {missing_cols}")
+        return 0
+
+    matchups_with_history = bvp_matchups[
+        bvp_matchups["PA"] > 0
+    ].copy()
+
+    if matchups_with_history.empty:
+        write_log("No BvP rows with PA > 0. No game logs to preload.")
+        return 0
+
+    matchups_with_history = matchups_with_history.sort_values(
+        "PA",
+        ascending=False
+    )
+
+    matchups_to_build = matchups_with_history.head(max_game_logs)
+
+    write_log(
+        f"Preloading {len(matchups_to_build)} career BvP game logs "
+        f"out of {len(matchups_with_history)} matchups with history."
+    )
+
+    built_count = 0
+
+    for _, row in matchups_to_build.iterrows():
+        batter = row.get("batter")
+        pitcher = row.get("opposing_pitcher")
+        batter_id = row.get("batter_id")
+        pitcher_id = row.get("opposing_pitcher_id")
+
+        if batter_id is None or pitcher_id is None:
+            continue
+
+        write_log(f"Preloading game log: {batter} vs {pitcher}")
+
+        game_log_df = get_batter_vs_pitcher_game_log(
+            batter_id=int(batter_id),
+            pitcher_id=int(pitcher_id),
+            season=season
+        )
+
+        if game_log_df is not None and not game_log_df.empty:
+            built_count += 1
+
+    write_log(f"Career game logs successfully preloaded: {built_count}")
+
+    return built_count
+
+
+def run_nightly_refresh(
+    game_date,
+    season,
+    min_pa=100,
+    build_game_logs=True,
+    max_game_logs=50
+):
     """
     Refreshes MLB matchup data.
 
-    This script is meant to be run by GitHub Actions every morning.
+    This script is meant to run locally or through GitHub Actions.
     """
 
     write_log("========================================")
@@ -87,6 +178,8 @@ def run_nightly_refresh(game_date, season, min_pa=100, rebuild_game_logs=False):
     write_log(f"Game date: {game_date}")
     write_log(f"Season: {season}")
     write_log(f"Minimum PA: {min_pa}")
+    write_log(f"Build game logs: {build_game_logs}")
+    write_log(f"Max game logs: {max_game_logs}")
 
     write_log("Pulling daily schedule...")
     schedule_df = get_daily_schedule(game_date)
@@ -101,7 +194,8 @@ def run_nightly_refresh(game_date, season, min_pa=100, rebuild_game_logs=False):
             schedule_rows=0,
             bvp_rows=0,
             hand_rows=0,
-            k_rows=0
+            k_rows=0,
+            game_logs_built=0
         )
 
         return
@@ -146,6 +240,15 @@ def run_nightly_refresh(game_date, season, min_pa=100, rebuild_game_logs=False):
     )
     write_log(f"Pitcher K matchup rows built: {len(pitcher_k_matchups)}")
 
+    game_logs_built = 0
+
+    if build_game_logs:
+        game_logs_built = build_precomputed_game_logs(
+            bvp_matchups=bvp_matchups,
+            season=season,
+            max_game_logs=max_game_logs
+        )
+
     write_log("Saving precomputed data files...")
     save_dataframe(schedule_df, "latest_schedule.csv")
     save_dataframe(bvp_matchups, "latest_batter_vs_pitcher.csv")
@@ -159,34 +262,9 @@ def run_nightly_refresh(game_date, season, min_pa=100, rebuild_game_logs=False):
         schedule_rows=len(schedule_df),
         bvp_rows=len(bvp_matchups),
         hand_rows=len(hand_matchups),
-        k_rows=len(pitcher_k_matchups)
+        k_rows=len(pitcher_k_matchups),
+        game_logs_built=game_logs_built
     )
-
-    if rebuild_game_logs and not bvp_matchups.empty:
-        write_log("Rebuilding career BvP game logs for matchups with history...")
-
-        bvp_with_history = bvp_matchups[
-            bvp_matchups["PA"] > 0
-        ].copy()
-
-        write_log(f"Game logs to check: {len(bvp_with_history)}")
-
-        for _, row in bvp_with_history.iterrows():
-            batter = row.get("batter")
-            pitcher = row.get("opposing_pitcher")
-            batter_id = row.get("batter_id")
-            pitcher_id = row.get("opposing_pitcher_id")
-
-            if batter_id is None or pitcher_id is None:
-                continue
-
-            write_log(f"Building game log: {batter} vs {pitcher}")
-
-            get_batter_vs_pitcher_game_log(
-                batter_id=int(batter_id),
-                pitcher_id=int(pitcher_id),
-                season=season
-            )
 
     write_log("Nightly refresh completed successfully")
     write_log("========================================")
@@ -216,9 +294,16 @@ def main():
     )
 
     parser.add_argument(
-        "--rebuild-game-logs",
+        "--build-game-logs",
         action="store_true",
-        help="Also rebuild career BvP game logs for matchups with history"
+        help="Preload career BvP game logs into data/matchup_cache.json"
+    )
+
+    parser.add_argument(
+        "--max-game-logs",
+        default=50,
+        type=int,
+        help="Maximum number of career BvP game logs to preload"
     )
 
     args = parser.parse_args()
@@ -228,7 +313,8 @@ def main():
             game_date=args.date,
             season=args.season,
             min_pa=args.min_pa,
-            rebuild_game_logs=args.rebuild_game_logs
+            build_game_logs=args.build_game_logs,
+            max_game_logs=args.max_game_logs
         )
 
     except Exception as error:

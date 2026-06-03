@@ -1,0 +1,38 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Streamlit local secrets
+.streamlit/secrets.toml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code settings
+.vscode/
+
+# Local logs
+data/nightly_refresh_log.txt
+
+# Local season stats cache
+data/batters_*.csv
+data/pitchers_*.csv
+
+# PyBaseball cache
+pybaseball/
+.cache/
+
+# Keep precomputed cloud files
+!data/precomputed/
+!data/precomputed/*.csv
+!data/precomputed/*.json
+
+# Keep cloud matchup cache because it stores preloaded game logs
+!data/matchup_cache.json

@@ -19,3 +19,38 @@
 [2026-06-03 14:12:47] Saving precomputed data files...
 [2026-06-03 14:12:47] Nightly refresh completed successfully
 [2026-06-03 14:12:47] ========================================
+[2026-06-03 15:22:32] ========================================
+[2026-06-03 15:22:32] Starting nightly MLB data refresh
+[2026-06-03 15:22:32] Game date: 2026-06-03
+[2026-06-03 15:22:32] Season: 2026
+[2026-06-03 15:22:32] Minimum PA: 100
+[2026-06-03 15:22:32] Build game logs: True
+[2026-06-03 15:22:32] Max game logs: 10
+[2026-06-03 15:22:32] Pulling daily schedule...
+[2026-06-03 15:22:51] Games found: 15
+[2026-06-03 15:22:51] Refreshing batter season stats...
+[2026-06-03 15:22:52] Batter rows loaded: 568
+[2026-06-03 15:22:52] Refreshing pitcher season stats...
+[2026-06-03 15:22:53] Pitcher rows loaded: 659
+[2026-06-03 15:22:53] Clearing old matchup cache...
+[2026-06-03 15:22:53] Building batter vs opposing pitcher matchups...
+[2026-06-03 15:26:41] Batter vs pitcher rows built: 310
+[2026-06-03 15:26:41] Building batter vs pitcher-hand matchups...
+[2026-06-03 15:32:46] Batter vs hand rows built: 310
+[2026-06-03 15:32:46] Building pitcher strikeout matchups...
+[2026-06-03 15:32:47] Pitcher K matchup rows built: 30
+[2026-06-03 15:32:47] Preloading 10 career BvP game logs out of 200 matchups with history.
+[2026-06-03 15:32:47] Preloading game log: Max Muncy vs Zac Gallen
+[2026-06-03 15:33:42] Preloading game log: Mookie Betts vs Zac Gallen
+[2026-06-03 15:34:49] Preloading game log: Marcus Semien vs George Kirby
+[2026-06-03 15:35:49] Preloading game log: Matt Olson vs Patrick Corbin
+[2026-06-03 15:36:45] Preloading game log: Wilyer Abreu vs Chris Bassitt
+[2026-06-03 15:37:16] Preloading game log: Fernando Tatis Jr. vs Cristopher Sánchez
+[2026-06-03 15:37:52] Preloading game log: Brandon Nimmo vs Andre Pallante
+[2026-06-03 15:38:46] Preloading game log: Kyle Schwarber vs Walker Buehler
+[2026-06-03 15:39:42] Preloading game log: Zach Neto vs Michael Lorenzen
+[2026-06-03 15:40:14] Preloading game log: Josh Naylor vs Freddy Peralta
+[2026-06-03 15:40:55] Career game logs successfully preloaded: 10
+[2026-06-03 15:40:55] Saving precomputed data files...
+[2026-06-03 15:40:55] Nightly refresh completed successfully
+[2026-06-03 15:40:55] ========================================

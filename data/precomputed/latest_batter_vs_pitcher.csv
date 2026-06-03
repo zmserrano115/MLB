@@ -1,75 +1,82 @@
 game,team,batter,batter_id,opposing_pitcher,opposing_pitcher_id,opposing_pitcher_hand,split,AB,PA,H,BB,SO,HR,RBI,AVG,OBP,SLG,OPS,K%,BB%,matchup_grade
-Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Freddie Freeman,518692,Zac Gallen,668678,R,Batter vs Pitcher,26,28,6,1,6,2,6,0.231,0.25,0.538,0.788,21.428571428571427,3.571428571428571,Avoid
-Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Logan O'Hoppe,681351,Michael Lorenzen,547179,R,Batter vs Pitcher,11,14,2,2,2,0,0,0.182,0.357,0.182,0.539,14.285714285714285,14.285714285714285,Avoid
-Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Jo Adell,666176,Michael Lorenzen,547179,R,Batter vs Pitcher,11,12,6,1,3,2,3,0.545,0.583,1.091,1.674,25.0,8.333333333333332,Strong
-New York Mets @ Seattle Mariners,New York Mets,Marcus Semien,543760,George Kirby,669923,R,Batter vs Pitcher,10,11,2,1,1,1,2,0.2,0.273,0.5,0.773,9.090909090909092,9.090909090909092,Avoid
-Chicago White Sox @ Minnesota Twins,Minnesota Twins,Trevor Larnach,663616,Erick Fedde,607200,R,Batter vs Pitcher,10,11,2,1,3,0,0,0.2,0.273,0.3,0.573,27.27272727272727,9.090909090909092,Avoid
-Kansas City Royals @ Cincinnati Reds,Cincinnati Reds,Eugenio Suárez,553993,Stephen Kolek,663568,R,Batter vs Pitcher,8,11,0,2,6,0,0,0.0,0.273,0.0,0.273,54.54545454545454,18.181818181818183,Avoid
+Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Max Muncy,571970,Zac Gallen,668678,R,Batter vs Pitcher,27,34,6,6,10,1,3,0.222,0.382,0.37,0.752,29.411764705882355,17.647058823529413,Good
+Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Mookie Betts,605141,Zac Gallen,668678,R,Batter vs Pitcher,28,32,8,3,8,1,3,0.286,0.344,0.464,0.808,25.0,9.375,Good
+New York Mets @ Seattle Mariners,New York Mets,Marcus Semien,543760,George Kirby,669923,R,Batter vs Pitcher,27,29,4,2,3,1,3,0.148,0.207,0.333,0.54,10.344827586206897,6.896551724137931,Avoid
+Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Matt Olson,621566,Patrick Corbin,571578,L,Batter vs Pitcher,14,17,6,3,5,0,3,0.429,0.529,0.571,1.1,29.411764705882355,17.647058823529413,Strong
+Baltimore Orioles @ Boston Red Sox,Boston Red Sox,Wilyer Abreu,677800,Chris Bassitt,605135,R,Batter vs Pitcher,14,16,6,2,3,1,6,0.429,0.5,0.786,1.286,18.75,12.5,Strong
+San Diego Padres @ Philadelphia Phillies,San Diego Padres,Fernando Tatis Jr.,665487,Cristopher Sánchez,650911,L,Batter vs Pitcher,14,15,7,1,3,1,2,0.5,0.533,0.714,1.247,20.0,6.666666666666667,Strong
+Texas Rangers @ St. Louis Cardinals,Texas Rangers,Brandon Nimmo,607043,Andre Pallante,669467,R,Batter vs Pitcher,15,15,1,0,2,0,0,0.067,0.067,0.133,0.2,13.333333333333334,0.0,Avoid
+San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Kyle Schwarber,656941,Walker Buehler,621111,R,Batter vs Pitcher,13,14,3,1,4,1,2,0.231,0.286,0.462,0.748,28.57142857142857,7.142857142857142,Neutral
+Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Zach Neto,687263,Michael Lorenzen,547179,R,Batter vs Pitcher,7,10,2,2,1,0,1,0.286,0.5,0.429,0.929,10.0,20.0,Strong
 New York Mets @ Seattle Mariners,Seattle Mariners,Josh Naylor,647304,Freddy Peralta,642547,R,Batter vs Pitcher,9,10,2,1,2,1,1,0.222,0.3,0.556,0.856,20.0,10.0,Neutral
-San Diego Padres @ Philadelphia Phillies,San Diego Padres,Ramón Laureano,657656,Cristopher Sánchez,650911,L,Batter vs Pitcher,10,10,3,0,5,0,0,0.3,0.3,0.5,0.8,50.0,0.0,Neutral
-Chicago White Sox @ Minnesota Twins,Chicago White Sox,Chase Meidroth,805367,Taj Bradley,671737,R,Batter vs Pitcher,8,9,3,1,1,0,1,0.375,0.444,0.625,1.069,11.11111111111111,11.11111111111111,Strong
+San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Adolis García,666969,Walker Buehler,621111,R,Batter vs Pitcher,10,10,2,0,1,1,3,0.2,0.2,0.6,0.8,10.0,0.0,Avoid
+San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Brice Turang,668930,Logan Webb,657277,R,Batter vs Pitcher,9,9,4,0,1,0,0,0.444,0.444,0.667,1.111,11.11111111111111,0.0,Strong
+San Diego Padres @ Philadelphia Phillies,San Diego Padres,Miguel Andujar,609280,Cristopher Sánchez,650911,L,Batter vs Pitcher,9,9,4,0,2,0,1,0.444,0.444,0.444,0.888,22.22222222222222,0.0,Strong
+Texas Rangers @ St. Louis Cardinals,St. Louis Cardinals,Alec Burleson,676475,MacKenzie Gore,669022,L,Batter vs Pitcher,8,9,2,1,1,0,1,0.25,0.333,0.25,0.583,11.11111111111111,11.11111111111111,Avoid
+Chicago White Sox @ Minnesota Twins,Minnesota Twins,Trevor Larnach,663616,Erick Fedde,607200,R,Batter vs Pitcher,8,9,1,1,3,0,0,0.125,0.222,0.25,0.472,33.33333333333333,11.11111111111111,Avoid
+Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Michael Harris II,671739,Patrick Corbin,571578,L,Batter vs Pitcher,9,9,2,0,3,0,0,0.222,0.222,0.222,0.444,33.33333333333333,0.0,Avoid
 Baltimore Orioles @ Boston Red Sox,Boston Red Sox,Ceddanne Rafaela,678882,Chris Bassitt,605135,R,Batter vs Pitcher,8,9,1,0,3,0,1,0.125,0.222,0.125,0.347,33.33333333333333,0.0,Avoid
 New York Mets @ Seattle Mariners,New York Mets,Francisco Lindor,596019,George Kirby,669923,R,Batter vs Pitcher,7,8,4,0,0,0,3,0.571,0.5,0.714,1.214,0.0,0.0,Strong
 Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Miguel Rojas,500743,Zac Gallen,668678,R,Batter vs Pitcher,8,8,4,0,0,0,1,0.5,0.5,0.625,1.125,0.0,0.0,Strong
-San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Sal Frelick,686217,Logan Webb,657277,R,Batter vs Pitcher,8,8,2,0,1,0,0,0.25,0.25,0.25,0.5,12.5,0.0,Avoid
+New York Mets @ Seattle Mariners,New York Mets,Bo Bichette,666182,George Kirby,669923,R,Batter vs Pitcher,7,8,2,1,2,1,2,0.286,0.375,0.857,1.232,25.0,12.5,Good
+Toronto Blue Jays @ Atlanta Braves,Toronto Blue Jays,Jesús Sánchez,660821,Grant Holmes,656550,R,Batter vs Pitcher,7,8,2,1,1,0,1,0.286,0.375,0.571,0.946,12.5,12.5,Good
 Pittsburgh Pirates @ Houston Astros,Houston Astros,Isaac Paredes,670623,Paul Skenes,694973,R,Batter vs Pitcher,7,8,0,1,2,0,0,0.0,0.125,0.0,0.125,25.0,12.5,Avoid
-Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Zach Neto,687263,Michael Lorenzen,547179,R,Batter vs Pitcher,5,7,2,2,1,0,1,0.4,0.571,0.6,1.171,14.285714285714285,28.57142857142857,Strong
 Chicago White Sox @ Minnesota Twins,Chicago White Sox,Colson Montgomery,695657,Taj Bradley,671737,R,Batter vs Pitcher,5,7,2,1,1,2,6,0.4,0.429,1.6,2.029,14.285714285714285,14.285714285714285,Strong
 Baltimore Orioles @ Boston Red Sox,Boston Red Sox,Masataka Yoshida,807799,Chris Bassitt,605135,R,Batter vs Pitcher,7,7,1,0,2,0,0,0.143,0.143,0.286,0.429,28.57142857142857,0.0,Avoid
 Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Austin Riley,663586,Patrick Corbin,571578,L,Batter vs Pitcher,7,7,1,0,3,0,1,0.143,0.143,0.286,0.429,42.857142857142854,0.0,Avoid
-New York Mets @ Seattle Mariners,New York Mets,Juan Soto,665742,George Kirby,669923,R,Batter vs Pitcher,4,6,3,2,0,0,1,0.75,0.833,0.75,1.583,0.0,33.33333333333333,Strong
 Texas Rangers @ St. Louis Cardinals,St. Louis Cardinals,Masyn Winn,691026,MacKenzie Gore,669022,L,Batter vs Pitcher,5,6,3,1,0,1,4,0.6,0.667,1.2,1.867,0.0,16.666666666666664,Strong
-San Diego Padres @ Philadelphia Phillies,San Diego Padres,Miguel Andujar,609280,Cristopher Sánchez,650911,L,Batter vs Pitcher,6,6,4,0,0,0,1,0.667,0.667,0.667,1.334,0.0,0.0,Strong
-San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Brandon Marsh,669016,Walker Buehler,621111,R,Batter vs Pitcher,4,6,2,2,2,0,0,0.5,0.667,0.5,1.167,33.33333333333333,33.33333333333333,Strong
-Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Mookie Betts,605141,Zac Gallen,668678,R,Batter vs Pitcher,6,6,3,0,2,1,2,0.5,0.5,1.0,1.5,33.33333333333333,0.0,Strong
 Chicago White Sox @ Minnesota Twins,Chicago White Sox,Edgar Quero,700337,Taj Bradley,671737,R,Batter vs Pitcher,6,6,3,0,0,0,2,0.5,0.5,0.667,1.167,0.0,0.0,Strong
 Chicago White Sox @ Minnesota Twins,Chicago White Sox,Andrew Benintendi,643217,Taj Bradley,671737,R,Batter vs Pitcher,5,6,2,1,1,0,0,0.4,0.5,0.4,0.9,16.666666666666664,16.666666666666664,Strong
+Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Jo Adell,666176,Michael Lorenzen,547179,R,Batter vs Pitcher,5,6,2,1,2,0,0,0.4,0.5,0.4,0.9,33.33333333333333,16.666666666666664,Strong
+Chicago White Sox @ Minnesota Twins,Chicago White Sox,Chase Meidroth,805367,Taj Bradley,671737,R,Batter vs Pitcher,6,6,2,0,0,0,0,0.333,0.333,0.5,0.833,0.0,0.0,Good
 San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,J.T. Realmuto,592663,Walker Buehler,621111,R,Batter vs Pitcher,6,6,2,0,1,0,0,0.333,0.333,0.333,0.666,16.666666666666664,0.0,Neutral
-San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Bryson Stott,681082,Walker Buehler,621111,R,Batter vs Pitcher,6,6,2,0,0,0,3,0.333,0.333,0.333,0.666,0.0,0.0,Neutral
-Texas Rangers @ St. Louis Cardinals,St. Louis Cardinals,Alec Burleson,676475,MacKenzie Gore,669022,L,Batter vs Pitcher,5,6,1,1,1,0,0,0.2,0.333,0.2,0.533,16.666666666666664,16.666666666666664,Avoid
+Pittsburgh Pirates @ Houston Astros,Houston Astros,Jose Altuve,514888,Paul Skenes,694973,R,Batter vs Pitcher,6,6,2,0,0,0,1,0.333,0.333,0.333,0.666,0.0,0.0,Neutral
+Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Spencer Torkelson,679529,Nick Martinez,607259,R,Batter vs Pitcher,4,6,1,0,1,0,1,0.25,0.333,0.25,0.583,16.666666666666664,0.0,Avoid
 Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Ronald Acuña Jr.,660670,Patrick Corbin,571578,L,Batter vs Pitcher,6,6,1,0,0,0,0,0.167,0.167,0.333,0.5,0.0,0.0,Avoid
 San Diego Padres @ Philadelphia Phillies,San Diego Padres,Gavin Sheets,657757,Cristopher Sánchez,650911,L,Batter vs Pitcher,6,6,1,0,2,0,0,0.167,0.167,0.167,0.334,33.33333333333333,0.0,Avoid
+San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Luis Rengifo,650859,Logan Webb,657277,R,Batter vs Pitcher,6,6,1,0,0,0,0,0.167,0.167,0.167,0.334,0.0,0.0,Avoid
 Texas Rangers @ St. Louis Cardinals,St. Louis Cardinals,Jordan Walker,691023,MacKenzie Gore,669022,L,Batter vs Pitcher,6,6,1,0,3,0,0,0.167,0.167,0.167,0.334,50.0,0.0,Avoid
+Athletics @ Chicago Cubs,Chicago Cubs,Alex Bregman,608324,Jeffrey Springs,605488,L,Batter vs Pitcher,6,6,1,0,1,0,0,0.167,0.167,0.167,0.334,16.666666666666664,0.0,Avoid
 New York Mets @ Seattle Mariners,Seattle Mariners,Brendan Donovan,680977,Freddy Peralta,642547,R,Batter vs Pitcher,5,6,0,1,1,0,0,0.0,0.167,0.0,0.167,16.666666666666664,16.666666666666664,Avoid
 Pittsburgh Pirates @ Houston Astros,Houston Astros,Jeremy Peña,665161,Paul Skenes,694973,R,Batter vs Pitcher,5,6,0,1,0,0,0,0.0,0.167,0.0,0.167,0.0,16.666666666666664,Avoid
-Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Max Muncy,571970,Zac Gallen,668678,R,Batter vs Pitcher,5,6,0,0,2,0,0,0.0,0.167,0.0,0.167,33.33333333333333,0.0,Avoid
-Cleveland Guardians @ New York Yankees,New York Yankees,Aaron Judge,592450,Gavin Williams,668909,R,Batter vs Pitcher,4,5,2,1,1,1,1,0.5,0.6,1.5,2.1,20.0,20.0,Strong
+Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Josh Lowe,666139,Michael Lorenzen,547179,R,Batter vs Pitcher,5,5,3,0,2,0,1,0.6,0.6,0.8,1.4,40.0,0.0,Strong
 Cleveland Guardians @ New York Yankees,New York Yankees,José Caballero,676609,Gavin Williams,668909,R,Batter vs Pitcher,3,5,1,2,0,0,0,0.333,0.6,0.667,1.267,0.0,40.0,Strong
+San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Alec Bohm,664761,Walker Buehler,621111,R,Batter vs Pitcher,5,5,3,0,0,0,0,0.6,0.6,0.6,1.2,0.0,0.0,Strong
 Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Kyle Tucker,663656,Zac Gallen,668678,R,Batter vs Pitcher,5,5,2,0,1,0,1,0.4,0.4,0.6,1.0,20.0,0.0,Strong
 Chicago White Sox @ Minnesota Twins,Minnesota Twins,Matt Wallner,670242,Erick Fedde,607200,R,Batter vs Pitcher,4,5,1,1,2,0,0,0.25,0.4,0.25,0.65,40.0,20.0,Avoid
-Toronto Blue Jays @ Atlanta Braves,Toronto Blue Jays,Jesús Sánchez,660821,Grant Holmes,656550,R,Batter vs Pitcher,5,5,1,0,1,0,1,0.2,0.2,0.4,0.6,20.0,0.0,Avoid
+Kansas City Royals @ Cincinnati Reds,Cincinnati Reds,Eugenio Suárez,553993,Stephen Kolek,663568,R,Batter vs Pitcher,3,5,0,2,2,0,0,0.0,0.4,0.0,0.4,40.0,40.0,Avoid
+Athletics @ Chicago Cubs,Chicago Cubs,Dansby Swanson,621020,Jeffrey Springs,605488,L,Batter vs Pitcher,5,5,1,0,2,0,1,0.2,0.2,0.4,0.6,40.0,0.0,Avoid
 Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Ozzie Albies,645277,Patrick Corbin,571578,L,Batter vs Pitcher,5,5,1,0,1,0,1,0.2,0.2,0.2,0.4,20.0,0.0,Avoid
 Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Teoscar Hernández,606192,Zac Gallen,668678,R,Batter vs Pitcher,5,5,1,0,3,0,0,0.2,0.2,0.2,0.4,60.0,0.0,Avoid
 Cleveland Guardians @ New York Yankees,Cleveland Guardians,Steven Kwan,680757,Gerrit Cole,543037,R,Batter vs Pitcher,5,5,0,0,2,0,0,0.0,0.0,0.0,0.0,40.0,0.0,Avoid
-Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Michael Harris II,671739,Patrick Corbin,571578,L,Batter vs Pitcher,5,5,0,0,3,0,0,0.0,0.0,0.0,0.0,60.0,0.0,Avoid
+Athletics @ Chicago Cubs,Athletics,Jeff McNeil,643446,Colin Rea,607067,R,Batter vs Pitcher,5,5,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Avoid
 Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Dominic Smith,642086,Patrick Corbin,571578,L,Batter vs Pitcher,4,4,3,0,0,0,0,0.75,0.75,1.25,2.0,0.0,0.0,Small Sample
+Athletics @ Chicago Cubs,Chicago Cubs,Ian Happ,664023,Jeffrey Springs,605488,L,Batter vs Pitcher,4,4,3,0,0,0,1,0.75,0.75,0.75,1.5,0.0,0.0,Small Sample
 Chicago White Sox @ Minnesota Twins,Chicago White Sox,Miguel Vargas,678246,Taj Bradley,671737,R,Batter vs Pitcher,3,4,2,1,0,0,0,0.667,0.75,0.667,1.417,0.0,25.0,Small Sample
+San Diego Padres @ Philadelphia Phillies,San Diego Padres,Freddy Fermin,666023,Cristopher Sánchez,650911,L,Batter vs Pitcher,4,4,2,0,0,2,2,0.5,0.5,2.0,2.5,0.0,0.0,Small Sample
 Texas Rangers @ St. Louis Cardinals,Texas Rangers,Corey Seager,608369,Andre Pallante,669467,R,Batter vs Pitcher,3,4,1,1,2,0,1,0.333,0.5,0.667,1.167,50.0,25.0,Small Sample
-Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Spencer Torkelson,679529,Nick Martinez,607259,R,Batter vs Pitcher,3,4,1,0,1,0,0,0.333,0.5,0.333,0.833,25.0,0.0,Small Sample
 Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Junior Caminero,691406,Troy Melton,675512,R,Batter vs Pitcher,4,4,1,0,1,0,0,0.25,0.25,0.25,0.5,25.0,0.0,Small Sample
+New York Mets @ Seattle Mariners,New York Mets,Brett Baty,683146,George Kirby,669923,R,Batter vs Pitcher,4,4,1,0,0,0,1,0.25,0.25,0.25,0.5,0.0,0.0,Small Sample
 Baltimore Orioles @ Boston Red Sox,Boston Red Sox,Carlos Narváez,665966,Chris Bassitt,605135,R,Batter vs Pitcher,4,4,1,0,2,0,0,0.25,0.25,0.25,0.5,50.0,0.0,Small Sample
 Baltimore Orioles @ Boston Red Sox,Boston Red Sox,Jarren Duran,680776,Chris Bassitt,605135,R,Batter vs Pitcher,4,4,0,0,1,0,0,0.0,0.0,0.0,0.0,25.0,0.0,Small Sample
 Texas Rangers @ St. Louis Cardinals,St. Louis Cardinals,Victor Scott II,687363,MacKenzie Gore,669022,L,Batter vs Pitcher,4,4,0,0,3,0,0,0.0,0.0,0.0,0.0,75.0,0.0,Small Sample
 San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Bryce Harper,547180,Walker Buehler,621111,R,Batter vs Pitcher,1,3,1,2,0,1,3,1.0,1.0,4.0,5.0,0.0,66.66666666666666,Small Sample
 Miami Marlins @ Washington Nationals,Washington Nationals,Keibert Ruiz,660688,Max Meyer,676974,R,Batter vs Pitcher,3,3,3,0,0,1,1,1.0,1.0,2.333,3.333,0.0,0.0,Small Sample
-Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Matt Olson,621566,Patrick Corbin,571578,L,Batter vs Pitcher,2,3,2,1,0,0,0,1.0,1.0,1.5,2.5,0.0,33.33333333333333,Small Sample
+New York Mets @ Seattle Mariners,New York Mets,Juan Soto,665742,George Kirby,669923,R,Batter vs Pitcher,3,3,3,0,0,0,1,1.0,1.0,1.0,2.0,0.0,0.0,Small Sample
+San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Brandon Marsh,669016,Walker Buehler,621111,R,Batter vs Pitcher,1,3,1,2,0,0,0,1.0,1.0,1.0,2.0,0.0,66.66666666666666,Small Sample
 New York Mets @ Seattle Mariners,New York Mets,Mark Vientos,668901,George Kirby,669923,R,Batter vs Pitcher,2,3,2,0,0,1,4,1.0,0.667,2.5,3.167,0.0,0.0,Small Sample
 Athletics @ Chicago Cubs,Athletics,Brent Rooker,667670,Colin Rea,607067,R,Batter vs Pitcher,3,3,2,0,0,1,2,0.667,0.667,2.0,2.667,0.0,0.0,Small Sample
 Miami Marlins @ Washington Nationals,Washington Nationals,James Wood,695578,Max Meyer,676974,R,Batter vs Pitcher,2,3,1,1,1,0,0,0.5,0.667,1.0,1.667,33.33333333333333,33.33333333333333,Small Sample
 Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Mike Yastrzemski,573262,Patrick Corbin,571578,L,Batter vs Pitcher,3,3,2,0,1,0,0,0.667,0.667,1.0,1.667,33.33333333333333,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Pittsburgh Pirates,Brandon Lowe,664040,Spencer Arrighetti,681293,R,Batter vs Pitcher,3,3,2,0,1,0,1,0.667,0.667,1.0,1.667,33.33333333333333,0.0,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,Nolan Arenado,571448,Shohei Ohtani,660271,R,Batter vs Pitcher,2,3,1,1,1,0,0,0.5,0.667,1.0,1.667,33.33333333333333,33.33333333333333,Small Sample
-San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Alec Bohm,664761,Walker Buehler,621111,R,Batter vs Pitcher,3,3,2,0,0,0,0,0.667,0.667,0.667,1.334,0.0,0.0,Small Sample
 Athletics @ Chicago Cubs,Athletics,Zack Gelof,680869,Colin Rea,607067,R,Batter vs Pitcher,3,3,2,0,1,0,0,0.667,0.667,0.667,1.334,33.33333333333333,0.0,Small Sample
 Chicago White Sox @ Minnesota Twins,Minnesota Twins,Victor Caratini,605170,Erick Fedde,607200,R,Batter vs Pitcher,2,3,1,1,1,0,0,0.5,0.667,0.5,1.167,33.33333333333333,33.33333333333333,Small Sample
-Baltimore Orioles @ Boston Red Sox,Boston Red Sox,Wilyer Abreu,677800,Chris Bassitt,605135,R,Batter vs Pitcher,2,3,1,1,0,0,0,0.5,0.667,0.5,1.167,0.0,33.33333333333333,Small Sample
-Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Jonathan Aranda,666018,Troy Melton,675512,R,Batter vs Pitcher,1,3,0,2,0,0,0,0.0,0.667,0.0,0.667,0.0,66.66666666666666,Small Sample
 San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,William Contreras,661388,Logan Webb,657277,R,Batter vs Pitcher,1,3,0,2,0,0,0,0.0,0.667,0.0,0.667,0.0,66.66666666666666,Small Sample
 Cleveland Guardians @ New York Yankees,Cleveland Guardians,José Ramírez,608070,Gerrit Cole,543037,R,Batter vs Pitcher,3,3,1,0,1,1,2,0.333,0.333,1.333,1.666,33.33333333333333,0.0,Small Sample
 San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Jackson Chourio,694192,Logan Webb,657277,R,Batter vs Pitcher,3,3,1,0,1,1,2,0.333,0.333,1.333,1.666,33.33333333333333,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Pittsburgh Pirates,Spencer Horwitz,687462,Spencer Arrighetti,681293,R,Batter vs Pitcher,3,3,1,0,0,1,1,0.333,0.333,1.333,1.666,0.0,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Houston Astros,Christian Walker,572233,Paul Skenes,694973,R,Batter vs Pitcher,3,3,1,0,1,1,1,0.333,0.333,1.333,1.666,33.33333333333333,0.0,Small Sample
-San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Brice Turang,668930,Logan Webb,657277,R,Batter vs Pitcher,3,3,1,0,1,0,0,0.333,0.333,1.0,1.333,33.33333333333333,0.0,Small Sample
 Baltimore Orioles @ Boston Red Sox,Boston Red Sox,Trevor Story,596115,Chris Bassitt,605135,R,Batter vs Pitcher,3,3,1,0,1,0,0,0.333,0.333,0.667,1.0,33.33333333333333,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Houston Astros,Yainer Diaz,673237,Paul Skenes,694973,R,Batter vs Pitcher,3,3,1,0,1,0,0,0.333,0.333,0.667,1.0,33.33333333333333,0.0,Small Sample
 Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Jorge Soler,624585,Michael Lorenzen,547179,R,Batter vs Pitcher,3,3,1,0,2,0,2,0.333,0.333,0.667,1.0,66.66666666666666,0.0,Small Sample
@@ -79,12 +86,11 @@ San Diego Padres @ Philadelphia Phillies,San Diego Padres,Nick Castellanos,59220
 Cleveland Guardians @ New York Yankees,New York Yankees,Cody Bellinger,641355,Gavin Williams,668909,R,Batter vs Pitcher,3,3,1,0,0,0,0,0.333,0.333,0.333,0.666,0.0,0.0,Small Sample
 Kansas City Royals @ Cincinnati Reds,Cincinnati Reds,Matt McLain,680574,Stephen Kolek,663568,R,Batter vs Pitcher,3,3,1,0,0,0,0,0.333,0.333,0.333,0.666,0.0,0.0,Small Sample
 San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Garrett Mitchell,669003,Logan Webb,657277,R,Batter vs Pitcher,3,3,1,0,1,0,0,0.333,0.333,0.333,0.666,33.33333333333333,0.0,Small Sample
-San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Luis Rengifo,650859,Logan Webb,657277,R,Batter vs Pitcher,3,3,1,0,0,0,0,0.333,0.333,0.333,0.666,0.0,0.0,Small Sample
 Texas Rangers @ St. Louis Cardinals,Texas Rangers,Josh Smith,669701,Andre Pallante,669467,R,Batter vs Pitcher,3,3,1,0,0,0,0,0.333,0.333,0.333,0.666,0.0,0.0,Small Sample
 Athletics @ Chicago Cubs,Athletics,Lawrence Butler,671732,Colin Rea,607067,R,Batter vs Pitcher,3,3,1,0,0,0,0,0.333,0.333,0.333,0.666,0.0,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Houston Astros,Yordan Alvarez,670541,Paul Skenes,694973,R,Batter vs Pitcher,3,3,1,0,0,0,0,0.333,0.333,0.333,0.666,0.0,0.0,Small Sample
-Pittsburgh Pirates @ Houston Astros,Houston Astros,Jose Altuve,514888,Paul Skenes,694973,R,Batter vs Pitcher,3,3,1,0,0,0,1,0.333,0.333,0.333,0.666,0.0,0.0,Small Sample
 Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Nolan Schanuel,694384,Michael Lorenzen,547179,R,Batter vs Pitcher,3,3,1,0,0,0,0,0.333,0.333,0.333,0.666,0.0,0.0,Small Sample
+Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Freddie Freeman,518692,Zac Gallen,668678,R,Batter vs Pitcher,3,3,1,0,1,0,0,0.333,0.333,0.333,0.666,33.33333333333333,0.0,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Hyeseong Kim,808975,Zac Gallen,668678,R,Batter vs Pitcher,3,3,1,0,1,0,0,0.333,0.333,0.333,0.666,33.33333333333333,0.0,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,Corbin Carroll,682998,Shohei Ohtani,660271,R,Batter vs Pitcher,3,3,1,0,2,0,0,0.333,0.333,0.333,0.666,66.66666666666666,0.0,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,Geraldo Perdomo,672695,Shohei Ohtani,660271,R,Batter vs Pitcher,3,3,1,0,1,0,0,0.333,0.333,0.333,0.666,33.33333333333333,0.0,Small Sample
@@ -94,39 +100,38 @@ Toronto Blue Jays @ Atlanta Braves,Toronto Blue Jays,Andrés Giménez,665926,Gra
 San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Christian Yelich,592885,Logan Webb,657277,R,Batter vs Pitcher,2,3,0,1,0,0,0,0.0,0.333,0.0,0.333,0.0,33.33333333333333,Small Sample
 San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Jake Bauers,641343,Logan Webb,657277,R,Batter vs Pitcher,2,3,0,1,0,0,0,0.0,0.333,0.0,0.333,0.0,33.33333333333333,Small Sample
 Texas Rangers @ St. Louis Cardinals,St. Louis Cardinals,Iván Herrera,671056,MacKenzie Gore,669022,L,Batter vs Pitcher,2,3,0,1,1,0,0,0.0,0.333,0.0,0.333,33.33333333333333,33.33333333333333,Small Sample
+Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Logan O'Hoppe,681351,Michael Lorenzen,547179,R,Batter vs Pitcher,2,3,0,1,1,0,0,0.0,0.333,0.0,0.333,33.33333333333333,33.33333333333333,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,Ketel Marte,606466,Shohei Ohtani,660271,R,Batter vs Pitcher,2,3,0,1,1,0,0,0.0,0.333,0.0,0.333,33.33333333333333,33.33333333333333,Small Sample
+Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,Lourdes Gurriel Jr.,666971,Shohei Ohtani,660271,R,Batter vs Pitcher,2,3,0,1,1,0,0,0.0,0.333,0.0,0.333,33.33333333333333,33.33333333333333,Small Sample
 Miami Marlins @ Washington Nationals,Washington Nationals,CJ Abrams,682928,Max Meyer,676974,R,Batter vs Pitcher,3,3,0,0,1,0,0,0.0,0.0,0.0,0.0,33.33333333333333,0.0,Small Sample
 Miami Marlins @ Washington Nationals,Washington Nationals,Luis García Jr.,671277,Max Meyer,676974,R,Batter vs Pitcher,3,3,0,0,2,0,0,0.0,0.0,0.0,0.0,66.66666666666666,0.0,Small Sample
+Miami Marlins @ Washington Nationals,Washington Nationals,Daylen Lile,695734,Max Meyer,676974,R,Batter vs Pitcher,3,3,0,0,1,0,0,0.0,0.0,0.0,0.0,33.33333333333333,0.0,Small Sample
 Miami Marlins @ Washington Nationals,Washington Nationals,José Tena,677588,Max Meyer,676974,R,Batter vs Pitcher,3,3,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
-Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Chandler Simpson,802415,Troy Melton,675512,R,Batter vs Pitcher,3,3,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
-Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Richie Palacios,680700,Troy Melton,675512,R,Batter vs Pitcher,3,3,0,0,1,0,0,0.0,0.0,0.0,0.0,33.33333333333333,0.0,Small Sample
+Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Ben Williamson,810938,Troy Melton,675512,R,Batter vs Pitcher,3,3,0,0,1,0,0,0.0,0.0,0.0,0.0,33.33333333333333,0.0,Small Sample
 Chicago White Sox @ Minnesota Twins,Minnesota Twins,Josh Bell,605137,Erick Fedde,607200,R,Batter vs Pitcher,3,3,0,0,1,0,0,0.0,0.0,0.0,0.0,33.33333333333333,0.0,Small Sample
-New York Mets @ Seattle Mariners,New York Mets,Bo Bichette,666182,George Kirby,669923,R,Batter vs Pitcher,3,3,0,0,1,0,0,0.0,0.0,0.0,0.0,33.33333333333333,0.0,Small Sample
-San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Adolis García,666969,Walker Buehler,621111,R,Batter vs Pitcher,3,3,0,0,1,0,0,0.0,0.0,0.0,0.0,33.33333333333333,0.0,Small Sample
 Cleveland Guardians @ New York Yankees,Cleveland Guardians,Rhys Hoskins,656555,Gerrit Cole,543037,R,Batter vs Pitcher,3,3,0,0,1,0,0,0.0,0.0,0.0,0.0,33.33333333333333,0.0,Small Sample
 Cleveland Guardians @ New York Yankees,New York Yankees,Paul Goldschmidt,502671,Gavin Williams,668909,R,Batter vs Pitcher,3,3,0,0,3,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
 Cleveland Guardians @ New York Yankees,New York Yankees,Jazz Chisholm Jr.,665862,Gavin Williams,668909,R,Batter vs Pitcher,3,3,0,0,2,0,0,0.0,0.0,0.0,0.0,66.66666666666666,0.0,Small Sample
 Kansas City Royals @ Cincinnati Reds,Cincinnati Reds,TJ Friedl,670770,Stephen Kolek,663568,R,Batter vs Pitcher,3,3,0,0,1,0,0,0.0,0.0,0.0,0.0,33.33333333333333,0.0,Small Sample
-Texas Rangers @ St. Louis Cardinals,Texas Rangers,Brandon Nimmo,607043,Andre Pallante,669467,R,Batter vs Pitcher,3,3,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Texas Rangers @ St. Louis Cardinals,Texas Rangers,Kyle Higashioka,543309,Andre Pallante,669467,R,Batter vs Pitcher,3,3,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Athletics @ Chicago Cubs,Athletics,Shea Langeliers,669127,Colin Rea,607067,R,Batter vs Pitcher,3,3,0,0,2,0,0,0.0,0.0,0.0,0.0,66.66666666666666,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Pittsburgh Pirates,Ryan O'Hearn,656811,Spencer Arrighetti,681293,R,Batter vs Pitcher,3,3,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Houston Astros,Cam Smith,701358,Paul Skenes,694973,R,Batter vs Pitcher,3,3,0,0,2,0,0,0.0,0.0,0.0,0.0,66.66666666666666,0.0,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Shohei Ohtani,660271,Zac Gallen,668678,R,Batter vs Pitcher,3,3,0,0,2,0,0,0.0,0.0,0.0,0.0,66.66666666666666,0.0,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,Gabriel Moreno,672515,Shohei Ohtani,660271,R,Batter vs Pitcher,3,3,0,0,2,0,0,0.0,0.0,0.0,0.0,66.66666666666666,0.0,Small Sample
-San Diego Padres @ Philadelphia Phillies,San Diego Padres,Freddy Fermin,666023,Cristopher Sánchez,650911,L,Batter vs Pitcher,2,2,2,0,0,2,2,1.0,1.0,4.0,5.0,0.0,0.0,Small Sample
 Athletics @ Chicago Cubs,Chicago Cubs,Seiya Suzuki,673548,Jeffrey Springs,605488,L,Batter vs Pitcher,1,2,1,1,0,1,3,1.0,1.0,4.0,5.0,0.0,50.0,Small Sample
 Miami Marlins @ Washington Nationals,Washington Nationals,Jacob Young,696285,Max Meyer,676974,R,Batter vs Pitcher,2,2,2,0,0,0,1,1.0,1.0,1.5,2.5,0.0,0.0,Small Sample
+San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Bryson Stott,681082,Walker Buehler,621111,R,Batter vs Pitcher,2,2,2,0,0,0,3,1.0,1.0,1.0,2.0,0.0,0.0,Small Sample
 Kansas City Royals @ Cincinnati Reds,Cincinnati Reds,Spencer Steer,668715,Stephen Kolek,663568,R,Batter vs Pitcher,1,2,1,1,0,0,0,1.0,1.0,1.0,2.0,0.0,50.0,Small Sample
 Athletics @ Chicago Cubs,Chicago Cubs,Matt Shaw,807713,Jeffrey Springs,605488,L,Batter vs Pitcher,1,2,1,1,0,0,1,1.0,1.0,1.0,2.0,0.0,50.0,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,Alek Thomas,677950,Shohei Ohtani,660271,R,Batter vs Pitcher,2,2,2,0,0,0,0,1.0,1.0,1.0,2.0,0.0,0.0,Small Sample
 Baltimore Orioles @ Boston Red Sox,Baltimore Orioles,Blaze Alexander,677942,Payton Tolle,801139,L,Batter vs Pitcher,0,2,0,2,0,0,0,0.0,1.0,0.0,1.0,0.0,100.0,Small Sample
-San Diego Padres @ Philadelphia Phillies,San Diego Padres,Fernando Tatis Jr.,665487,Cristopher Sánchez,650911,L,Batter vs Pitcher,2,2,1,0,0,1,2,0.5,0.5,2.0,2.5,0.0,0.0,Small Sample
-Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Matt Vierling,663837,Nick Martinez,607259,R,Batter vs Pitcher,2,2,1,0,0,0,0,0.5,0.5,1.0,1.5,0.0,0.0,Small Sample
+Cleveland Guardians @ New York Yankees,New York Yankees,Aaron Judge,592450,Gavin Williams,668909,R,Batter vs Pitcher,2,2,1,0,0,1,1,0.5,0.5,2.0,2.5,0.0,0.0,Small Sample
 Chicago White Sox @ Minnesota Twins,Minnesota Twins,Byron Buxton,621439,Erick Fedde,607200,R,Batter vs Pitcher,2,2,1,0,0,0,0,0.5,0.5,1.0,1.5,0.0,0.0,Small Sample
 Texas Rangers @ St. Louis Cardinals,St. Louis Cardinals,Nolan Gorman,669357,MacKenzie Gore,669022,L,Batter vs Pitcher,2,2,1,0,1,0,0,0.5,0.5,1.0,1.5,50.0,0.0,Small Sample
-Athletics @ Chicago Cubs,Chicago Cubs,Dansby Swanson,621020,Jeffrey Springs,605488,L,Batter vs Pitcher,2,2,1,0,1,0,1,0.5,0.5,1.0,1.5,50.0,0.0,Small Sample
 Chicago White Sox @ Minnesota Twins,Minnesota Twins,Tristan Gray,656484,Erick Fedde,607200,R,Batter vs Pitcher,2,2,1,0,0,0,0,0.5,0.5,0.5,1.0,0.0,0.0,Small Sample
+Chicago White Sox @ Minnesota Twins,Minnesota Twins,Luke Keaschall,807712,Erick Fedde,607200,R,Batter vs Pitcher,2,2,1,0,0,0,0,0.5,0.5,0.5,1.0,0.0,0.0,Small Sample
+New York Mets @ Seattle Mariners,New York Mets,Luis Torrens,620443,George Kirby,669923,R,Batter vs Pitcher,2,2,1,0,0,0,0,0.5,0.5,0.5,1.0,0.0,0.0,Small Sample
 San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Justin Crawford,702222,Walker Buehler,621111,R,Batter vs Pitcher,2,2,1,0,0,0,0,0.5,0.5,0.5,1.0,0.0,0.0,Small Sample
 Baltimore Orioles @ Boston Red Sox,Boston Red Sox,Willson Contreras,575929,Chris Bassitt,605135,R,Batter vs Pitcher,2,2,1,0,0,0,0,0.5,0.5,0.5,1.0,0.0,0.0,Small Sample
 Baltimore Orioles @ Boston Red Sox,Boston Red Sox,Roman Anthony,701350,Chris Bassitt,605135,R,Batter vs Pitcher,2,2,1,0,0,0,0,0.5,0.5,0.5,1.0,0.0,0.0,Small Sample
@@ -146,44 +151,44 @@ Miami Marlins @ Washington Nationals,Miami Marlins,Javier Sanoja,691594,Andrew A
 Miami Marlins @ Washington Nationals,Miami Marlins,Agustín Ramírez,682663,Andrew Alvarez,674841,L,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Miami Marlins @ Washington Nationals,Miami Marlins,Heriberto Hernández,681715,Andrew Alvarez,674841,L,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Miami Marlins @ Washington Nationals,Miami Marlins,Jakob Marsee,805300,Andrew Alvarez,674841,L,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
-Chicago White Sox @ Minnesota Twins,Minnesota Twins,Brooks Lee,686797,Erick Fedde,607200,R,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Chicago White Sox @ Minnesota Twins,Minnesota Twins,Austin Martin,668885,Erick Fedde,607200,R,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
+Chicago White Sox @ Minnesota Twins,Minnesota Twins,Brooks Lee,686797,Erick Fedde,607200,R,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 New York Mets @ Seattle Mariners,Seattle Mariners,Randy Arozarena,668227,Freddy Peralta,642547,R,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
-New York Mets @ Seattle Mariners,Seattle Mariners,Luke Raley,670042,Freddy Peralta,642547,R,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
 New York Mets @ Seattle Mariners,Seattle Mariners,Dominic Canzone,686527,Freddy Peralta,642547,R,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
+New York Mets @ Seattle Mariners,Seattle Mariners,Luke Raley,670042,Freddy Peralta,642547,R,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
 San Diego Padres @ Philadelphia Phillies,San Diego Padres,Jackson Merrill,701538,Cristopher Sánchez,650911,L,Batter vs Pitcher,2,2,0,0,2,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
 San Diego Padres @ Philadelphia Phillies,San Diego Padres,Manny Machado,592518,Cristopher Sánchez,650911,L,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 San Diego Padres @ Philadelphia Phillies,San Diego Padres,Jake Cronenworth,630105,Cristopher Sánchez,650911,L,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
 Cleveland Guardians @ New York Yankees,Cleveland Guardians,Brayan Rocchio,677587,Gerrit Cole,543037,R,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
 Kansas City Royals @ Cincinnati Reds,Cincinnati Reds,Elly De La Cruz,682829,Stephen Kolek,663568,R,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
+San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Sal Frelick,686217,Logan Webb,657277,R,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
 San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,Joey Ortiz,687401,Logan Webb,657277,R,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
-Athletics @ Chicago Cubs,Athletics,Jeff McNeil,643446,Colin Rea,607067,R,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Athletics @ Chicago Cubs,Chicago Cubs,Pete Crow-Armstrong,691718,Jeffrey Springs,605488,L,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Pittsburgh Pirates,Marcell Ozuna,542303,Spencer Arrighetti,681293,R,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Houston Astros,Carlos Correa,621043,Paul Skenes,694973,R,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
 Pittsburgh Pirates @ Houston Astros,Houston Astros,Christian Vázquez,543877,Paul Skenes,694973,R,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Oswald Peraza,672724,Michael Lorenzen,547179,R,Batter vs Pitcher,2,2,0,0,1,0,0,0.0,0.0,0.0,0.0,50.0,0.0,Small Sample
-Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Josh Lowe,666139,Michael Lorenzen,547179,R,Batter vs Pitcher,2,2,0,0,2,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,Alex Freeland,690976,Zac Gallen,668678,R,Batter vs Pitcher,2,2,0,0,2,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
 Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,Ildemaro Vargas,545121,Shohei Ohtani,660271,R,Batter vs Pitcher,2,2,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Riley Greene,682985,Nick Martinez,607259,R,Batter vs Pitcher,1,1,1,0,0,1,2,1.0,1.0,4.0,5.0,0.0,0.0,Small Sample
+Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Matt Vierling,663837,Nick Martinez,607259,R,Batter vs Pitcher,1,1,1,0,0,0,0,1.0,1.0,2.0,3.0,0.0,0.0,Small Sample
 Texas Rangers @ St. Louis Cardinals,Texas Rangers,Jake Burger,669394,Andre Pallante,669467,R,Batter vs Pitcher,1,1,1,0,0,0,2,1.0,1.0,2.0,3.0,0.0,0.0,Small Sample
 Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,Mike Trout,545361,Michael Lorenzen,547179,R,Batter vs Pitcher,1,1,1,0,0,0,0,1.0,1.0,2.0,3.0,0.0,0.0,Small Sample
 Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Gleyber Torres,650402,Nick Martinez,607259,R,Batter vs Pitcher,1,1,1,0,0,0,0,1.0,1.0,1.0,2.0,0.0,0.0,Small Sample
 Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Colt Keith,690993,Nick Martinez,607259,R,Batter vs Pitcher,1,1,1,0,0,0,1,1.0,1.0,1.0,2.0,0.0,0.0,Small Sample
 New York Mets @ Seattle Mariners,New York Mets,Francisco Alvarez,682626,George Kirby,669923,R,Batter vs Pitcher,1,1,1,0,0,0,1,1.0,1.0,1.0,2.0,0.0,0.0,Small Sample
 Toronto Blue Jays @ Atlanta Braves,Toronto Blue Jays,Ernie Clement,676391,Grant Holmes,656550,R,Batter vs Pitcher,1,1,1,0,0,0,0,1.0,1.0,1.0,2.0,0.0,0.0,Small Sample
-Athletics @ Chicago Cubs,Chicago Cubs,Ian Happ,664023,Jeffrey Springs,605488,L,Batter vs Pitcher,1,1,1,0,0,0,1,1.0,1.0,1.0,2.0,0.0,0.0,Small Sample
 Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Cedric Mullins,656775,Troy Melton,675512,R,Batter vs Pitcher,0,1,0,1,0,0,0,0.0,1.0,0.0,1.0,0.0,100.0,Small Sample
-San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Kyle Schwarber,656941,Walker Buehler,621111,R,Batter vs Pitcher,0,1,0,1,0,0,0,0.0,1.0,0.0,1.0,0.0,100.0,Small Sample
 Miami Marlins @ Washington Nationals,Miami Marlins,Xavier Edwards,669364,Andrew Alvarez,674841,L,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
+Miami Marlins @ Washington Nationals,Washington Nationals,Nasim Nuñez,683083,Max Meyer,676974,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Kerry Carpenter,681481,Nick Martinez,607259,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Wenceel Pérez,672761,Nick Martinez,607259,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Zach McKinstry,656716,Nick Martinez,607259,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
-New York Mets @ Seattle Mariners,New York Mets,Brett Baty,683146,George Kirby,669923,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
+New York Mets @ Seattle Mariners,Seattle Mariners,Cole Young,702284,Freddy Peralta,642547,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 New York Mets @ Seattle Mariners,Seattle Mariners,J.P. Crawford,641487,Freddy Peralta,642547,R,Batter vs Pitcher,1,1,0,0,1,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
 San Diego Padres @ Philadelphia Phillies,San Diego Padres,Ty France,664034,Cristopher Sánchez,650911,L,Batter vs Pitcher,1,1,0,0,1,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
 San Diego Padres @ Philadelphia Phillies,San Diego Padres,Xander Bogaerts,593428,Cristopher Sánchez,650911,L,Batter vs Pitcher,1,1,0,0,1,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
+San Diego Padres @ Philadelphia Phillies,San Diego Padres,Ramón Laureano,657656,Cristopher Sánchez,650911,L,Batter vs Pitcher,1,1,0,0,1,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
 San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,Trea Turner,607208,Walker Buehler,621111,R,Batter vs Pitcher,1,1,0,0,1,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
 Kansas City Royals @ Cincinnati Reds,Cincinnati Reds,Nathaniel Lowe,663993,Stephen Kolek,663568,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Kansas City Royals @ Cincinnati Reds,Cincinnati Reds,Tyler Stephenson,663886,Stephen Kolek,663568,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
@@ -193,35 +198,30 @@ Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,Mauricio Dubón,643289,Patrick
 Texas Rangers @ St. Louis Cardinals,Texas Rangers,Joc Pederson,592626,Andre Pallante,669467,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Athletics @ Chicago Cubs,Athletics,Max Muncy,691777,Colin Rea,607067,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Athletics @ Chicago Cubs,Athletics,Tyler Soderstrom,691016,Colin Rea,607067,R,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
-Athletics @ Chicago Cubs,Chicago Cubs,Alex Bregman,608324,Jeffrey Springs,605488,L,Batter vs Pitcher,1,1,0,0,0,0,0,0.0,0.0,0.0,0.0,0.0,0.0,Small Sample
 Athletics @ Chicago Cubs,Chicago Cubs,Nico Hoerner,663538,Jeffrey Springs,605488,L,Batter vs Pitcher,1,1,0,0,1,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
-Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,Lourdes Gurriel Jr.,666971,Shohei Ohtani,660271,R,Batter vs Pitcher,1,1,0,0,1,0,0,0.0,0.0,0.0,0.0,100.0,0.0,Small Sample
 Miami Marlins @ Washington Nationals,Miami Marlins,Liam Hicks,689414,Andrew Alvarez,674841,L,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Miami Marlins @ Washington Nationals,Miami Marlins,Owen Caissie,683357,Andrew Alvarez,674841,L,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Miami Marlins @ Washington Nationals,Miami Marlins,Kyle Stowers,669065,Andrew Alvarez,674841,L,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
-Miami Marlins @ Washington Nationals,Washington Nationals,Daylen Lile,695734,Max Meyer,676974,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Miami Marlins @ Washington Nationals,Washington Nationals,Curtis Mead,678554,Max Meyer,676974,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Miami Marlins @ Washington Nationals,Washington Nationals,Jorbit Vivas,678391,Max Meyer,676974,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Miami Marlins @ Washington Nationals,Washington Nationals,Brady House,691781,Max Meyer,676974,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
-Miami Marlins @ Washington Nationals,Washington Nationals,Nasim Nuñez,683083,Max Meyer,676974,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Miami Marlins @ Washington Nationals,Washington Nationals,Drew Millas,686452,Max Meyer,676974,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,Dillon Dingler,693307,Nick Martinez,607259,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Yandy Díaz,650490,Troy Melton,675512,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
+Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Chandler Simpson,802415,Troy Melton,675512,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
+Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Jonathan Aranda,666018,Troy Melton,675512,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Jonny DeLuca,676356,Troy Melton,675512,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
-Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Ben Williamson,810938,Troy Melton,675512,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Nick Fortes,663743,Troy Melton,675512,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
+Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Richie Palacios,680700,Troy Melton,675512,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,Taylor Walls,670764,Troy Melton,675512,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Chicago White Sox @ Minnesota Twins,Chicago White Sox,Sam Antonacci,803011,Taj Bradley,671737,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Chicago White Sox @ Minnesota Twins,Chicago White Sox,Tristan Peters,671976,Taj Bradley,671737,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Chicago White Sox @ Minnesota Twins,Chicago White Sox,Munetaka Murakami,808959,Taj Bradley,671737,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Chicago White Sox @ Minnesota Twins,Chicago White Sox,Luisangel Acuña,682668,Taj Bradley,671737,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
-Chicago White Sox @ Minnesota Twins,Minnesota Twins,Luke Keaschall,807712,Erick Fedde,607200,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Chicago White Sox @ Minnesota Twins,Minnesota Twins,Kody Clemens,665019,Erick Fedde,607200,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Chicago White Sox @ Minnesota Twins,Minnesota Twins,Royce Lewis,668904,Erick Fedde,607200,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 New York Mets @ Seattle Mariners,New York Mets,Carson Benge,701807,George Kirby,669923,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
-New York Mets @ Seattle Mariners,New York Mets,Luis Torrens,620443,George Kirby,669923,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 New York Mets @ Seattle Mariners,New York Mets,Tyrone Taylor,621438,George Kirby,669923,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
-New York Mets @ Seattle Mariners,Seattle Mariners,Cole Young,702284,Freddy Peralta,642547,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 New York Mets @ Seattle Mariners,Seattle Mariners,Leo Rivas,660844,Freddy Peralta,642547,R,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Baltimore Orioles @ Boston Red Sox,Baltimore Orioles,Samuel Basallo,694212,Payton Tolle,801139,L,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
 Baltimore Orioles @ Boston Red Sox,Baltimore Orioles,Leody Taveras,665750,Payton Tolle,801139,L,Batter vs Pitcher,0,0,0,0,0,0,0,,,,,,,No History
