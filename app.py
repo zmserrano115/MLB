@@ -1,0 +1,573 @@
+# app.py
+
+from datetime import date
+
+import pandas as pd
+import streamlit as st
+
+from src.mlb_schedule import get_daily_schedule
+from src.stat_data import (
+    get_batter_stats,
+    get_pitcher_stats,
+    clear_matchup_cache,
+    get_batter_vs_pitcher_game_log
+)
+from src.matchups import (
+    build_batter_vs_pitcher_matchups,
+    build_batter_vs_hand_matchups,
+    build_pitcher_k_matchups
+)
+
+
+st.set_page_config(
+    page_title="MLB Matchup Finder",
+    layout="wide"
+)
+
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background: linear-gradient(180deg, #040816 0%, #071122 100%);
+    }
+
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+    }
+
+    h1, h2, h3 {
+        letter-spacing: 0.2px;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: rgba(10, 18, 30, 0.55);
+        padding: 8px;
+        border-radius: 14px;
+        border: 1px solid rgba(95, 170, 255, 0.16);
+        backdrop-filter: blur(6px);
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        height: 44px;
+        white-space: nowrap;
+        border-radius: 10px;
+        padding-left: 16px;
+        padding-right: 16px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #d8e7ff;
+        border: 1px solid rgba(120, 170, 255, 0.10);
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: rgba(30, 50, 85, 0.90) !important;
+        color: #7dd3fc !important;
+        border: 1px solid rgba(125, 211, 252, 0.40) !important;
+    }
+
+    div[data-testid="stDataFrame"] {
+        border: 1px solid rgba(120, 170, 255, 0.16);
+        border-radius: 14px;
+        overflow: hidden;
+        background: rgba(8, 14, 24, 0.35);
+        backdrop-filter: blur(6px);
+    }
+
+    div[data-testid="stSidebar"] {
+        background: rgba(7, 15, 28, 0.96);
+    }
+
+    .stButton > button {
+        border-radius: 10px;
+        border: 1px solid rgba(125, 211, 252, 0.25);
+        background: rgba(20, 35, 60, 0.85);
+        color: #e6f1ff;
+    }
+
+    .stButton > button:hover {
+        border-color: rgba(125, 211, 252, 0.50);
+        color: white;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.title("MLB Daily Matchup Finder")
+
+st.write(
+    "Find batter vs pitcher matchups, batter splits against pitcher throwing hand, "
+    "and pitcher strikeout matchups."
+)
+
+
+def row_color_by_grade(row):
+    """
+    Color-codes the entire row based on matchup grade.
+    These colors are brighter and easier to read with black text.
+    """
+    grade = ""
+
+    if "matchup_grade" in row:
+        grade = str(row["matchup_grade"])
+    elif "k_matchup_grade" in row:
+        grade = str(row["k_matchup_grade"])
+
+    grade_lower = grade.lower()
+
+    base_style = (
+        "color: #05070a; "
+        "font-weight: 700; "
+        "border-bottom: 1px solid rgba(0,0,0,0.12); "
+        "font-size: 14px;"
+    )
+
+    if "elite" in grade_lower or "strong" in grade_lower:
+        style = (
+            "background-color: #86efac; "
+            "border-left: 6px solid #16a34a; "
+            + base_style
+        )
+    elif "good" in grade_lower:
+        style = (
+            "background-color: #bbf7d0; "
+            "border-left: 6px solid #22c55e; "
+            + base_style
+        )
+    elif "avoid" in grade_lower:
+        style = (
+            "background-color: #fca5a5; "
+            "border-left: 6px solid #dc2626; "
+            + base_style
+        )
+    elif "neutral" in grade_lower:
+        style = (
+            "background-color: #fde68a; "
+            "border-left: 6px solid #ca8a04; "
+            + base_style
+        )
+    elif "small sample" in grade_lower:
+        style = (
+            "background-color: #bfdbfe; "
+            "border-left: 6px solid #2563eb; "
+            + base_style
+        )
+    elif "no history" in grade_lower:
+        style = (
+            "background-color: #e5e7eb; "
+            "border-left: 6px solid #6b7280; "
+            + base_style
+        )
+    else:
+        style = (
+            "background-color: rgba(15, 23, 42, 0.85); "
+            "color: #e8eef9; "
+            "border-bottom: 1px solid rgba(255,255,255,0.06); "
+            "font-size: 14px;"
+        )
+
+    return [style] * len(row)
+
+
+def style_matchup_table(df):
+    """
+    Applies row colors and number formatting.
+    """
+    if df.empty:
+        return df
+
+    format_dict = {}
+
+    for col in ["AVG", "OBP", "SLG", "OPS"]:
+        if col in df.columns:
+            format_dict[col] = "{:.3f}"
+
+    for col in ["K%", "BB%", "opponent_avg_k%", "k_matchup_score"]:
+        if col in df.columns:
+            format_dict[col] = "{:.2f}"
+
+    styler = df.style.apply(row_color_by_grade, axis=1).format(format_dict, na_rep="")
+
+    styler = styler.set_table_styles(
+        [
+            {
+                "selector": "th",
+                "props": [
+                    ("background-color", "#111827"),
+                    ("color", "#e5f0ff"),
+                    ("font-weight", "700"),
+                    ("font-size", "14px"),
+                    ("border-bottom", "2px solid rgba(125,211,252,0.35)"),
+                    ("padding", "10px 12px")
+                ]
+            },
+            {
+                "selector": "td",
+                "props": [
+                    ("padding", "9px 12px"),
+                    ("white-space", "nowrap")
+                ]
+            }
+        ]
+    )
+
+    return styler
+
+
+def display_bvp_game_log(selected_row, season):
+    """
+    Shows individual game log for selected batter-vs-pitcher matchup.
+    """
+    batter_name = selected_row.get("batter")
+    pitcher_name = selected_row.get("opposing_pitcher")
+    batter_id = selected_row.get("batter_id")
+    pitcher_id = selected_row.get("opposing_pitcher_id")
+
+    st.subheader(f"Game Log: {batter_name} vs {pitcher_name}")
+
+    game_log_df = get_batter_vs_pitcher_game_log(
+        int(batter_id),
+        int(pitcher_id),
+        int(season)
+    )
+
+    if game_log_df.empty:
+        st.warning(
+            "No individual game-log history was found for this matchup."
+        )
+        return
+
+    game_log_cols = [
+        "game_date",
+        "home_away",
+        "team",
+        "opponent",
+        "PA",
+        "AB",
+        "H",
+        "BB",
+        "HBP",
+        "SO",
+        "HR",
+        "RBI",
+        "AVG",
+        "OBP",
+        "SLG",
+        "OPS",
+        "K%",
+        "BB%"
+    ]
+
+    game_log_cols = [
+        col for col in game_log_cols if col in game_log_df.columns
+    ]
+
+    st.dataframe(
+        style_matchup_table(game_log_df[game_log_cols]),
+        width="stretch",
+        hide_index=True
+    )
+
+
+current_year = date.today().year
+
+with st.sidebar:
+    st.header("Filters")
+
+    selected_date = st.date_input("Game Date", value=date.today())
+
+    season = st.selectbox(
+        "Season Data",
+        list(range(current_year, current_year - 26, -1))
+    )
+
+    min_pa = st.number_input(
+        "Minimum Team Season PA to Include Batter",
+        min_value=0,
+        max_value=700,
+        value=100,
+        step=10
+    )
+
+    top_n = st.number_input(
+        "Rows to Show",
+        min_value=5,
+        max_value=100,
+        value=25,
+        step=5
+    )
+
+    force_refresh = st.button("Refresh Baseball Data")
+
+    if st.button("Clear Matchup Cache"):
+        clear_matchup_cache()
+        st.cache_data.clear()
+        st.success("Matchup cache cleared. The app will rebuild matchup data.")
+
+
+@st.cache_data(show_spinner=True)
+def load_schedule(game_date):
+    return get_daily_schedule(str(game_date))
+
+
+@st.cache_data(show_spinner=True)
+def load_batter_stats(season, force_refresh):
+    return get_batter_stats(season, force_refresh=force_refresh)
+
+
+@st.cache_data(show_spinner=True)
+def load_pitcher_stats(season, force_refresh):
+    return get_pitcher_stats(season, force_refresh=force_refresh)
+
+
+schedule_df = load_schedule(selected_date)
+
+if schedule_df.empty:
+    st.warning("No MLB games found for this date.")
+    st.stop()
+
+
+batters_df = load_batter_stats(season, force_refresh)
+pitchers_df = load_pitcher_stats(season, force_refresh)
+
+
+st.header("Today's Games and Probable Pitchers")
+
+schedule_display_cols = [
+    "away_team",
+    "home_team",
+    "away_probable_pitcher",
+    "away_pitcher_hand",
+    "home_probable_pitcher",
+    "home_pitcher_hand"
+]
+
+schedule_display_cols = [
+    col for col in schedule_display_cols if col in schedule_df.columns
+]
+
+st.dataframe(
+    schedule_df[schedule_display_cols],
+    width="stretch",
+    hide_index=True
+)
+
+
+st.header("Final Answer Area")
+
+with st.spinner("Building batter vs pitcher matchups... first run may take a few minutes."):
+    bvp_matchups = build_batter_vs_pitcher_matchups(
+        schedule_df=schedule_df,
+        batters_df=batters_df,
+        season=season,
+        min_pa=min_pa
+    )
+
+with st.spinner("Building batter vs pitcher hand matchups..."):
+    hand_matchups = build_batter_vs_hand_matchups(
+        schedule_df=schedule_df,
+        batters_df=batters_df,
+        season=season,
+        min_pa=min_pa
+    )
+
+with st.spinner("Building pitcher strikeout matchups..."):
+    pitcher_k_matchups = build_pitcher_k_matchups(
+        schedule_df=schedule_df,
+        batters_df=batters_df,
+        pitchers_df=pitchers_df,
+        min_pa=min_pa
+    )
+
+
+batter_cols = [
+    "game",
+    "team",
+    "batter",
+    "opposing_pitcher",
+    "opposing_pitcher_hand",
+    "split",
+    "PA",
+    "AB",
+    "H",
+    "BB",
+    "SO",
+    "HR",
+    "RBI",
+    "AVG",
+    "OBP",
+    "SLG",
+    "OPS",
+    "K%",
+    "BB%",
+    "matchup_grade"
+]
+
+
+tab1, tab2, tab3 = st.tabs([
+    "Batter vs Opposing Pitcher",
+    "Batter vs Pitcher Hand",
+    "Pitcher Strikeout Matchups"
+])
+
+
+with tab1:
+    st.subheader("Batter vs Opposing Pitcher")
+    st.write(
+        "This section shows each hitter's direct history against today's opposing probable pitcher."
+    )
+
+    if bvp_matchups.empty:
+        st.warning("No batter vs pitcher matchup data was found.")
+    else:
+        available_cols = [
+            col for col in batter_cols if col in bvp_matchups.columns
+        ]
+
+        min_bvp_pa = st.slider(
+            "Minimum PA vs Opposing Pitcher",
+            min_value=0,
+            max_value=50,
+            value=0,
+            step=1
+        )
+
+        filtered_bvp = bvp_matchups[
+            bvp_matchups["PA"] >= min_bvp_pa
+        ].copy()
+
+        filtered_bvp = filtered_bvp.head(int(top_n))
+
+        st.write("Click one row below to view its individual game-log history.")
+
+        bvp_event = st.dataframe(
+            style_matchup_table(filtered_bvp[available_cols]),
+            width="stretch",
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="bvp_table"
+        )
+
+        selected_row = None
+
+        try:
+            selected_rows = bvp_event.selection.rows
+
+            if selected_rows:
+                selected_row = filtered_bvp.iloc[selected_rows[0]]
+        except Exception:
+            selected_row = None
+
+        st.divider()
+
+        if selected_row is not None:
+            display_bvp_game_log(selected_row, season)
+        else:
+            st.info("Select a batter-vs-pitcher row above to view the game log.")
+
+
+with tab2:
+    st.subheader("Batter vs Pitcher Throwing Hand")
+    st.write(
+        "This section shows each hitter's split against the same throwing hand "
+        "as today's opposing probable pitcher."
+    )
+
+    if hand_matchups.empty:
+        st.warning("No batter vs pitcher-hand split data was found.")
+    else:
+        available_cols = [
+            col for col in batter_cols if col in hand_matchups.columns
+        ]
+
+        min_hand_pa = st.slider(
+            "Minimum PA vs Pitcher Hand",
+            min_value=0,
+            max_value=300,
+            value=20,
+            step=5
+        )
+
+        min_hand_obp = st.slider(
+            "Minimum OBP vs Pitcher Hand",
+            min_value=0.150,
+            max_value=0.500,
+            value=0.320,
+            step=0.005
+        )
+
+        filtered_hand = hand_matchups[
+            (hand_matchups["PA"] >= min_hand_pa) &
+            (hand_matchups["OBP"] >= min_hand_obp)
+        ].copy()
+
+        filtered_hand = filtered_hand.head(int(top_n))
+
+        st.dataframe(
+            style_matchup_table(filtered_hand[available_cols]),
+            width="stretch",
+            hide_index=True
+        )
+
+
+with tab3:
+    st.subheader("Best Pitcher Strikeout Matchups")
+
+    if pitcher_k_matchups.empty:
+        st.warning("No pitcher strikeout matchups were created.")
+    else:
+        k_cols = [
+            "game",
+            "pitcher",
+            "pitcher_team",
+            "pitcher_hand",
+            "opponent",
+            "IP",
+            "ERA",
+            "WHIP",
+            "K%",
+            "K/9",
+            "opponent_avg_k%",
+            "k_matchup_score",
+            "k_matchup_grade"
+        ]
+
+        k_cols = [
+            col for col in k_cols if col in pitcher_k_matchups.columns
+        ]
+
+        filtered_k = pitcher_k_matchups.head(int(top_n)).copy()
+
+        st.dataframe(
+            style_matchup_table(filtered_k[k_cols]),
+            width="stretch",
+            hide_index=True
+        )
+
+
+st.header("How the Matchup Tables Work")
+
+st.markdown(
+    """
+    **Batter vs Opposing Pitcher**
+    - Direct hitter history against today's probable pitcher.
+    - Click a row to see the individual game-log history.
+
+    **Batter vs Pitcher Hand**
+    - Hitter split against right-handed or left-handed pitchers.
+    - Usually more reliable than direct batter-vs-pitcher history.
+
+    **Pitcher Strikeout Matchups**
+    - Uses pitcher K ability and opponent hitter strikeout tendencies.
+
+    **Row Colors**
+    - Dark green = Strong or Elite
+    - Light green = Good
+    - Yellow = Neutral
+    - Red = Avoid
+    - Blue = Small Sample
+    - Gray = No History
+    """
+)
