@@ -1,10 +1,10 @@
 game_date,game_pk,away_team,away_team_id,home_team,home_team_id,away_probable_pitcher,away_probable_pitcher_id,away_pitcher_hand,home_probable_pitcher,home_probable_pitcher_id,home_pitcher_hand
-2026-06-04,823457,San Diego Padres,135,Philadelphia Phillies,143,Lucas Giolito,608337.0,R,Zack Wheeler,554430,R
-2026-06-04,824753,Baltimore Orioles,110,Boston Red Sox,111,Trevor Rogers,669432.0,L,Brayan Bello,678394,R
-2026-06-04,823542,Cleveland Guardians,114,New York Yankees,147,Slade Cecconi,677944.0,R,Carlos Rodón,607074,L
-2026-06-04,823779,San Francisco Giants,137,Milwaukee Brewers,158,Adrian Houser,605288.0,R,Coleman Crow,689441,R
-2026-06-04,824919,Toronto Blue Jays,141,Atlanta Braves,144,,,,Chris Sale,519242,L
-2026-06-04,823698,Kansas City Royals,118,Minnesota Twins,142,Seth Lugo,607625.0,R,Andrew Morris,702193,R
-2026-06-04,824672,Athletics,133,Chicago Cubs,112,J.T. Ginn,669372.0,R,Shota Imanaga,684007,L
-2026-06-04,824185,Pittsburgh Pirates,134,Houston Astros,117,Jared Jones,683003.0,R,Kai-Wei Teng,678906,R
-2026-06-04,825076,Los Angeles Dodgers,119,Arizona Diamondbacks,109,Justin Wrobleski,680736.0,L,Ryne Nelson,669194,R
+2026-06-04,823457,San Diego Padres,135,Philadelphia Phillies,143,Lucas Giolito,608337,R,Zack Wheeler,554430,R
+2026-06-04,824753,Baltimore Orioles,110,Boston Red Sox,111,Trevor Rogers,669432,L,Brayan Bello,678394,R
+2026-06-04,823542,Cleveland Guardians,114,New York Yankees,147,Slade Cecconi,677944,R,Carlos Rodón,607074,L
+2026-06-04,823779,San Francisco Giants,137,Milwaukee Brewers,158,Adrian Houser,605288,R,Coleman Crow,689441,R
+2026-06-04,824919,Toronto Blue Jays,141,Atlanta Braves,144,Mason Fluharty,689254,L,Chris Sale,519242,L
+2026-06-04,823698,Kansas City Royals,118,Minnesota Twins,142,Seth Lugo,607625,R,Andrew Morris,702193,R
+2026-06-04,824672,Athletics,133,Chicago Cubs,112,J.T. Ginn,669372,R,Shota Imanaga,684007,L
+2026-06-04,824185,Pittsburgh Pirates,134,Houston Astros,117,Jared Jones,683003,R,Kai-Wei Teng,678906,R
+2026-06-04,825076,Los Angeles Dodgers,119,Arizona Diamondbacks,109,Justin Wrobleski,680736,L,Ryne Nelson,669194,R
