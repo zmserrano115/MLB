@@ -12,7 +12,6 @@ from src.mlb_schedule import get_daily_schedule
 from src.stat_data import (
     get_batter_stats,
     get_pitcher_stats,
-    clear_matchup_cache,
     get_batter_vs_pitcher_game_log
 )
 from src.matchups import (
@@ -102,6 +101,7 @@ st.markdown(
         border: 1px solid rgba(125, 211, 252, 0.22);
         border-radius: 14px;
         padding: 14px 18px;
+        margin-top: 20px;
         margin-bottom: 18px;
     }
     </style>
@@ -119,10 +119,6 @@ st.write(
 
 
 def read_precomputed_csv(file_name):
-    """
-    Reads a precomputed CSV file if it exists.
-    Returns an empty DataFrame if missing or empty.
-    """
     file_path = PRECOMPUTED_DIR / file_name
 
     if not file_path.exists():
@@ -137,9 +133,6 @@ def read_precomputed_csv(file_name):
 
 
 def read_precomputed_metadata():
-    """
-    Reads latest refresh metadata if it exists.
-    """
     file_path = PRECOMPUTED_DIR / "latest_metadata.json"
 
     if not file_path.exists():
@@ -153,9 +146,6 @@ def read_precomputed_metadata():
 
 
 def precomputed_files_available():
-    """
-    Checks whether the main precomputed cloud data files exist.
-    """
     required_files = [
         PRECOMPUTED_DIR / "latest_schedule.csv",
         PRECOMPUTED_DIR / "latest_batter_vs_pitcher.csv",
@@ -167,9 +157,6 @@ def precomputed_files_available():
 
 
 def load_precomputed_data():
-    """
-    Loads all precomputed data files.
-    """
     schedule_df = read_precomputed_csv("latest_schedule.csv")
     bvp_matchups = read_precomputed_csv("latest_batter_vs_pitcher.csv")
     hand_matchups = read_precomputed_csv("latest_batter_vs_hand.csv")
@@ -180,9 +167,6 @@ def load_precomputed_data():
 
 
 def row_color_by_grade(row):
-    """
-    Color-codes the entire row based on matchup grade.
-    """
     grade = ""
 
     if "matchup_grade" in row:
@@ -247,9 +231,6 @@ def row_color_by_grade(row):
 
 
 def style_matchup_table(df):
-    """
-    Applies row colors and number formatting.
-    """
     if df.empty:
         return df
 
@@ -292,9 +273,6 @@ def style_matchup_table(df):
 
 
 def display_bvp_game_log(selected_row, season):
-    """
-    Shows individual career game log for selected batter-vs-pitcher matchup.
-    """
     batter_name = selected_row.get("batter")
     pitcher_name = selected_row.get("opposing_pitcher")
     batter_id = selected_row.get("batter_id")
@@ -385,11 +363,6 @@ with st.sidebar:
 
     force_refresh = st.button("Refresh Baseball Data")
 
-    if st.button("Clear Matchup Cache"):
-        clear_matchup_cache()
-        st.cache_data.clear()
-        st.success("Matchup cache cleared. The app will rebuild matchup data.")
-
 
 @st.cache_data(show_spinner=True)
 def load_schedule(game_date):
@@ -406,23 +379,22 @@ def load_pitcher_stats(season, force_refresh):
     return get_pitcher_stats(season, force_refresh=force_refresh)
 
 
+cloud_status_html = ""
+
 if use_precomputed and has_precomputed:
     schedule_df, bvp_matchups, hand_matchups, pitcher_k_matchups, metadata = load_precomputed_data()
 
     season = int(metadata.get("season", season))
 
-    st.markdown(
-        f"""
-        <div class="cloud-box">
-            <b>Cloud Data Mode:</b> Using precomputed GitHub Actions data.<br>
-            <b>Last refreshed:</b> {metadata.get("last_refreshed", "Unknown")}<br>
-            <b>Game date:</b> {metadata.get("game_date", "Unknown")} |
-            <b>Season:</b> {metadata.get("season", "Unknown")} |
-            <b>Minimum PA:</b> {metadata.get("minimum_pa", "Unknown")}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    cloud_status_html = f"""
+    <div class="cloud-box">
+        <b>Cloud Data Mode:</b> Using precomputed GitHub Actions data.<br>
+        <b>Last refreshed:</b> {metadata.get("last_refreshed", "Unknown")}<br>
+        <b>Game date:</b> {metadata.get("game_date", "Unknown")} |
+        <b>Season:</b> {metadata.get("season", "Unknown")} |
+        <b>Minimum PA:</b> {metadata.get("minimum_pa", "Unknown")}
+    </div>
+    """
 
 else:
     if use_precomputed and not has_precomputed:
@@ -439,7 +411,12 @@ else:
     batters_df = load_batter_stats(season, force_refresh)
     pitchers_df = load_pitcher_stats(season, force_refresh)
 
-    st.info("Live Data Mode: Building data directly from MLB sources.")
+    cloud_status_html = """
+    <div class="cloud-box">
+        <b>Live Data Mode:</b> Building data directly from MLB sources.<br>
+        This mode may take longer because the app is not using precomputed cloud files.
+    </div>
+    """
 
     with st.spinner("Building batter vs pitcher matchups... first run may take a few minutes."):
         bvp_matchups = build_batter_vs_pitcher_matchups(
@@ -492,6 +469,8 @@ st.dataframe(
     hide_index=True
 )
 
+
+st.header("Final Answer Area")
 
 
 batter_cols = [
@@ -676,7 +655,7 @@ st.markdown(
     - Uses pitcher K ability and opponent hitter strikeout tendencies.
 
     **Row Colors**
-    - Bright green = Strong or Elite
+    - Dark green = Strong or Elite
     - Light green = Good
     - Yellow = Neutral
     - Red = Avoid
@@ -684,3 +663,6 @@ st.markdown(
     - Gray = No History
     """
 )
+
+st.header("Data Refresh Status")
+st.markdown(cloud_status_html, unsafe_allow_html=True)
