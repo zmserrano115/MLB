@@ -48,6 +48,91 @@ def find_player_row(df, player_name):
     return None
 
 
+def safe_number(value, default=np.nan):
+    value = pd.to_numeric(value, errors="coerce")
+
+    if pd.isna(value):
+        return default
+
+    return float(value)
+
+
+def parse_baseball_ip(ip_value):
+    """
+    Converts baseball innings format into real decimal innings.
+
+    MLB often stores innings like:
+    5.1 = 5 and 1/3 innings
+    5.2 = 5 and 2/3 innings
+
+    This converts:
+    5.1 -> 5.333
+    5.2 -> 5.667
+    """
+    if pd.isna(ip_value):
+        return np.nan
+
+    ip_str = str(ip_value)
+
+    if "." not in ip_str:
+        return safe_number(ip_str)
+
+    whole, partial = ip_str.split(".", 1)
+
+    whole = safe_number(whole, default=0)
+
+    if partial == "1":
+        return whole + (1 / 3)
+    elif partial == "2":
+        return whole + (2 / 3)
+    else:
+        return safe_number(ip_value)
+
+
+def estimate_projected_ip(pitcher_row):
+    """
+    Estimates how many innings a starting pitcher is likely to pitch today.
+
+    It uses:
+    season IP / games started
+
+    Then caps it to a realistic starter range.
+    """
+    season_ip = parse_baseball_ip(pitcher_row.get("IP", np.nan))
+    games_started = safe_number(pitcher_row.get("GS", np.nan))
+
+    if pd.isna(season_ip) or pd.isna(games_started) or games_started <= 0:
+        return 5.0
+
+    avg_ip_per_start = season_ip / games_started
+
+    # Realistic daily starter range.
+    projected_ip = min(max(avg_ip_per_start, 3.5), 7.0)
+
+    return projected_ip
+
+
+def estimate_projected_pitch_count(pitcher_row):
+    """
+    Estimates expected pitch count using season pitches / games started.
+
+    If pitches are not available, it estimates based on projected innings.
+    """
+    pitches = safe_number(pitcher_row.get("Pitches", np.nan))
+    games_started = safe_number(pitcher_row.get("GS", np.nan))
+
+    if not pd.isna(pitches) and not pd.isna(games_started) and games_started > 0:
+        avg_pitches = pitches / games_started
+        return min(max(avg_pitches, 55), 105)
+
+    projected_ip = estimate_projected_ip(pitcher_row)
+
+    # Rough estimate: 15 pitches per inning.
+    estimated_pitches = projected_ip * 15
+
+    return min(max(estimated_pitches, 55), 105)
+
+
 def grade_hitter_score(score):
     if score >= 75:
         return "Elite Matchup"
@@ -128,12 +213,24 @@ def score_hitter_matchups(batter_df, opposing_pitcher_row=None):
 
 
 def score_pitcher_k_matchup(pitcher_row, opposing_batters):
+    """
+    Scores one pitcher against the opposing team's hitters for strikeout upside.
+
+    Important:
+    This no longer treats season IP as today's projected innings.
+    It calculates projected innings using season IP / games started.
+    """
     if pitcher_row is None or opposing_batters.empty:
         return None
 
-    pitcher_k_pct = pitcher_row.get("K%", np.nan)
-    pitcher_k9 = pitcher_row.get("K/9", np.nan)
-    pitcher_swstr = pitcher_row.get("SwStr%", np.nan)
+    pitcher_k_pct = safe_number(pitcher_row.get("K%", np.nan))
+    pitcher_k9 = safe_number(pitcher_row.get("K/9", np.nan))
+    pitcher_swstr = safe_number(pitcher_row.get("SwStr%", np.nan))
+
+    season_ip = parse_baseball_ip(pitcher_row.get("IP", np.nan))
+    games_started = safe_number(pitcher_row.get("GS", np.nan))
+    projected_ip = estimate_projected_ip(pitcher_row)
+    projected_pitch_count = estimate_projected_pitch_count(pitcher_row)
 
     opponent_avg_k_pct = opposing_batters["K%"].mean()
 
@@ -154,10 +251,27 @@ def score_pitcher_k_matchup(pitcher_row, opposing_batters):
         opponent_k_score * 0.20
     )
 
+    opponent_k_adjustment = 1
+
+    if not pd.isna(opponent_avg_k_pct):
+        # 22% is a rough neutral team K-rate reference.
+        opponent_k_adjustment = opponent_avg_k_pct / 22
+
+    projected_ks = (pitcher_k9 * projected_ip / 9) * opponent_k_adjustment
+
     return {
         "pitcher": pitcher_row.get("Name"),
         "pitcher_team": pitcher_row.get("Team"),
-        "IP": pitcher_row.get("IP"),
+
+        # Season workload, not today's projection.
+        "Season IP": season_ip,
+        "GS": games_started,
+
+        # Today's estimated workload.
+        "Projected IP": projected_ip,
+        "Projected Pitch Count": projected_pitch_count,
+        "Projected Ks": projected_ks,
+
         "ERA": pitcher_row.get("ERA"),
         "WHIP": pitcher_row.get("WHIP"),
         "K%": pitcher_k_pct,
