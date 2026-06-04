@@ -1,0 +1,128 @@
+name: All Rise Data Refresh
+
+on:
+  schedule:
+    # Morning refresh
+    - cron: "30 12 * * *"
+
+    # Midday refresh
+    - cron: "30 18 * * *"
+
+  workflow_dispatch:
+    inputs:
+      min_pa:
+        description: "Minimum season PA to include hitters"
+        required: false
+        default: "100"
+      build_game_logs:
+        description: "Preload Batter vs Pitcher career game logs"
+        required: false
+        default: "true"
+      max_game_logs:
+        description: "Maximum number of BvP game logs to preload"
+        required: false
+        default: "50"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: all-rise-data-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run MLB refresh
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MIN_PA="${{ github.event.inputs.min_pa }}"
+            BUILD_GAME_LOGS="${{ github.event.inputs.build_game_logs }}"
+            MAX_GAME_LOGS="${{ github.event.inputs.max_game_logs }}"
+          else
+            MIN_PA="100"
+            BUILD_GAME_LOGS="true"
+            MAX_GAME_LOGS="50"
+          fi
+
+          if [ "$BUILD_GAME_LOGS" = "true" ]; then
+            python refresh_nightly.py --min-pa "$MIN_PA" --build-game-logs --max-game-logs "$MAX_GAME_LOGS"
+          else
+            python refresh_nightly.py --min-pa "$MIN_PA"
+          fi
+
+      - name: Save refreshed files temporarily
+        run: |
+          mkdir -p /tmp/refreshed_data
+
+          if [ -d "data/precomputed" ]; then
+            cp -r data/precomputed /tmp/refreshed_data/precomputed
+          fi
+
+          if [ -f "data/matchup_cache.json" ]; then
+            cp data/matchup_cache.json /tmp/refreshed_data/matchup_cache.json
+          fi
+
+      - name: Commit refreshed data safely
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3
+          do
+            echo "Push attempt $attempt"
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            mkdir -p data
+
+            if [ -d "/tmp/refreshed_data/precomputed" ]; then
+              rm -rf data/precomputed
+              cp -r /tmp/refreshed_data/precomputed data/precomputed
+            fi
+
+            if [ -f "/tmp/refreshed_data/matchup_cache.json" ]; then
+              cp /tmp/refreshed_data/matchup_cache.json data/matchup_cache.json
+            fi
+
+            git add data/precomputed/
+            git add data/matchup_cache.json || true
+
+            if git diff --cached --quiet; then
+              echo "No refreshed data changes to commit."
+              exit 0
+            fi
+
+            git commit -m "Refresh MLB matchup data"
+
+            if git push origin main; then
+              echo "Push succeeded."
+              exit 0
+            fi
+
+            echo "Push failed. Retrying..."
+            sleep 5
+          done
+
+          echo "Failed to push after 3 attempts."
+          exit 1
