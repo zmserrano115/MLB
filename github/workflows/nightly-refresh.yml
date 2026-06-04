@@ -1,8 +1,14 @@
-name: Nightly MLB Data Refresh
+name: MLB Data Refresh
 
 on:
   schedule:
-    - cron: "30 11 * * *"
+    # Morning refresh: catches the day's schedule and early probable pitchers.
+    - cron: "30 6 * * *"
+      timezone: "America/Denver"
+
+    # Midday refresh: catches lineup/probable pitcher changes closer to game time.
+    - cron: "30 12 * * *"
+      timezone: "America/Denver"
 
   workflow_dispatch:
     inputs:
@@ -21,6 +27,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: mlb-data-refresh
+  cancel-in-progress: true
 
 jobs:
   refresh-data:
@@ -41,7 +51,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run nightly MLB refresh
+      - name: Run MLB refresh
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MIN_PA="${{ github.event.inputs.min_pa }}"
@@ -70,6 +80,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No refreshed data changes to commit."
           else
-            git commit -m "Nightly MLB data refresh"
+            git commit -m "Refresh MLB matchup data"
             git push
           fi
