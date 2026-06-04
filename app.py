@@ -493,7 +493,7 @@ st.dataframe(
 )
 
 
-st.header("Final Answer Area")
+st.header(" ")
 
 
 batter_cols = [
@@ -666,10 +666,6 @@ st.header("How the Matchup Tables Work")
 
 st.markdown(
     """
-    **Cloud Precomputed Data**
-    - GitHub Actions can refresh the data every morning.
-    - The public website reads saved CSV files instead of rebuilding everything for each user.
-
     **Batter vs Opposing Pitcher**
     - Direct hitter history against today's probable pitcher.
     - Click a row to see the career matchup game log.
@@ -682,7 +678,7 @@ st.markdown(
     - Uses pitcher K ability and opponent hitter strikeout tendencies.
 
     **Row Colors**
-    - Dark green = Strong or Elite
+    - Bright green = Strong or Elite
     - Light green = Good
     - Yellow = Neutral
     - Red = Avoid
