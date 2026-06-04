@@ -469,10 +469,6 @@ st.dataframe(
     hide_index=True
 )
 
-
-st.header("Final Answer Area")
-
-
 batter_cols = [
     "game",
     "team",
