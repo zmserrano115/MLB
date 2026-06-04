@@ -1,16 +1,10 @@
 game_date,game_pk,away_team,away_team_id,home_team,home_team_id,away_probable_pitcher,away_probable_pitcher_id,away_pitcher_hand,home_probable_pitcher,home_probable_pitcher_id,home_pitcher_hand
-2026-06-03,822727,Miami Marlins,146,Washington Nationals,120,Max Meyer,676974,R,Andrew Alvarez,674841,L
-2026-06-03,822973,Detroit Tigers,116,Tampa Bay Rays,139,Troy Melton,675512,R,Nick Martinez,607259,R
-2026-06-03,823701,Chicago White Sox,145,Minnesota Twins,142,Erick Fedde,607200,R,Taj Bradley,671737,R
-2026-06-03,823130,New York Mets,121,Seattle Mariners,136,Freddy Peralta,642547,R,George Kirby,669923,R
-2026-06-03,823456,San Diego Padres,135,Philadelphia Phillies,143,Walker Buehler,621111,R,Cristopher Sánchez,650911,L
-2026-06-03,824755,Baltimore Orioles,110,Boston Red Sox,111,Chris Bassitt,605135,R,Payton Tolle,801139,L
-2026-06-03,823540,Cleveland Guardians,114,New York Yankees,147,Gavin Williams,668909,R,Gerrit Cole,543037,R
-2026-06-03,824509,Kansas City Royals,118,Cincinnati Reds,113,Stephen Kolek,663568,R,Chase Burns,695505,R
-2026-06-03,824917,Toronto Blue Jays,141,Atlanta Braves,144,Patrick Corbin,571578,L,Grant Holmes,656550,R
-2026-06-03,823780,San Francisco Giants,137,Milwaukee Brewers,158,Logan Webb,657277,R,Robert Gasser,688107,L
-2026-06-03,823051,Texas Rangers,140,St. Louis Cardinals,138,MacKenzie Gore,669022,L,Andre Pallante,669467,R
-2026-06-03,824671,Athletics,133,Chicago Cubs,112,Jeffrey Springs,605488,L,Colin Rea,607067,R
-2026-06-03,824188,Pittsburgh Pirates,134,Houston Astros,117,Paul Skenes,694973,R,Spencer Arrighetti,681293,R
-2026-06-03,824024,Colorado Rockies,115,Los Angeles Angels,108,Michael Lorenzen,547179,R,Walbert Ureña,700712,R
-2026-06-03,825077,Los Angeles Dodgers,119,Arizona Diamondbacks,109,Shohei Ohtani,660271,R,Zac Gallen,668678,R
+2026-06-04,823457,San Diego Padres,135,Philadelphia Phillies,143,Lucas Giolito,608337.0,R,Zack Wheeler,554430,R
+2026-06-04,824753,Baltimore Orioles,110,Boston Red Sox,111,Trevor Rogers,669432.0,L,Brayan Bello,678394,R
+2026-06-04,823542,Cleveland Guardians,114,New York Yankees,147,Slade Cecconi,677944.0,R,Carlos Rodón,607074,L
+2026-06-04,823779,San Francisco Giants,137,Milwaukee Brewers,158,Adrian Houser,605288.0,R,Coleman Crow,689441,R
+2026-06-04,824919,Toronto Blue Jays,141,Atlanta Braves,144,,,,Chris Sale,519242,L
+2026-06-04,823698,Kansas City Royals,118,Minnesota Twins,142,Seth Lugo,607625.0,R,Andrew Morris,702193,R
+2026-06-04,824672,Athletics,133,Chicago Cubs,112,J.T. Ginn,669372.0,R,Shota Imanaga,684007,L
+2026-06-04,824185,Pittsburgh Pirates,134,Houston Astros,117,Jared Jones,683003.0,R,Kai-Wei Teng,678906,R
+2026-06-04,825076,Los Angeles Dodgers,119,Arizona Diamondbacks,109,Justin Wrobleski,680736.0,L,Ryne Nelson,669194,R

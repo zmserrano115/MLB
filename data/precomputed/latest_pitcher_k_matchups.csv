@@ -1,31 +1,18 @@
 pitcher,pitcher_team,IP,ERA,WHIP,K%,K/9,SwStr%,opponent_avg_k%,k_matchup_score,k_matchup_grade,game,opponent,pitcher_hand
-Cristopher Sánchez,,79.1,1.47,1.12,29.411764705882355,10.78,,22.938743360726058,60.415783340541125,Good K Matchup,San Diego Padres @ Philadelphia Phillies,San Diego Padres,L
-Gavin Williams,,76.1,3.07,1.09,29.042904290429046,10.38,,22.635918727124505,57.376502091315075,Good K Matchup,Cleveland Guardians @ New York Yankees,New York Yankees,R
-Payton Tolle,,41.1,2.61,0.9,28.57142857142857,10.02,,23.814870847979744,56.73206765979817,Good K Matchup,Baltimore Orioles @ Boston Red Sox,Baltimore Orioles,L
-Chase Burns,,64.1,1.96,0.96,28.915662650602407,10.07,,22.001727912863124,54.72845864050303,Neutral,Kansas City Royals @ Cincinnati Reds,Kansas City Royals,R
-Paul Skenes,,65.1,2.89,0.86,29.411764705882355,10.33,,19.59754761545978,52.972123765097336,Neutral,Pittsburgh Pirates @ Houston Astros,Houston Astros,R
-Taj Bradley,,60.2,3.56,1.32,26.81992337164751,10.38,,22.961230766056847,52.68814548455948,Neutral,Chicago White Sox @ Minnesota Twins,Chicago White Sox,R
-Shohei Ohtani,,55.0,0.82,0.82,28.638497652582164,9.98,,20.21482375642128,50.72313210991506,Neutral,Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,R
-Max Meyer,,73.2,2.81,1.05,26.910299003322258,9.9,,20.895838980535803,47.45847438714146,Neutral,Miami Marlins @ Washington Nationals,Washington Nationals,R
-Andrew Alvarez,,20.1,3.54,1.23,26.82926829268293,9.74,,21.232870682232424,47.16286672768054,Neutral,Miami Marlins @ Washington Nationals,Miami Marlins,L
-MacKenzie Gore,,61.1,3.96,1.19,25.291828793774318,9.54,,22.010280914879345,44.007712412111026,Avoid,Texas Rangers @ St. Louis Cardinals,St. Louis Cardinals,L
-Freddy Peralta,,70.1,3.45,1.34,23.934426229508198,9.34,,22.69754743403626,41.12593489086404,Avoid,New York Mets @ Seattle Mariners,Seattle Mariners,R
-Gerrit Cole,,12.2,0.0,0.71,26.666666666666668,8.53,,20.37749683717786,40.312984924708196,Avoid,Cleveland Guardians @ New York Yankees,Cleveland Guardians,R
-Walbert Ureña,,44.1,2.44,1.38,21.1340206185567,8.32,,23.96248050210828,32.394966998157024,Avoid,Colorado Rockies @ Los Angeles Angels,Colorado Rockies,R
-Spencer Arrighetti,,47.0,1.34,1.13,21.71717171717172,8.23,,22.328111767134615,30.66813933856958,Avoid,Pittsburgh Pirates @ Houston Astros,Pittsburgh Pirates,R
-Grant Holmes,,57.0,3.95,1.33,21.721311475409834,8.37,,19.28714493577251,26.19293522725183,Avoid,Toronto Blue Jays @ Atlanta Braves,Toronto Blue Jays,R
-Logan Webb,,52.1,4.82,1.39,20.614035087719298,8.08,,20.936287892939177,25.127817282865603,Avoid,San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,R
-Jeffrey Springs,,66.1,4.07,1.19,20.577617328519857,7.73,,20.85644225276305,23.450719037396905,Avoid,Athletics @ Chicago Cubs,Chicago Cubs,L
-Walker Buehler,,51.2,4.88,1.32,19.545454545454547,7.49,,21.645916762299365,21.337891573529248,Avoid,San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,R
-Colin Rea,,59.1,4.7,1.37,19.06614785992218,7.43,,21.496488545013978,19.71106410817352,Avoid,Athletics @ Chicago Cubs,Athletics,R
-Michael Lorenzen,,57.1,7.22,1.9,15.412186379928317,6.75,,24.61062146037635,19.55936910062725,Avoid,Colorado Rockies @ Los Angeles Angels,Los Angeles Angels,R
-George Kirby,,78.0,4.04,1.28,19.814241486068113,7.38,,20.253922926181744,19.192008373600427,Avoid,New York Mets @ Seattle Mariners,New York Mets,R
-Andre Pallante,,58.0,4.19,1.34,18.326693227091635,7.14,,22.54073246769375,18.50324405892088,Avoid,Texas Rangers @ St. Louis Cardinals,Texas Rangers,R
-Robert Gasser,,8.1,6.48,1.56,17.073170731707318,7.56,,21.370838474536296,17.534730790893825,Avoid,San Francisco Giants @ Milwaukee Brewers,San Francisco Giants,L
-Stephen Kolek,,31.0,3.48,0.94,15.702479338842975,5.52,,23.930889036410427,17.384815060684048,Avoid,Kansas City Royals @ Cincinnati Reds,Cincinnati Reds,R
-Erick Fedde,,58.1,4.94,1.41,14.173228346456693,5.55,,23.240624595142567,16.23437432523761,Avoid,Chicago White Sox @ Minnesota Twins,Minnesota Twins,R
-Chris Bassitt,,53.1,5.06,1.58,14.69387755102041,6.08,,22.57323596604477,15.12205994340795,Avoid,Baltimore Orioles @ Boston Red Sox,Boston Red Sox,R
-Nick Martinez,,70.2,2.29,1.19,14.432989690721648,5.35,,21.171219219192942,12.78536536532157,Avoid,Detroit Tigers @ Tampa Bay Rays,Detroit Tigers,R
-Zac Gallen,,59.1,5.16,1.47,16.091954022988507,6.37,,20.63316886279776,11.8886147713296,Avoid,Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,R
-Patrick Corbin,,49.1,3.65,1.36,17.061611374407583,6.57,,19.856129552036997,10.885215920061663,Avoid,Toronto Blue Jays @ Atlanta Braves,Atlanta Braves,L
-Troy Melton,,20.2,1.74,0.87,11.39240506329114,3.92,,17.964514734347574,7.5,Avoid,Detroit Tigers @ Tampa Bay Rays,Tampa Bay Rays,R
+Jared Jones,,4.1,10.38,2.08,28.57142857142857,12.46,,19.64121442547779,59.94264028896159,Good K Matchup,Pittsburgh Pirates @ Houston Astros,Houston Astros,R
+Chris Sale,,67.0,2.01,0.94,30.18867924528302,10.75,,19.022659438465464,55.59201101379465,Good K Matchup,Toronto Blue Jays @ Atlanta Braves,Toronto Blue Jays,L
+Kai-Wei Teng,,42.0,2.57,1.1,25.748502994011975,9.21,,22.45353315247917,44.44599367141504,Avoid,Pittsburgh Pirates @ Houston Astros,Pittsburgh Pirates,R
+Carlos Rodón,,19.0,3.32,1.32,24.691358024691358,9.47,,20.397980805245364,39.616006498212144,Avoid,Cleveland Guardians @ New York Yankees,Cleveland Guardians,L
+Zack Wheeler,,43.2,2.27,0.85,24.390243902439025,8.24,,22.976850507621222,38.080618851774254,Avoid,San Diego Padres @ Philadelphia Phillies,San Diego Padres,R
+Shota Imanaga,,70.0,4.37,1.07,24.295774647887324,8.87,,21.339697773481443,37.754750362596106,Avoid,Athletics @ Chicago Cubs,Athletics,L
+J.T. Ginn,,59.2,2.87,1.14,21.57676348547718,7.84,,20.920668997603133,26.367029079480936,Avoid,Athletics @ Chicago Cubs,Chicago Cubs,R
+Andrew Morris,,24.1,4.07,1.52,20.0,8.14,,22.17615584075526,25.999475420866617,Avoid,Kansas City Royals @ Minnesota Twins,Kansas City Royals,R
+Seth Lugo,,71.0,3.55,1.35,20.066889632107024,7.61,,23.240624595142567,25.722644047842373,Avoid,Kansas City Royals @ Minnesota Twins,Minnesota Twins,R
+Slade Cecconi,,61.2,5.25,1.49,18.38235294117647,7.3,,22.848785862921485,19.8142970841079,Avoid,Cleveland Guardians @ New York Yankees,New York Yankees,R
+Trevor Rogers,,48.2,6.84,1.56,17.272727272727273,7.03,,22.460660669834116,17.14276778305686,Avoid,Baltimore Orioles @ Boston Red Sox,Boston Red Sox,L
+Brayan Bello,,56.0,5.63,1.64,15.625,6.43,,23.730696309804827,17.051160516341376,Avoid,Baltimore Orioles @ Boston Red Sox,Baltimore Orioles,R
+Ryne Nelson,,65.1,4.82,1.19,18.705035971223023,7.16,,20.468963231186798,16.023846886228245,Avoid,Los Angeles Dodgers @ Arizona Diamondbacks,Los Angeles Dodgers,R
+Lucas Giolito,,12.2,4.97,1.74,10.526315789473683,4.26,,21.67994859858966,13.633247664316102,Avoid,San Diego Padres @ Philadelphia Phillies,Philadelphia Phillies,R
+Coleman Crow,,14.1,3.14,0.98,13.793103448275861,5.02,,21.40960466218439,13.182674436973983,Avoid,San Francisco Giants @ Milwaukee Brewers,San Francisco Giants,R
+Adrian Houser,,56.1,5.59,1.56,13.618677042801556,5.59,,20.91558530439381,12.359308840656354,Avoid,San Francisco Giants @ Milwaukee Brewers,Milwaukee Brewers,R
+Justin Wrobleski,,62.2,2.87,1.01,16.0,5.74,,20.273021244688046,11.288368741146744,Avoid,Los Angeles Dodgers @ Arizona Diamondbacks,Arizona Diamondbacks,L

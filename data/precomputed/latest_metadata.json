@@ -1,11 +1,11 @@
 {
-    "last_refreshed": "2026-06-03 15:40:55",
-    "game_date": "2026-06-03",
+    "last_refreshed": "2026-06-04 17:08:16",
+    "game_date": "2026-06-04",
     "season": 2026,
     "minimum_pa": 100,
-    "schedule_rows": 15,
-    "batter_vs_pitcher_rows": 310,
-    "batter_vs_hand_rows": 310,
-    "pitcher_k_rows": 30,
-    "game_logs_preloaded": 10
+    "schedule_rows": 9,
+    "batter_vs_pitcher_rows": 188,
+    "batter_vs_hand_rows": 188,
+    "pitcher_k_rows": 17,
+    "game_logs_preloaded": 50
 }
