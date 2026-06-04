@@ -286,6 +286,12 @@ def get_pitcher_stats(season, force_refresh=False):
     """
     Pulls pitcher season stats from MLB Stats API.
     Used for the pitcher strikeout matchup section.
+
+    Important:
+    This keeps both season workload and projected-start fields:
+    - IP = season innings pitched
+    - GS = games started
+    - Pitches = season pitch count, if available
     """
     file_path = CACHE_DIR / f"pitchers_{season}.csv"
 
@@ -305,10 +311,20 @@ def get_pitcher_stats(season, force_refresh=False):
         "walksPer9Inn": "BB/9",
         "strikeOuts": "SO",
         "baseOnBalls": "BB",
-        "battersFaced": "BF"
+        "battersFaced": "BF",
+        "gamesStarted": "GS",
+        "numberOfPitches": "Pitches"
     }
 
     df = df.rename(columns=rename_cols)
+
+    # Some seasons/API responses may not include pitch count.
+    # Keep the column anyway so scoring.py does not break.
+    if "GS" not in df.columns:
+        df["GS"] = None
+
+    if "Pitches" not in df.columns:
+        df["Pitches"] = None
 
     keep_cols = [
         "player_id",
@@ -317,6 +333,8 @@ def get_pitcher_stats(season, force_refresh=False):
         "team_name",
         "Team",
         "IP",
+        "GS",
+        "Pitches",
         "ERA",
         "WHIP",
         "K/9",
@@ -332,7 +350,8 @@ def get_pitcher_stats(season, force_refresh=False):
     numeric_cols = [
         "player_id",
         "team_id",
-        "IP",
+        "GS",
+        "Pitches",
         "ERA",
         "WHIP",
         "K/9",
@@ -343,6 +362,11 @@ def get_pitcher_stats(season, force_refresh=False):
     ]
 
     df = make_numeric(df, numeric_cols)
+
+    # Do NOT force IP to numeric here because baseball IP can be written as:
+    # 5.1 = 5 and 1/3 innings
+    # 5.2 = 5 and 2/3 innings
+    # scoring.py handles this conversion.
 
     df["K%"] = (df["SO"] / df["BF"]) * 100
     df["BB%"] = (df["BB"] / df["BF"]) * 100
@@ -518,8 +542,6 @@ def get_statcast_batter_vs_pitcher_pitches(batter_id, pitcher_id):
     """
     Pulls Statcast pitch-level data for one exact batter,
     then filters it to one exact pitcher.
-
-    This fixes the incorrect game log issue.
     """
     batter_id = int(batter_id)
     pitcher_id = int(pitcher_id)
