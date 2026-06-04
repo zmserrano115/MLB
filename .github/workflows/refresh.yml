@@ -1,0 +1,92 @@
+name: MLB Data Refresh
+
+on:
+  schedule:
+    - cron: "30 12 * * *"
+    - cron: "30 18 * * *"
+
+  workflow_dispatch:
+    inputs:
+      min_pa:
+        description: "Minimum season PA to include hitters"
+        required: false
+        default: "100"
+      build_game_logs:
+        description: "Preload Batter vs Pitcher career game logs"
+        required: false
+        default: "true"
+      max_game_logs:
+        description: "Maximum number of BvP game logs to preload"
+        required: false
+        default: "50"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mlb-data-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run MLB refresh
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MIN_PA="${{ github.event.inputs.min_pa }}"
+            BUILD_GAME_LOGS="${{ github.event.inputs.build_game_logs }}"
+            MAX_GAME_LOGS="${{ github.event.inputs.max_game_logs }}"
+          else
+            MIN_PA="100"
+            BUILD_GAME_LOGS="true"
+            MAX_GAME_LOGS="50"
+          fi
+
+          if [ "$BUILD_GAME_LOGS" = "true" ]; then
+            python refresh_nightly.py --min-pa "$MIN_PA" --build-game-logs --max-game-logs "$MAX_GAME_LOGS"
+          else
+            python refresh_nightly.py --min-pa "$MIN_PA"
+          fi
+
+      - name: Commit refreshed data and cache
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/precomputed/
+          git add data/matchup_cache.json || true
+
+          if git diff --cached --quiet; then
+            echo "No refreshed data changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Refresh MLB matchup data"
+
+          echo "Fetching latest main before push..."
+          git fetch origin main
+
+          echo "Rebasing refresh commit on latest main..."
+          git rebase origin/main
+
+          echo "Pushing refreshed data..."
+          git push origin main
