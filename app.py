@@ -493,8 +493,6 @@ st.dataframe(
 )
 
 
-st.header(" ")
-
 
 batter_cols = [
     "game",
