@@ -125,6 +125,24 @@ def safe_divide(numerator, denominator):
 
     return numerator / denominator
 
+def is_missing(value):
+    """
+    Checks for None, NaN, or blank values.
+    """
+    if value is None:
+        return True
+
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
+
+    if str(value).strip() == "":
+        return True
+
+    return False
+
 
 def clean_json_value(value):
     """
