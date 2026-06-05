@@ -2,301 +2,387 @@
 
 import pandas as pd
 
+from src.scoring import (
+    find_player_row,
+    score_hitter_matchups,
+    score_pitcher_k_matchup
+)
 from src.stat_data import (
     get_hitter_vs_pitcher_stats,
     get_hitter_vs_hand_stats
 )
 
-from src.scoring import (
-    find_player_row,
-    score_pitcher_k_matchup
-)
 
-
-def filter_team_players(df, team_id, min_pa=20):
+def get_team_batters(batters_df, team_id, min_pa=100):
     """
-    Filters MLB Stats API player data by MLB team ID.
+    Gets batters for one MLB team using team_id.
     """
-    if df.empty or "team_id" not in df.columns:
+    if batters_df.empty or team_id is None:
         return pd.DataFrame()
 
-    team_df = df[df["team_id"] == team_id].copy()
+    df = batters_df.copy()
 
-    if "PA" in team_df.columns:
-        team_df = team_df[team_df["PA"] >= min_pa]
+    if "team_id" not in df.columns:
+        return pd.DataFrame()
 
-    return team_df
+    team_batters = df[df["team_id"] == team_id].copy()
+
+    if "PA" in team_batters.columns:
+        team_batters["PA"] = pd.to_numeric(team_batters["PA"], errors="coerce")
+        team_batters = team_batters[team_batters["PA"] >= min_pa].copy()
+
+    return team_batters
 
 
-def grade_batter_row(row):
+def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100):
     """
-    Grades based on the actual split/matchup row.
-    """
-    pa = row.get("PA", 0)
-    obp = row.get("OBP", None)
-    ops = row.get("OPS", None)
-
-    if pa == 0:
-        return "No History"
-
-    if pa < 5:
-        return "Small Sample"
-
-    if pd.notna(obp) and pd.notna(ops):
-        if obp >= 0.380 and ops >= 0.850:
-            return "Strong"
-        elif obp >= 0.330 and ops >= 0.750:
-            return "Good"
-        elif obp <= 0.280 or ops <= 0.650:
-            return "Avoid"
-
-    return "Neutral"
-
-
-def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=20):
-    """
-    Builds exact batter vs opposing probable pitcher table.
+    Builds hitter rows based on direct batter-vs-opposing-pitcher history.
     """
     rows = []
 
+    if schedule_df.empty or batters_df.empty:
+        return pd.DataFrame()
+
     for _, game in schedule_df.iterrows():
-        away_team = game["away_team"]
-        home_team = game["home_team"]
+        away_team = game.get("away_team")
+        home_team = game.get("home_team")
+        away_team_id = game.get("away_team_id")
+        home_team_id = game.get("home_team_id")
 
-        away_team_id = game["away_team_id"]
-        home_team_id = game["home_team_id"]
+        away_pitcher = game.get("away_probable_pitcher")
+        home_pitcher = game.get("home_probable_pitcher")
 
-        away_pitcher = game["away_probable_pitcher"]
-        away_pitcher_id = game["away_probable_pitcher_id"]
+        away_pitcher_id = game.get("away_probable_pitcher_id")
+        home_pitcher_id = game.get("home_probable_pitcher_id")
 
-        home_pitcher = game["home_probable_pitcher"]
-        home_pitcher_id = game["home_probable_pitcher_id"]
+        away_pitcher_hand = game.get("away_pitcher_hand")
+        home_pitcher_hand = game.get("home_pitcher_hand")
 
-        # Away hitters vs home pitcher
-        away_hitters = filter_team_players(
-            batters_df,
-            away_team_id,
+        game_name = f"{away_team} @ {home_team}"
+
+        # Home batters face away pitcher
+        home_batters = get_team_batters(
+            batters_df=batters_df,
+            team_id=home_team_id,
             min_pa=min_pa
         )
 
-        for _, batter in away_hitters.iterrows():
+        for _, batter in home_batters.iterrows():
+            batter_id = batter.get("player_id")
+
             stats = get_hitter_vs_pitcher_stats(
-                int(batter["player_id"]),
-                int(home_pitcher_id) if pd.notna(home_pitcher_id) else None,
-                int(season)
+                batter_id=batter_id,
+                pitcher_id=away_pitcher_id,
+                season=season
             )
 
             row = {
-                "game": f"{away_team} @ {home_team}",
-                "team": away_team,
-                "batter": batter["Name"],
-                "batter_id": batter["player_id"],
-                "opposing_pitcher": home_pitcher,
-                "opposing_pitcher_id": home_pitcher_id,
-                "opposing_pitcher_hand": game["home_pitcher_hand"],
-                "split": "Batter vs Pitcher"
-            }
-
-            row.update(stats)
-            row["matchup_grade"] = grade_batter_row(row)
-            rows.append(row)
-
-        # Home hitters vs away pitcher
-        home_hitters = filter_team_players(
-            batters_df,
-            home_team_id,
-            min_pa=min_pa
-        )
-
-        for _, batter in home_hitters.iterrows():
-            stats = get_hitter_vs_pitcher_stats(
-                int(batter["player_id"]),
-                int(away_pitcher_id) if pd.notna(away_pitcher_id) else None,
-                int(season)
-            )
-
-            row = {
-                "game": f"{away_team} @ {home_team}",
+                "game": game_name,
                 "team": home_team,
-                "batter": batter["Name"],
-                "batter_id": batter["player_id"],
-                "opposing_pitcher": away_pitcher,
+                "batter_id": batter_id,
+                "batter": batter.get("Name"),
                 "opposing_pitcher_id": away_pitcher_id,
-                "opposing_pitcher_hand": game["away_pitcher_hand"],
+                "opposing_pitcher": away_pitcher,
+                "opposing_pitcher_hand": away_pitcher_hand,
                 "split": "Batter vs Pitcher"
             }
 
             row.update(stats)
-            row["matchup_grade"] = grade_batter_row(row)
             rows.append(row)
 
-    df = pd.DataFrame(rows)
+        # Away batters face home pitcher
+        away_batters = get_team_batters(
+            batters_df=batters_df,
+            team_id=away_team_id,
+            min_pa=min_pa
+        )
 
-    if df.empty:
-        return df
+        for _, batter in away_batters.iterrows():
+            batter_id = batter.get("player_id")
 
-    return df.sort_values(
-        ["PA", "OBP", "OPS"],
+            stats = get_hitter_vs_pitcher_stats(
+                batter_id=batter_id,
+                pitcher_id=home_pitcher_id,
+                season=season
+            )
+
+            row = {
+                "game": game_name,
+                "team": away_team,
+                "batter_id": batter_id,
+                "batter": batter.get("Name"),
+                "opposing_pitcher_id": home_pitcher_id,
+                "opposing_pitcher": home_pitcher,
+                "opposing_pitcher_hand": home_pitcher_hand,
+                "split": "Batter vs Pitcher"
+            }
+
+            row.update(stats)
+            rows.append(row)
+
+    result_df = pd.DataFrame(rows)
+
+    if result_df.empty:
+        return result_df
+
+    result_df["PA"] = pd.to_numeric(result_df["PA"], errors="coerce").fillna(0)
+
+    # Grade direct BvP results with simple sample-aware labels.
+    result_df["matchup_grade"] = "No History"
+
+    result_df.loc[
+        (result_df["PA"] > 0) & (result_df["PA"] < 5),
+        "matchup_grade"
+    ] = "Small Sample"
+
+    result_df.loc[
+        (result_df["PA"] >= 5) & (result_df["OBP"] >= 0.360),
+        "matchup_grade"
+    ] = "Strong Matchup"
+
+    result_df.loc[
+        (result_df["PA"] >= 5) & (result_df["OBP"] >= 0.320) & (result_df["OBP"] < 0.360),
+        "matchup_grade"
+    ] = "Good Matchup"
+
+    result_df.loc[
+        (result_df["PA"] >= 5) & (result_df["OBP"] >= 0.280) & (result_df["OBP"] < 0.320),
+        "matchup_grade"
+    ] = "Neutral"
+
+    result_df.loc[
+        (result_df["PA"] >= 5) & (result_df["OBP"] < 0.280),
+        "matchup_grade"
+    ] = "Avoid"
+
+    result_df = result_df.sort_values(
+        by=["PA", "OBP", "OPS"],
         ascending=[False, False, False]
     )
 
+    return result_df
 
-def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=20):
+
+def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=100):
     """
-    Builds hitter splits against the opposing pitcher's throwing hand.
+    Builds hitter rows based on splits against the opposing pitcher's throwing hand.
     """
     rows = []
 
+    if schedule_df.empty or batters_df.empty:
+        return pd.DataFrame()
+
     for _, game in schedule_df.iterrows():
-        away_team = game["away_team"]
-        home_team = game["home_team"]
+        away_team = game.get("away_team")
+        home_team = game.get("home_team")
+        away_team_id = game.get("away_team_id")
+        home_team_id = game.get("home_team_id")
 
-        away_team_id = game["away_team_id"]
-        home_team_id = game["home_team_id"]
+        away_pitcher = game.get("away_probable_pitcher")
+        home_pitcher = game.get("home_probable_pitcher")
 
-        away_pitcher = game["away_probable_pitcher"]
-        away_pitcher_hand = game["away_pitcher_hand"]
+        away_pitcher_id = game.get("away_probable_pitcher_id")
+        home_pitcher_id = game.get("home_probable_pitcher_id")
 
-        home_pitcher = game["home_probable_pitcher"]
-        home_pitcher_hand = game["home_pitcher_hand"]
+        away_pitcher_hand = game.get("away_pitcher_hand")
+        home_pitcher_hand = game.get("home_pitcher_hand")
 
-        # Away hitters vs home pitcher's hand
-        away_hitters = filter_team_players(
-            batters_df,
-            away_team_id,
+        game_name = f"{away_team} @ {home_team}"
+
+        # Home batters vs away pitcher hand
+        home_batters = get_team_batters(
+            batters_df=batters_df,
+            team_id=home_team_id,
             min_pa=min_pa
         )
 
-        for _, batter in away_hitters.iterrows():
+        for _, batter in home_batters.iterrows():
+            batter_id = batter.get("player_id")
+
             stats = get_hitter_vs_hand_stats(
-                int(batter["player_id"]),
-                home_pitcher_hand,
-                int(season)
+                batter_id=batter_id,
+                pitcher_hand=away_pitcher_hand,
+                season=season
             )
 
             row = {
-                "game": f"{away_team} @ {home_team}",
-                "team": away_team,
-                "batter": batter["Name"],
-                "batter_id": batter["player_id"],
-                "opposing_pitcher": home_pitcher,
-                "opposing_pitcher_hand": home_pitcher_hand,
-                "split": f"vs {home_pitcher_hand}HP"
-            }
-
-            row.update(stats)
-            row["matchup_grade"] = grade_batter_row(row)
-            rows.append(row)
-
-        # Home hitters vs away pitcher's hand
-        home_hitters = filter_team_players(
-            batters_df,
-            home_team_id,
-            min_pa=min_pa
-        )
-
-        for _, batter in home_hitters.iterrows():
-            stats = get_hitter_vs_hand_stats(
-                int(batter["player_id"]),
-                away_pitcher_hand,
-                int(season)
-            )
-
-            row = {
-                "game": f"{away_team} @ {home_team}",
+                "game": game_name,
                 "team": home_team,
-                "batter": batter["Name"],
-                "batter_id": batter["player_id"],
+                "batter_id": batter_id,
+                "batter": batter.get("Name"),
+                "opposing_pitcher_id": away_pitcher_id,
                 "opposing_pitcher": away_pitcher,
                 "opposing_pitcher_hand": away_pitcher_hand,
                 "split": f"vs {away_pitcher_hand}HP"
             }
 
             row.update(stats)
-            row["matchup_grade"] = grade_batter_row(row)
             rows.append(row)
 
-    df = pd.DataFrame(rows)
+        # Away batters vs home pitcher hand
+        away_batters = get_team_batters(
+            batters_df=batters_df,
+            team_id=away_team_id,
+            min_pa=min_pa
+        )
 
-    if df.empty:
-        return df
+        for _, batter in away_batters.iterrows():
+            batter_id = batter.get("player_id")
 
-    return df.sort_values(
-        ["OBP", "OPS", "PA"],
+            stats = get_hitter_vs_hand_stats(
+                batter_id=batter_id,
+                pitcher_hand=home_pitcher_hand,
+                season=season
+            )
+
+            row = {
+                "game": game_name,
+                "team": away_team,
+                "batter_id": batter_id,
+                "batter": batter.get("Name"),
+                "opposing_pitcher_id": home_pitcher_id,
+                "opposing_pitcher": home_pitcher,
+                "opposing_pitcher_hand": home_pitcher_hand,
+                "split": f"vs {home_pitcher_hand}HP"
+            }
+
+            row.update(stats)
+            rows.append(row)
+
+    result_df = pd.DataFrame(rows)
+
+    if result_df.empty:
+        return result_df
+
+    result_df["PA"] = pd.to_numeric(result_df["PA"], errors="coerce").fillna(0)
+    result_df["OBP"] = pd.to_numeric(result_df["OBP"], errors="coerce")
+    result_df["OPS"] = pd.to_numeric(result_df["OPS"], errors="coerce")
+
+    result_df["matchup_grade"] = "No History"
+
+    result_df.loc[
+        (result_df["PA"] > 0) & (result_df["PA"] < 20),
+        "matchup_grade"
+    ] = "Small Sample"
+
+    result_df.loc[
+        (result_df["PA"] >= 20) & (result_df["OBP"] >= 0.360),
+        "matchup_grade"
+    ] = "Strong Matchup"
+
+    result_df.loc[
+        (result_df["PA"] >= 20) & (result_df["OBP"] >= 0.320) & (result_df["OBP"] < 0.360),
+        "matchup_grade"
+    ] = "Good Matchup"
+
+    result_df.loc[
+        (result_df["PA"] >= 20) & (result_df["OBP"] >= 0.280) & (result_df["OBP"] < 0.320),
+        "matchup_grade"
+    ] = "Neutral"
+
+    result_df.loc[
+        (result_df["PA"] >= 20) & (result_df["OBP"] < 0.280),
+        "matchup_grade"
+    ] = "Avoid"
+
+    result_df = result_df.sort_values(
+        by=["OBP", "OPS", "PA"],
         ascending=[False, False, False]
     )
 
+    return result_df
 
-def build_pitcher_k_matchups(schedule_df, batters_df, pitchers_df, min_pa=20):
+
+def build_pitcher_k_matchups(schedule_df, batters_df, pitchers_df, min_pa=100):
     """
-    Builds pitcher strikeout matchup table.
+    Builds strikeout matchup rows for today's probable pitchers.
+
+    IMPORTANT:
+    This version keeps pitcher_id in the final output so the app can
+    load a pitcher-vs-opponent career game log when a row is clicked.
     """
     rows = []
 
+    if schedule_df.empty or batters_df.empty or pitchers_df.empty:
+        return pd.DataFrame()
+
     for _, game in schedule_df.iterrows():
-        away_team = game["away_team"]
-        home_team = game["home_team"]
+        away_team = game.get("away_team")
+        home_team = game.get("home_team")
+        away_team_id = game.get("away_team_id")
+        home_team_id = game.get("home_team_id")
 
-        away_team_id = game["away_team_id"]
-        home_team_id = game["home_team_id"]
+        away_pitcher_name = game.get("away_probable_pitcher")
+        home_pitcher_name = game.get("home_probable_pitcher")
 
-        away_pitcher_name = game["away_probable_pitcher"]
-        home_pitcher_name = game["home_probable_pitcher"]
+        away_pitcher_hand = game.get("away_pitcher_hand")
+        home_pitcher_hand = game.get("home_pitcher_hand")
 
-        away_pitcher_row = find_player_row(pitchers_df, away_pitcher_name)
-        home_pitcher_row = find_player_row(pitchers_df, home_pitcher_name)
+        game_name = f"{away_team} @ {home_team}"
 
-        home_batters = filter_team_players(
-            batters_df,
-            home_team_id,
+        # Away pitcher faces home batters
+        away_pitcher_row = find_player_row(
+            pitchers_df,
+            away_pitcher_name
+        )
+
+        home_batters = get_team_batters(
+            batters_df=batters_df,
+            team_id=home_team_id,
             min_pa=min_pa
         )
 
-        away_batters = filter_team_players(
-            batters_df,
-            away_team_id,
+        if away_pitcher_row is not None and not home_batters.empty:
+            score_row = score_pitcher_k_matchup(
+                pitcher_row=away_pitcher_row,
+                opposing_batters=home_batters
+            )
+
+            if score_row is not None:
+                score_row["game"] = game_name
+                score_row["pitcher_id"] = away_pitcher_row.get("player_id")
+                score_row["pitcher"] = away_pitcher_row.get("Name")
+                score_row["pitcher_team"] = away_team
+                score_row["pitcher_hand"] = away_pitcher_hand
+                score_row["opponent"] = home_team
+                rows.append(score_row)
+
+        # Home pitcher faces away batters
+        home_pitcher_row = find_player_row(
+            pitchers_df,
+            home_pitcher_name
+        )
+
+        away_batters = get_team_batters(
+            batters_df=batters_df,
+            team_id=away_team_id,
             min_pa=min_pa
         )
 
-        away_k_matchup = score_pitcher_k_matchup(
-            away_pitcher_row,
-            home_batters
+        if home_pitcher_row is not None and not away_batters.empty:
+            score_row = score_pitcher_k_matchup(
+                pitcher_row=home_pitcher_row,
+                opposing_batters=away_batters
+            )
+
+            if score_row is not None:
+                score_row["game"] = game_name
+                score_row["pitcher_id"] = home_pitcher_row.get("player_id")
+                score_row["pitcher"] = home_pitcher_row.get("Name")
+                score_row["pitcher_team"] = home_team
+                score_row["pitcher_hand"] = home_pitcher_hand
+                score_row["opponent"] = away_team
+                rows.append(score_row)
+
+    result_df = pd.DataFrame(rows)
+
+    if result_df.empty:
+        return result_df
+
+    if "k_matchup_score" in result_df.columns:
+        result_df = result_df.sort_values(
+            "k_matchup_score",
+            ascending=False
         )
 
-        if away_k_matchup:
-            away_k_matchup["game"] = f"{away_team} @ {home_team}"
-            away_k_matchup["opponent"] = home_team
-            away_k_matchup["pitcher_hand"] = game["away_pitcher_hand"]
-            rows.append(away_k_matchup)
-
-        home_k_matchup = score_pitcher_k_matchup(
-            home_pitcher_row,
-            away_batters
-        )
-
-        if home_k_matchup:
-            home_k_matchup["game"] = f"{away_team} @ {home_team}"
-            home_k_matchup["opponent"] = away_team
-            home_k_matchup["pitcher_hand"] = game["home_pitcher_hand"]
-            rows.append(home_k_matchup)
-
-    if not rows:
-        return pd.DataFrame()
-
-    return pd.DataFrame(rows).sort_values(
-        "k_matchup_score",
-        ascending=False
-    )
-
-
-# Optional old-name compatibility
-def build_hitter_matchups(schedule_df, batters_df, pitchers_df=None, min_pa=20, season=None):
-    if season is None:
-        return pd.DataFrame()
-
-    return build_batter_vs_pitcher_matchups(
-        schedule_df=schedule_df,
-        batters_df=batters_df,
-        season=season,
-        min_pa=min_pa
-    )
+    return result_df
