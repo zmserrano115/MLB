@@ -12,7 +12,8 @@ from src.mlb_schedule import get_daily_schedule
 from src.stat_data import (
     get_batter_stats,
     get_pitcher_stats,
-    get_batter_vs_pitcher_game_log
+    get_batter_vs_pitcher_game_log,
+    get_pitcher_vs_team_game_log
 )
 from src.matchups import (
     build_batter_vs_pitcher_matchups,
@@ -356,7 +357,21 @@ def style_matchup_table(df):
         if col in df.columns:
             format_dict[col] = "{:.3f}"
 
-    for col in ["K%", "BB%", "opponent_avg_k%", "k_matchup_score"]:
+    for col in [
+        "K%",
+        "BB%",
+        "opponent_avg_k%",
+        "k_matchup_score",
+        "Season IP",
+        "Projected IP",
+        "Projected Pitch Count",
+        "Projected Ks",
+        "Pitch Count"
+    ]:
+        if col in df.columns:
+            format_dict[col] = "{:.2f}"
+
+    for col in ["ERA", "WHIP", "K/9"]:
         if col in df.columns:
             format_dict[col] = "{:.2f}"
 
@@ -428,6 +443,54 @@ def display_bvp_game_log(selected_row, season):
         "OPS",
         "K%",
         "BB%"
+    ]
+
+    game_log_cols = [
+        col for col in game_log_cols if col in game_log_df.columns
+    ]
+
+    st.dataframe(
+        style_matchup_table(game_log_df[game_log_cols]),
+        width="stretch",
+        hide_index=True
+    )
+
+
+def display_pitcher_vs_team_game_log(selected_row):
+    pitcher_name = selected_row.get("pitcher")
+    opponent_team = selected_row.get("opponent")
+    pitcher_id = selected_row.get("pitcher_id")
+
+    st.subheader(f"Career Game Log: {pitcher_name} vs {opponent_team}")
+
+    if pitcher_id is None or pd.isna(pitcher_id):
+        st.warning("Pitcher ID was not found for this row.")
+        return
+
+    with st.spinner("Loading pitcher-vs-team career game log..."):
+        game_log_df = get_pitcher_vs_team_game_log(
+            pitcher_id=int(pitcher_id),
+            opponent_team=opponent_team
+        )
+
+    if game_log_df.empty:
+        st.warning(
+            "No pitcher-vs-team career game-log history was found for this matchup."
+        )
+        return
+
+    game_log_cols = [
+        "game_date",
+        "opponent",
+        "IP",
+        "Pitch Count",
+        "BF",
+        "H",
+        "BB",
+        "HBP",
+        "SO",
+        "HR",
+        "R"
     ]
 
     game_log_cols = [
@@ -782,13 +845,32 @@ with tab3:
     if filtered_pitcher_k_matchups.empty:
         st.warning("No pitcher strikeout matchups were created for this selection.")
     else:
+        required_projected_cols = [
+            "Projected IP",
+            "Projected Pitch Count",
+            "Projected Ks"
+        ]
+
+        missing_projected_cols = [
+            col for col in required_projected_cols
+            if col not in filtered_pitcher_k_matchups.columns
+        ]
+
+        if missing_projected_cols:
+            st.warning(
+                "The cloud data has not been refreshed with the newest pitcher projection columns yet. "
+                "Run the GitHub Action refresh, then reboot the Streamlit app."
+            )
+
         k_cols = [
             "game",
             "pitcher",
             "pitcher_team",
             "pitcher_hand",
             "opponent",
-            "IP",
+            "Projected IP",
+            "Projected Pitch Count",
+            "Projected Ks",
             "ERA",
             "WHIP",
             "K%",
@@ -804,11 +886,33 @@ with tab3:
 
         display_k = filtered_pitcher_k_matchups.head(int(top_n)).copy()
 
-        st.dataframe(
+        st.write("Click one pitcher row below to view his career game log against that opponent.")
+
+        k_event = st.dataframe(
             style_matchup_table(display_k[k_cols]),
             width="stretch",
-            hide_index=True
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="pitcher_k_table"
         )
+
+        selected_pitcher_row = None
+
+        try:
+            selected_rows = k_event.selection.rows
+
+            if selected_rows:
+                selected_pitcher_row = display_k.iloc[selected_rows[0]]
+        except Exception:
+            selected_pitcher_row = None
+
+        st.divider()
+
+        if selected_pitcher_row is not None:
+            display_pitcher_vs_team_game_log(selected_pitcher_row)
+        else:
+            st.info("Select a pitcher row above to view his career game log against that opponent.")
 
 
 st.header("How the Matchup Tables Work")
@@ -824,7 +928,9 @@ st.markdown(
     - Usually more reliable than direct batter-vs-pitcher history.
 
     **Strikeout Targets**
-    - Uses pitcher strikeout ability and opponent hitter strikeout tendencies.
+    - Uses projected innings, projected pitch count, pitcher strikeout ability,
+      and opponent hitter strikeout tendencies.
+    - Click a pitcher row to see that pitcher's career game log against that opponent.
 
     **Row Colors**
     - Dark green = Strong or Elite

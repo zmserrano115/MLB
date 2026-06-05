@@ -7,7 +7,7 @@ import json
 import pandas as pd
 import requests
 
-from pybaseball import statcast_batter, cache as pybaseball_cache
+from pybaseball import statcast_batter, statcast_pitcher, cache as pybaseball_cache
 
 
 try:
@@ -23,6 +23,41 @@ STATS_URL = "https://statsapi.mlb.com/api/v1/stats"
 PLAYER_STATS_URL = "https://statsapi.mlb.com/api/v1/people/{}/stats"
 
 MATCHUP_CACHE_FILE = CACHE_DIR / "matchup_cache.json"
+
+
+TEAM_NAME_TO_ABBR_OPTIONS = {
+    "Arizona Diamondbacks": ["ARI", "AZ"],
+    "Atlanta Braves": ["ATL"],
+    "Baltimore Orioles": ["BAL"],
+    "Boston Red Sox": ["BOS"],
+    "Chicago Cubs": ["CHC"],
+    "Chicago White Sox": ["CWS"],
+    "Cincinnati Reds": ["CIN"],
+    "Cleveland Guardians": ["CLE"],
+    "Colorado Rockies": ["COL"],
+    "Detroit Tigers": ["DET"],
+    "Houston Astros": ["HOU"],
+    "Kansas City Royals": ["KC", "KCR"],
+    "Los Angeles Angels": ["LAA"],
+    "Los Angeles Dodgers": ["LAD"],
+    "Miami Marlins": ["MIA"],
+    "Milwaukee Brewers": ["MIL"],
+    "Minnesota Twins": ["MIN"],
+    "New York Mets": ["NYM"],
+    "New York Yankees": ["NYY"],
+    "Athletics": ["ATH", "OAK"],
+    "Oakland Athletics": ["OAK", "ATH"],
+    "Philadelphia Phillies": ["PHI"],
+    "Pittsburgh Pirates": ["PIT"],
+    "San Diego Padres": ["SD", "SDP"],
+    "San Francisco Giants": ["SF", "SFG"],
+    "Seattle Mariners": ["SEA"],
+    "St. Louis Cardinals": ["STL"],
+    "Tampa Bay Rays": ["TB", "TBR"],
+    "Texas Rangers": ["TEX"],
+    "Toronto Blue Jays": ["TOR"],
+    "Washington Nationals": ["WSH"],
+}
 
 
 def cache_is_fresh(file_path, hours=12):
@@ -213,11 +248,6 @@ def get_mlb_stats(season, group):
 def get_batter_stats(season, force_refresh=False):
     """
     Pulls batter season stats from MLB Stats API.
-
-    This is mainly used to get the batters for each team.
-    The actual matchup tabs use:
-    - batter vs pitcher stats
-    - batter vs pitcher hand stats
     """
     file_path = CACHE_DIR / f"batters_{season}.csv"
 
@@ -285,10 +315,8 @@ def get_batter_stats(season, force_refresh=False):
 def get_pitcher_stats(season, force_refresh=False):
     """
     Pulls pitcher season stats from MLB Stats API.
-    Used for the pitcher strikeout matchup section.
 
-    Important:
-    This keeps both season workload and projected-start fields:
+    Keeps:
     - IP = season innings pitched
     - GS = games started
     - Pitches = season pitch count, if available
@@ -318,8 +346,6 @@ def get_pitcher_stats(season, force_refresh=False):
 
     df = df.rename(columns=rename_cols)
 
-    # Some seasons/API responses may not include pitch count.
-    # Keep the column anyway so scoring.py does not break.
     if "GS" not in df.columns:
         df["GS"] = None
 
@@ -363,15 +389,9 @@ def get_pitcher_stats(season, force_refresh=False):
 
     df = make_numeric(df, numeric_cols)
 
-    # Do NOT force IP to numeric here because baseball IP can be written as:
-    # 5.1 = 5 and 1/3 innings
-    # 5.2 = 5 and 2/3 innings
-    # scoring.py handles this conversion.
-
     df["K%"] = (df["SO"] / df["BF"]) * 100
     df["BB%"] = (df["BB"] / df["BF"]) * 100
 
-    # MLB basic stats endpoint does not provide swinging strike percentage.
     df["SwStr%"] = None
 
     df = df.dropna(subset=["Name", "team_id"])
@@ -383,9 +403,6 @@ def get_pitcher_stats(season, force_refresh=False):
 def clean_stat_result(stat):
     """
     Converts MLB stat dictionary into clean matchup/split columns.
-    Used for both:
-    - batter vs pitcher
-    - batter vs pitcher hand
     """
     if not stat:
         return {
@@ -435,8 +452,6 @@ def clean_stat_result(stat):
 def get_hitter_vs_pitcher_stats(batter_id, pitcher_id, season):
     """
     Pulls exact batter vs opposing pitcher matchup for the selected season.
-
-    Uses local JSON cache so the same matchup does not get pulled every refresh.
     """
     if batter_id is None or pitcher_id is None:
         return clean_stat_result({})
@@ -487,8 +502,6 @@ def get_hitter_vs_hand_stats(batter_id, pitcher_hand, season):
 
     R = hitter vs right-handed pitchers
     L = hitter vs left-handed pitchers
-
-    Uses local JSON cache so the same split does not get pulled every refresh.
     """
     if batter_id is None or pitcher_hand not in ["R", "L"]:
         return clean_stat_result({})
@@ -596,9 +609,6 @@ def get_statcast_batter_vs_pitcher_pitches(batter_id, pitcher_id):
 def get_terminal_pa_rows(statcast_df):
     """
     Converts pitch-level Statcast data into one row per plate appearance.
-
-    Statcast has one row per pitch.
-    A plate appearance ends on the row where 'events' is not blank.
     """
     if statcast_df.empty:
         return pd.DataFrame()
@@ -731,9 +741,6 @@ def summarize_one_statcast_game(game_df):
 def get_batter_vs_pitcher_game_log(batter_id, pitcher_id, season=None):
     """
     Pulls career game-log history for one batter vs one pitcher.
-
-    This uses Statcast pitch-level data from 2015-present.
-    It only includes games where the selected batter faced the selected pitcher.
     """
     if batter_id is None or pitcher_id is None:
         return pd.DataFrame()
@@ -766,6 +773,263 @@ def get_batter_vs_pitcher_game_log(batter_id, pitcher_id, season=None):
     result_df = pd.DataFrame(rows)
 
     if not result_df.empty and "game_date" in result_df.columns:
+        result_df = result_df.sort_values("game_date", ascending=False)
+
+    result = clean_records_for_json(
+        result_df.to_dict(orient="records")
+    )
+
+    MATCHUP_CACHE[cache_key] = result
+    save_matchup_cache(MATCHUP_CACHE)
+
+    return pd.DataFrame(result)
+
+
+def get_team_abbr_options_for_statcast(team_name):
+    """
+    Converts full team name into one or more possible Statcast abbreviations.
+    """
+    if team_name is None:
+        return []
+
+    team_name = str(team_name).strip()
+
+    return TEAM_NAME_TO_ABBR_OPTIONS.get(team_name, [team_name])
+
+
+def calculate_outs_from_events(events):
+    """
+    Estimates outs recorded from Statcast terminal PA events.
+    """
+    outs = 0
+
+    for event in events:
+        event = str(event).lower()
+
+        if event in [
+            "strikeout",
+            "field_out",
+            "force_out",
+            "fielders_choice_out",
+            "sac_fly",
+            "sac_bunt",
+            "other_out"
+        ]:
+            outs += 1
+
+        elif event in [
+            "grounded_into_double_play",
+            "strikeout_double_play",
+            "double_play",
+            "sac_fly_double_play",
+            "sac_bunt_double_play"
+        ]:
+            outs += 2
+
+        elif event == "triple_play":
+            outs += 3
+
+    return outs
+
+
+def format_outs_as_ip(outs):
+    """
+    Converts outs into baseball IP format.
+
+    16 outs = 5.1 IP
+    17 outs = 5.2 IP
+    18 outs = 6.0 IP
+    """
+    outs = int(outs)
+
+    full_innings = outs // 3
+    remaining_outs = outs % 3
+
+    if remaining_outs == 0:
+        return float(full_innings)
+
+    return float(f"{full_innings}.{remaining_outs}")
+
+
+def summarize_pitcher_vs_team_game(game_df, pitch_df):
+    """
+    Summarizes one pitcher game against one opponent team.
+    """
+    if game_df.empty:
+        return {}
+
+    first_row = game_df.iloc[0]
+
+    events = game_df["events"].fillna("").astype(str).str.lower()
+
+    hit_events = ["single", "double", "triple", "home_run"]
+    walk_events = ["walk", "intent_walk"]
+    strikeout_events = ["strikeout", "strikeout_double_play"]
+    hbp_events = ["hit_by_pitch"]
+
+    pa = len(game_df)
+    h = int(events.isin(hit_events).sum())
+    bb = int(events.isin(walk_events).sum())
+    so = int(events.isin(strikeout_events).sum())
+    hbp = int(events.isin(hbp_events).sum())
+    hr = int((events == "home_run").sum())
+
+    outs = calculate_outs_from_events(events)
+    ip = format_outs_as_ip(outs)
+
+    pitch_count = len(pitch_df)
+
+    runs_allowed = 0
+
+    if "post_bat_score" in game_df.columns and "bat_score" in game_df.columns:
+        post_scores = pd.to_numeric(game_df["post_bat_score"], errors="coerce")
+        bat_scores = pd.to_numeric(game_df["bat_score"], errors="coerce")
+        runs_allowed = int((post_scores - bat_scores).clip(lower=0).fillna(0).sum())
+
+    game_date = first_row.get("game_date", None)
+
+    if pd.notna(game_date):
+        try:
+            game_date = pd.to_datetime(game_date).strftime("%Y-%m-%d")
+        except Exception:
+            game_date = str(game_date)
+
+    opponent = None
+
+    inning_topbot = first_row.get("inning_topbot", None)
+    home_team = first_row.get("home_team", None)
+    away_team = first_row.get("away_team", None)
+
+    if inning_topbot == "Top":
+        opponent = away_team
+    elif inning_topbot == "Bot":
+        opponent = home_team
+
+    return {
+        "game_date": game_date,
+        "game_pk": safe_int(first_row.get("game_pk")),
+        "opponent": opponent,
+        "IP": ip,
+        "Pitch Count": pitch_count,
+        "BF": pa,
+        "H": h,
+        "BB": bb,
+        "HBP": hbp,
+        "SO": so,
+        "HR": hr,
+        "R": runs_allowed,
+    }
+
+
+def get_pitcher_vs_team_game_log(pitcher_id, opponent_team):
+    """
+    Pulls career game-log history for one pitcher vs one opponent team.
+
+    Uses Statcast pitch-level data from 2015-present.
+    """
+    if pitcher_id is None or opponent_team is None:
+        return pd.DataFrame()
+
+    pitcher_id = int(pitcher_id)
+    opponent_abbr_options = get_team_abbr_options_for_statcast(opponent_team)
+
+    if not opponent_abbr_options:
+        return pd.DataFrame()
+
+    cache_key = f"pitcher_vs_team_statcast_{pitcher_id}_{'_'.join(opponent_abbr_options)}"
+
+    if cache_key in MATCHUP_CACHE:
+        return pd.DataFrame(MATCHUP_CACHE[cache_key])
+
+    start_year = 2015
+    current_year = date.today().year
+
+    all_rows = []
+
+    for year in range(start_year, current_year + 1):
+        start_dt = f"{year}-03-01"
+
+        if year == current_year:
+            end_dt = date.today().strftime("%Y-%m-%d")
+        else:
+            end_dt = f"{year}-11-30"
+
+        try:
+            year_df = statcast_pitcher(
+                start_dt=start_dt,
+                end_dt=end_dt,
+                player_id=pitcher_id
+            )
+
+            if year_df is None or year_df.empty:
+                continue
+
+            required_cols = [
+                "events",
+                "inning_topbot",
+                "home_team",
+                "away_team",
+                "game_pk"
+            ]
+
+            missing_cols = [
+                col for col in required_cols if col not in year_df.columns
+            ]
+
+            if missing_cols:
+                continue
+
+            year_df = year_df.copy()
+
+            year_df["batting_team"] = None
+
+            year_df.loc[
+                year_df["inning_topbot"] == "Top",
+                "batting_team"
+            ] = year_df["away_team"]
+
+            year_df.loc[
+                year_df["inning_topbot"] == "Bot",
+                "batting_team"
+            ] = year_df["home_team"]
+
+            matchup_pitch_df = year_df[
+                year_df["batting_team"].isin(opponent_abbr_options)
+            ].copy()
+
+            if matchup_pitch_df.empty:
+                continue
+
+            terminal_df = matchup_pitch_df[
+                matchup_pitch_df["events"].notna()
+            ].copy()
+
+            if terminal_df.empty:
+                continue
+
+            for game_pk, game_df in terminal_df.groupby("game_pk"):
+                full_game_pitch_df = matchup_pitch_df[
+                    matchup_pitch_df["game_pk"] == game_pk
+                ].copy()
+
+                all_rows.append(
+                    summarize_pitcher_vs_team_game(
+                        game_df=game_df,
+                        pitch_df=full_game_pitch_df
+                    )
+                )
+
+        except Exception:
+            continue
+
+    result_df = pd.DataFrame(all_rows)
+
+    if result_df.empty:
+        MATCHUP_CACHE[cache_key] = []
+        save_matchup_cache(MATCHUP_CACHE)
+        return pd.DataFrame()
+
+    if "game_date" in result_df.columns:
         result_df = result_df.sort_values("game_date", ascending=False)
 
     result = clean_records_for_json(
