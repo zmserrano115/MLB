@@ -7,8 +7,12 @@ import json
 import pandas as pd
 import requests
 
-from pybaseball import statcast_batter, statcast_pitcher, cache as pybaseball_cache
+from pybaseball import statcast_batter, cache as pybaseball_cache
 
+try:
+    from pybaseball import statcast_pitcher
+except ImportError:
+    statcast_pitcher = None
 
 try:
     pybaseball_cache.enable()
@@ -927,6 +931,9 @@ def get_pitcher_vs_team_game_log(pitcher_id, opponent_team):
 
     Uses Statcast pitch-level data from 2015-present.
     """
+    if statcast_pitcher is None:
+        return pd.DataFrame()
+
     if pitcher_id is None or opponent_team is None:
         return pd.DataFrame()
 
