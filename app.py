@@ -1288,8 +1288,7 @@ with matchup_tab:
     st.markdown(
         """
         <div class="section-shell">
-            <div class="section-label">Analysis</div>
-            <div class="section-title">Matchup Tables</div>
+]            <div class="section-title">Matchup Tables</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1536,7 +1535,6 @@ with info_tab:
     st.markdown(
         """
         <div class="section-shell">
-            <div class="section-label">Reference</div>
             <div class="section-title">Methodology & Status</div>
         </div>
         """,
@@ -1549,16 +1547,13 @@ with info_tab:
 
         **Hitter vs Pitcher**
         - Direct hitter history against today's probable pitcher.
-        - Best used with sample size context.
 
         **Hitter vs Throwing Hand**
         - Hitter split against right-handed or left-handed pitchers.
-        - Usually more reliable than direct batter-vs-pitcher history because the sample is larger.
 
         **Strikeout Targets**
         - Uses projected innings, projected pitch count, pitcher strikeout ability,
           and opponent hitter strikeout tendencies.
-        - Click a pitcher row to view career game logs against that opponent.
 
         **Row Markers**
         - Green bar = favorable
