@@ -447,8 +447,8 @@ def grade_bar_url(grade):
         color = "9ca3af"
 
     svg = (
-        f"<svg xmlns='http://www.w3.org/2000/svg' width='6' height='32' viewBox='0 0 6 32'>"
-        f"<rect width='6' height='32' fill='#{color}'/>"
+        f"<svg xmlns='http://www.w3.org/2000/svg' width='8' height='34' viewBox='0 0 8 34'>"
+        f"<rect x='0' y='0' width='8' height='34' fill='#{color}'/>"
         f"</svg>"
     )
 
@@ -558,12 +558,12 @@ def is_missing_value(value):
 
 def table_column_config():
     return {
-        "grade_bar": st.column_config.ImageColumn("", width="small"),
-        "team_logo": st.column_config.ImageColumn("", width="small"),
-        "opponent_logo": st.column_config.ImageColumn("", width="small"),
-        "away_logo": st.column_config.ImageColumn("", width="small"),
-        "home_logo": st.column_config.ImageColumn("", width="small"),
-        "pitcher_team_logo": st.column_config.ImageColumn("", width="small"),
+        "grade_bar": st.column_config.ImageColumn("", width=18),
+        "team_logo": st.column_config.ImageColumn("", width=36),
+        "opponent_logo": st.column_config.ImageColumn("", width=36),
+        "away_logo": st.column_config.ImageColumn("", width=36),
+        "home_logo": st.column_config.ImageColumn("", width=36),
+        "pitcher_team_logo": st.column_config.ImageColumn("", width=36),
         "AVG": st.column_config.NumberColumn("AVG", format="%.3f"),
         "OBP": st.column_config.NumberColumn("OBP", format="%.3f"),
         "SLG": st.column_config.NumberColumn("SLG", format="%.3f"),
