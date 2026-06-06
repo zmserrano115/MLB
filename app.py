@@ -12,18 +12,18 @@ from src.stat_data import (
     get_batter_stats,
     get_pitcher_stats,
     get_batter_vs_pitcher_game_log,
-    get_pitcher_vs_team_game_log
+    get_pitcher_vs_team_game_log,
 )
 from src.matchups import (
     build_batter_vs_pitcher_matchups,
     build_batter_vs_hand_matchups,
-    build_pitcher_k_matchups
+    build_pitcher_k_matchups,
 )
 
 
 st.set_page_config(
     page_title="All Rise Analytics",
-    layout="wide"
+    layout="wide",
 )
 
 
@@ -248,101 +248,29 @@ st.markdown(
 
     .hero-baseball-wrap {
         position: absolute;
-        right: 36px;
+        right: 34px;
         top: 50%;
         transform: translateY(-50%);
-        width: 360px;
-        height: 360px;
+        width: 300px;
+        height: 300px;
         z-index: 2;
         pointer-events: none;
     }
 
-    .hero-baseball-shadow {
+    .hero-ball-shadow {
         position: absolute;
-        inset: 30px 10px 0 70px;
-        background: radial-gradient(circle, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0) 68%);
-        filter: blur(24px);
-        opacity: 0.38;
+        inset: 36px 18px 16px 68px;
+        background: radial-gradient(circle, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 70%);
+        filter: blur(20px);
+        opacity: 0.34;
     }
 
-    .hero-baseball {
-        position: absolute;
-        inset: 0;
-        border-radius: 50%;
-        background:
-            radial-gradient(circle at 32% 28%, #ffffff 0%, #ffffff 18%, #f9fbfd 36%, #eef2f6 64%, #dbe3ec 100%);
-        border: 1px solid rgba(255,255,255,0.72);
-        box-shadow:
-            inset -18px -24px 36px rgba(152, 169, 188, 0.30),
-            inset 20px 16px 28px rgba(255,255,255,0.82),
-            0 18px 30px rgba(0,0,0,0.16);
-    }
-
-    .hero-baseball::before,
-    .hero-baseball::after {
-        content: "";
-        position: absolute;
-        top: 42px;
-        bottom: 42px;
-        width: 96px;
-        border: 4px solid #c4444f;
-        border-top-color: transparent;
-        border-bottom-color: transparent;
-        border-radius: 120px;
-        opacity: 0.92;
-    }
-
-    .hero-baseball::before {
-        left: 62px;
-        transform: rotate(7deg);
-    }
-
-    .hero-baseball::after {
-        right: 62px;
-        transform: rotate(-7deg);
-    }
-
-    .seam-stitches-left,
-    .seam-stitches-right {
-        position: absolute;
-        top: 62px;
-        bottom: 62px;
-        width: 26px;
-        opacity: 0.82;
-    }
-
-    .seam-stitches-left {
-        left: 106px;
-        transform: rotate(8deg);
-        background:
-            repeating-linear-gradient(
-                to bottom,
-                transparent 0px,
-                transparent 10px,
-                #c4444f 10px,
-                #c4444f 13px,
-                transparent 13px,
-                transparent 24px
-            );
-        mask-image: radial-gradient(circle at 100% 50%, black 58%, transparent 60%);
-        -webkit-mask-image: radial-gradient(circle at 100% 50%, black 58%, transparent 60%);
-    }
-
-    .seam-stitches-right {
-        right: 106px;
-        transform: rotate(-8deg);
-        background:
-            repeating-linear-gradient(
-                to bottom,
-                transparent 0px,
-                transparent 10px,
-                #c4444f 10px,
-                #c4444f 13px,
-                transparent 13px,
-                transparent 24px
-            );
-        mask-image: radial-gradient(circle at 0% 50%, black 58%, transparent 60%);
-        -webkit-mask-image: radial-gradient(circle at 0% 50%, black 58%, transparent 60%);
+    .hero-ball-svg {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: block;
+        opacity: 0.95;
     }
 
     .section-shell {
@@ -674,39 +602,14 @@ st.markdown(
         }
 
         .hero-baseball-wrap {
-            width: 220px;
-            height: 220px;
-            right: -35px;
-            opacity: 0.52;
+            width: 190px;
+            height: 190px;
+            right: -18px;
+            opacity: 0.58;
         }
 
-        .hero-baseball::before,
-        .hero-baseball::after {
-            top: 28px;
-            bottom: 28px;
-            width: 58px;
-        }
-
-        .hero-baseball::before {
-            left: 39px;
-        }
-
-        .hero-baseball::after {
-            right: 39px;
-        }
-
-        .seam-stitches-left {
-            left: 70px;
-            top: 40px;
-            bottom: 40px;
-            width: 16px;
-        }
-
-        .seam-stitches-right {
-            right: 70px;
-            top: 40px;
-            bottom: 40px;
-            width: 16px;
+        .hero-ball-shadow {
+            inset: 24px 10px 10px 34px;
         }
 
         .slate-strip {
@@ -728,7 +631,7 @@ st.markdown(
     }
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
@@ -808,7 +711,7 @@ def make_light_table(df):
             **{
                 "background-color": "#ffffff",
                 "color": "#111827",
-                "border-color": "#d6dde6"
+                "border-color": "#d6dde6",
             }
         )
         .set_table_styles(
@@ -843,7 +746,7 @@ def show_table(df, key=None, selectable=False):
         "width": "stretch",
         "hide_index": True,
         "column_config": table_column_config(),
-        "row_height": 42
+        "row_height": 42,
     }
 
     if selectable:
@@ -886,7 +789,7 @@ def precomputed_files_available():
         PRECOMPUTED_DIR / "latest_schedule.csv",
         PRECOMPUTED_DIR / "latest_batter_vs_pitcher.csv",
         PRECOMPUTED_DIR / "latest_batter_vs_hand.csv",
-        PRECOMPUTED_DIR / "latest_pitcher_k_matchups.csv"
+        PRECOMPUTED_DIR / "latest_pitcher_k_matchups.csv",
     ]
 
     return all(file.exists() for file in required_files)
@@ -958,24 +861,20 @@ def is_missing_value(value):
 def table_column_config():
     return {
         "grade_bar": st.column_config.ImageColumn("", width=18),
-
         "team_logo": st.column_config.ImageColumn("", width=32),
         "opponent_logo": st.column_config.ImageColumn("", width=32),
         "away_logo": st.column_config.ImageColumn("", width=32),
         "home_logo": st.column_config.ImageColumn("", width=32),
         "pitcher_team_logo": st.column_config.ImageColumn("", width=32),
-
         "away_team": st.column_config.TextColumn("Away Team", width=145),
         "home_team": st.column_config.TextColumn("Home Team", width=145),
         "team": st.column_config.TextColumn("Team", width=125),
         "opponent": st.column_config.TextColumn("Opponent", width=125),
         "opponent_team": st.column_config.TextColumn("Opponent", width=125),
-
         "away_probable_pitcher": st.column_config.TextColumn("Away Pitcher", width=145),
         "home_probable_pitcher": st.column_config.TextColumn("Home Pitcher", width=145),
         "away_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
         "home_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
-
         "batter": st.column_config.TextColumn("Batter", width=140),
         "pitcher": st.column_config.TextColumn("Pitcher", width=140),
         "opposing_pitcher": st.column_config.TextColumn("Pitcher", width=140),
@@ -986,7 +885,6 @@ def table_column_config():
         "game_date": st.column_config.TextColumn("Date", width=95),
         "matchup_grade": st.column_config.TextColumn("Grade", width=115),
         "k_matchup_grade": st.column_config.TextColumn("K Grade", width=115),
-
         "PA": st.column_config.NumberColumn("PA", width=55, format="%d"),
         "AB": st.column_config.NumberColumn("AB", width=55, format="%d"),
         "H": st.column_config.NumberColumn("H", width=50, format="%d"),
@@ -999,14 +897,12 @@ def table_column_config():
         "R": st.column_config.NumberColumn("R", width=50, format="%d"),
         "IP": st.column_config.NumberColumn("IP", width=55, format="%.1f"),
         "Pitch Count": st.column_config.NumberColumn("PC", width=60, format="%d"),
-
         "AVG": st.column_config.NumberColumn("AVG", width=70, format="%.3f"),
         "OBP": st.column_config.NumberColumn("OBP", width=70, format="%.3f"),
         "SLG": st.column_config.NumberColumn("SLG", width=70, format="%.3f"),
         "OPS": st.column_config.NumberColumn("OPS", width=70, format="%.3f"),
         "K%": st.column_config.NumberColumn("K%", width=65, format="%.2f"),
         "BB%": st.column_config.NumberColumn("BB%", width=65, format="%.2f"),
-
         "Projected IP": st.column_config.NumberColumn("Proj IP", width=80, format="%.2f"),
         "Projected Pitch Count": st.column_config.NumberColumn("Proj PC", width=80, format="%.0f"),
         "Projected Ks": st.column_config.NumberColumn("Proj K", width=75, format="%.2f"),
@@ -1044,7 +940,7 @@ def prepare_batter_display(df):
     if "game" in df.columns and "team" in df.columns:
         df["opponent_team"] = df.apply(
             lambda row: opponent_from_game(row.get("game"), row.get("team")),
-            axis=1
+            axis=1,
         )
         df["opponent_logo"] = df["opponent_team"].apply(team_logo_url)
 
@@ -1084,7 +980,7 @@ def display_bvp_game_log(selected_row, season):
         game_log_df = get_batter_vs_pitcher_game_log(
             int(batter_id),
             int(pitcher_id),
-            int(season)
+            int(season),
         )
 
     if game_log_df.empty:
@@ -1117,7 +1013,7 @@ def display_bvp_game_log(selected_row, season):
         "SLG",
         "OPS",
         "K%",
-        "BB%"
+        "BB%",
     ]
 
     game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
@@ -1139,7 +1035,7 @@ def display_pitcher_vs_team_game_log(selected_row):
     with st.spinner("Loading pitcher-vs-team career game log..."):
         game_log_df = get_pitcher_vs_team_game_log(
             pitcher_id=int(pitcher_id),
-            opponent_team=opponent_team
+            opponent_team=opponent_team,
         )
 
     if game_log_df.empty:
@@ -1161,7 +1057,7 @@ def display_pitcher_vs_team_game_log(selected_row):
         "HBP",
         "SO",
         "HR",
-        "R"
+        "R",
     ]
 
     game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
@@ -1181,7 +1077,7 @@ with st.sidebar:
 
     season = st.selectbox(
         "Season",
-        list(range(current_year, current_year - 26, -1))
+        list(range(current_year, current_year - 26, -1)),
     )
 
     min_pa = st.number_input(
@@ -1189,7 +1085,7 @@ with st.sidebar:
         min_value=0,
         max_value=700,
         value=100,
-        step=10
+        step=10,
     )
 
     top_n = st.number_input(
@@ -1197,7 +1093,7 @@ with st.sidebar:
         min_value=5,
         max_value=100,
         value=25,
-        step=5
+        step=5,
     )
 
     force_refresh = st.button("Refresh Baseball Data")
@@ -1256,7 +1152,7 @@ else:
             schedule_df=schedule_df,
             batters_df=batters_df,
             season=season,
-            min_pa=min_pa
+            min_pa=min_pa,
         )
 
     with st.spinner("Building batter vs pitcher hand matchups..."):
@@ -1264,7 +1160,7 @@ else:
             schedule_df=schedule_df,
             batters_df=batters_df,
             season=season,
-            min_pa=min_pa
+            min_pa=min_pa,
         )
 
     with st.spinner("Building pitcher strikeout matchups..."):
@@ -1272,7 +1168,7 @@ else:
             schedule_df=schedule_df,
             batters_df=batters_df,
             pitchers_df=pitchers_df,
-            min_pa=min_pa
+            min_pa=min_pa,
         )
 
 
@@ -1298,14 +1194,14 @@ with st.sidebar:
             </span>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     selected_game = st.selectbox(
         "Game Filter",
         game_options,
         index=0,
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
 
 
@@ -1321,31 +1217,82 @@ else:
     display_game_date = format_display_date(selected_date)
 
 
-main_tab, matchup_tab, info_tab = st.tabs([
-    "Overview",
-    "Matchups",
-    "Methodology & Status"
-])
+main_tab, matchup_tab, info_tab = st.tabs(
+    [
+        "Overview",
+        "Matchups",
+        "Methodology & Status",
+    ]
+)
 
 
 with main_tab:
     st.markdown(
-    """<section class="brand-hero">
-        <div class="hero-content">
-            <div class="hero-brand">All Rise Analytics</div>
-            <div class="hero-line"></div>
-            <p class="hero-headline">
-                Daily MLB matchup research built around probable pitchers, hitter splits, and strikeout targets.
-            </p>
-        </div>
-        <div class="hero-baseball-wrap">
-            <div class="hero-baseball-shadow"></div>
-            <div class="hero-baseball"></div>
-            <div class="seam-stitches-left"></div>
-            <div class="seam-stitches-right"></div>
-        </div>
-    </section>""",
-    unsafe_allow_html=True
+        """<section class="brand-hero">
+    <div class="hero-content">
+        <div class="hero-brand">All Rise Analytics</div>
+        <div class="hero-line"></div>
+        <p class="hero-headline">
+            Daily MLB matchup research built around probable pitchers, hitter splits, and strikeout targets.
+        </p>
+    </div>
+
+    <div class="hero-baseball-wrap">
+        <div class="hero-ball-shadow"></div>
+        <svg class="hero-ball-svg" viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+                <radialGradient id="ballFill" cx="32%" cy="28%" r="72%">
+                    <stop offset="0%" stop-color="#ffffff"/>
+                    <stop offset="55%" stop-color="#f4f7fb"/>
+                    <stop offset="100%" stop-color="#d9e3ee"/>
+                </radialGradient>
+            </defs>
+
+            <circle cx="210" cy="210" r="155" fill="url(#ballFill)" stroke="rgba(255,255,255,0.8)" stroke-width="2"/>
+
+            <path
+                d="M150 88
+                   C118 118, 112 162, 116 210
+                   C120 258, 118 304, 148 334"
+                fill="none"
+                stroke="#b44e63"
+                stroke-width="6"
+                stroke-linecap="round"
+            />
+
+            <path
+                d="M270 88
+                   C302 118, 308 162, 304 210
+                   C300 258, 302 304, 272 334"
+                fill="none"
+                stroke="#b44e63"
+                stroke-width="6"
+                stroke-linecap="round"
+            />
+
+            <g stroke="#b44e63" stroke-width="4" stroke-linecap="round">
+                <path d="M138 118 l18 6"/>
+                <path d="M128 150 l22 6"/>
+                <path d="M124 184 l24 4"/>
+                <path d="M124 218 l24 0"/>
+                <path d="M126 252 l24 -4"/>
+                <path d="M132 286 l22 -6"/>
+                <path d="M142 318 l18 -8"/>
+            </g>
+
+            <g stroke="#b44e63" stroke-width="4" stroke-linecap="round">
+                <path d="M282 118 l-18 6"/>
+                <path d="M292 150 l-22 6"/>
+                <path d="M296 184 l-24 4"/>
+                <path d="M296 218 l-24 0"/>
+                <path d="M294 252 l-24 -4"/>
+                <path d="M288 286 l-22 -6"/>
+                <path d="M278 318 l-18 -8"/>
+            </g>
+        </svg>
+    </div>
+</section>""",
+        unsafe_allow_html=True,
     )
 
     selected_game_display = selected_game if selected_game != "All Games" else "Full slate"
@@ -1371,7 +1318,7 @@ with main_tab:
             </div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     st.markdown(
@@ -1381,7 +1328,7 @@ with main_tab:
             <div class="section-title">Today's Games <span class="title-date">{display_game_date}</span></div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     schedule_display = prepare_schedule_display(filtered_schedule_df)
@@ -1394,7 +1341,7 @@ with main_tab:
         "away_probable_pitcher",
         "away_pitcher_hand",
         "home_probable_pitcher",
-        "home_pitcher_hand"
+        "home_pitcher_hand",
     ]
 
     schedule_display_cols = [
@@ -1412,14 +1359,16 @@ with matchup_tab:
             <div class="section-title">Matchup Tables</div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
-    tab1, tab2, tab3 = st.tabs([
-        "Hitter vs Pitcher",
-        "Hitter vs Throwing Hand",
-        "Strikeout Targets"
-    ])
+    tab1, tab2, tab3 = st.tabs(
+        [
+            "Hitter vs Pitcher",
+            "Hitter vs Throwing Hand",
+            "Strikeout Targets",
+        ]
+    )
 
     with tab1:
         st.markdown(
@@ -1429,7 +1378,7 @@ with matchup_tab:
                 <div class="section-title">Hitter vs Pitcher <span class="title-date">{display_game_date}</span></div>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         if filtered_bvp_matchups.empty:
@@ -1440,7 +1389,7 @@ with matchup_tab:
                 min_value=0,
                 max_value=50,
                 value=0,
-                step=1
+                step=1,
             )
 
             display_bvp = filtered_bvp_matchups[
@@ -1471,7 +1420,7 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
-                "matchup_grade"
+                "matchup_grade",
             ]
 
             bvp_cols = [col for col in bvp_cols if col in display_bvp.columns]
@@ -1481,7 +1430,7 @@ with matchup_tab:
             bvp_event = show_table(
                 display_bvp[bvp_cols],
                 key="bvp_table",
-                selectable=True
+                selectable=True,
             )
 
             selected_row = None
@@ -1509,7 +1458,7 @@ with matchup_tab:
                 <div class="section-title">Hitter vs Throwing Hand <span class="title-date">{display_game_date}</span></div>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         if filtered_hand_matchups.empty:
@@ -1520,7 +1469,7 @@ with matchup_tab:
                 min_value=0,
                 max_value=300,
                 value=20,
-                step=5
+                step=5,
             )
 
             min_hand_obp = st.slider(
@@ -1528,12 +1477,12 @@ with matchup_tab:
                 min_value=0.150,
                 max_value=0.500,
                 value=0.320,
-                step=0.005
+                step=0.005,
             )
 
             display_hand = filtered_hand_matchups[
-                (filtered_hand_matchups["PA"] >= min_hand_pa) &
-                (filtered_hand_matchups["OBP"] >= min_hand_obp)
+                (filtered_hand_matchups["PA"] >= min_hand_pa)
+                & (filtered_hand_matchups["OBP"] >= min_hand_obp)
             ].copy()
 
             display_hand = display_hand.head(int(top_n))
@@ -1561,7 +1510,7 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
-                "matchup_grade"
+                "matchup_grade",
             ]
 
             hand_cols = [col for col in hand_cols if col in display_hand.columns]
@@ -1576,7 +1525,7 @@ with matchup_tab:
                 <div class="section-title">Strikeout Targets <span class="title-date">{display_game_date}</span></div>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         if filtered_pitcher_k_matchups.empty:
@@ -1585,11 +1534,12 @@ with matchup_tab:
             required_projected_cols = [
                 "Projected IP",
                 "Projected Pitch Count",
-                "Projected Ks"
+                "Projected Ks",
             ]
 
             missing_projected_cols = [
-                col for col in required_projected_cols
+                col
+                for col in required_projected_cols
                 if col not in filtered_pitcher_k_matchups.columns
             ]
 
@@ -1618,7 +1568,7 @@ with matchup_tab:
                 "K/9",
                 "opponent_avg_k%",
                 "k_matchup_score",
-                "k_matchup_grade"
+                "k_matchup_grade",
             ]
 
             k_cols = [col for col in k_cols if col in display_k.columns]
@@ -1628,7 +1578,7 @@ with matchup_tab:
             k_event = show_table(
                 display_k[k_cols],
                 key="pitcher_k_table",
-                selectable=True
+                selectable=True,
             )
 
             selected_pitcher_row = None
@@ -1657,7 +1607,7 @@ with info_tab:
             <div class="section-title">Methodology & Status</div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     st.markdown(
@@ -1733,7 +1683,7 @@ with info_tab:
             be more useful for evaluating matchup context.
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     st.subheader("Data Refresh Status")
