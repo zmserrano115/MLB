@@ -111,6 +111,7 @@ st.markdown(
 
     :root {
         --bg: #f3f5f7;
+        --bg-top: #edf2f6;
         --nav: #06172b;
         --panel: #ffffff;
         --text: #111827;
@@ -120,7 +121,6 @@ st.markdown(
         --line-dark: #b9c3cf;
         --accent: #0f3b66;
         --accent-2: #173f68;
-        --field: #0b2a3f;
         --font-body: "Manrope", "Segoe UI", Helvetica, sans-serif;
         --font-display: "Bebas Neue", "Arial Narrow", sans-serif;
     }
@@ -131,15 +131,7 @@ st.markdown(
 
     .stApp {
         background:
-            linear-gradient(180deg, rgba(6, 23, 43, 0.035), rgba(243, 245, 247, 0) 360px),
-            repeating-linear-gradient(
-                135deg,
-                rgba(6, 23, 43, 0.018) 0px,
-                rgba(6, 23, 43, 0.018) 1px,
-                transparent 1px,
-                transparent 18px
-            ),
-            var(--bg);
+            linear-gradient(180deg, var(--bg-top) 0px, var(--bg) 260px, var(--bg) 100%);
         color: var(--text);
     }
 
@@ -195,15 +187,13 @@ st.markdown(
         position: relative;
         margin: 0 0 18px 0;
         padding: 34px 34px 38px 34px;
-        min-height: 285px;
+        min-height: 290px;
         display: flex;
         align-items: center;
         overflow: hidden;
         border: 1px solid #08223a;
         background:
-            linear-gradient(90deg, rgba(6, 23, 43, 0.96), rgba(8, 38, 62, 0.88)),
-            radial-gradient(circle at 78% 34%, rgba(255,255,255,0.16), transparent 24%),
-            linear-gradient(135deg, #06172b 0%, #0c2f4d 52%, #123f61 100%);
+            linear-gradient(90deg, rgba(6, 23, 43, 0.97) 0%, rgba(10, 35, 57, 0.93) 45%, rgba(14, 53, 84, 0.88) 100%);
     }
 
     .brand-hero::before {
@@ -211,46 +201,21 @@ st.markdown(
         position: absolute;
         inset: 0;
         background:
-            linear-gradient(115deg, transparent 0%, transparent 56%, rgba(255,255,255,0.08) 56%, rgba(255,255,255,0.08) 57%, transparent 57%),
-            repeating-linear-gradient(
-                90deg,
-                rgba(255,255,255,0.04) 0px,
-                rgba(255,255,255,0.04) 1px,
-                transparent 1px,
-                transparent 64px
-            );
-        opacity: 0.65;
-        animation: heroShift 16s linear infinite;
+            radial-gradient(circle at 76% 34%, rgba(255,255,255,0.08), transparent 22%),
+            linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+        opacity: 1;
+        animation: heroGlow 10s ease-in-out infinite alternate;
     }
 
-    .brand-hero::after {
-        content: "";
-        position: absolute;
-        right: -80px;
-        bottom: -120px;
-        width: 520px;
-        height: 320px;
-        border: 1px solid rgba(255,255,255,0.18);
-        transform: rotate(-12deg);
-        background:
-            repeating-linear-gradient(
-                0deg,
-                rgba(255,255,255,0.055) 0px,
-                rgba(255,255,255,0.055) 1px,
-                transparent 1px,
-                transparent 24px
-            );
-    }
-
-    @keyframes heroShift {
-        from { background-position: 0 0, 0 0; }
-        to { background-position: 220px 0, 160px 0; }
+    @keyframes heroGlow {
+        from { opacity: 0.85; }
+        to { opacity: 1; }
     }
 
     .hero-content {
         position: relative;
-        z-index: 2;
-        max-width: 850px;
+        z-index: 3;
+        max-width: 820px;
     }
 
     .hero-brand {
@@ -282,8 +247,121 @@ st.markdown(
         font-size: 20px;
         line-height: 1.45;
         font-weight: 500;
-        max-width: 760px;
+        max-width: 720px;
         margin: 0;
+    }
+
+    .hero-baseball-wrap {
+        position: absolute;
+        right: -46px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 470px;
+        height: 470px;
+        z-index: 1;
+        pointer-events: none;
+        animation: baseballFloat 8s ease-in-out infinite;
+    }
+
+    @keyframes baseballFloat {
+        0% { transform: translateY(-50%) rotate(-5deg); }
+        50% { transform: translateY(calc(-50% - 8px)) rotate(-2deg); }
+        100% { transform: translateY(-50%) rotate(-5deg); }
+    }
+
+    .hero-baseball-shadow {
+        position: absolute;
+        inset: 30px 10px 0 70px;
+        background: radial-gradient(circle, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0) 68%);
+        filter: blur(24px);
+        opacity: 0.45;
+        animation: shadowPulse 8s ease-in-out infinite;
+    }
+
+    @keyframes shadowPulse {
+        0% { opacity: 0.38; transform: scale(0.98); }
+        50% { opacity: 0.50; transform: scale(1.02); }
+        100% { opacity: 0.38; transform: scale(0.98); }
+    }
+
+    .hero-baseball {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background:
+            radial-gradient(circle at 32% 28%, #ffffff 0%, #ffffff 18%, #f9fbfd 36%, #eef2f6 64%, #dbe3ec 100%);
+        border: 1px solid rgba(255,255,255,0.72);
+        box-shadow:
+            inset -18px -24px 36px rgba(152, 169, 188, 0.34),
+            inset 20px 16px 28px rgba(255,255,255,0.86),
+            0 22px 38px rgba(0,0,0,0.20);
+    }
+
+    .hero-baseball::before,
+    .hero-baseball::after {
+        content: "";
+        position: absolute;
+        top: 52px;
+        bottom: 52px;
+        width: 120px;
+        border: 4px solid #c4444f;
+        border-top-color: transparent;
+        border-bottom-color: transparent;
+        border-radius: 120px;
+        opacity: 0.92;
+    }
+
+    .hero-baseball::before {
+        left: 88px;
+        transform: rotate(7deg);
+    }
+
+    .hero-baseball::after {
+        right: 88px;
+        transform: rotate(-7deg);
+    }
+
+    .seam-stitches-left,
+    .seam-stitches-right {
+        position: absolute;
+        top: 76px;
+        bottom: 76px;
+        width: 34px;
+        opacity: 0.82;
+    }
+
+    .seam-stitches-left {
+        left: 146px;
+        transform: rotate(8deg);
+        background:
+            repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 10px,
+                #c4444f 10px,
+                #c4444f 13px,
+                transparent 13px,
+                transparent 24px
+            );
+        mask-image: radial-gradient(circle at 100% 50%, black 58%, transparent 60%);
+        -webkit-mask-image: radial-gradient(circle at 100% 50%, black 58%, transparent 60%);
+    }
+
+    .seam-stitches-right {
+        right: 146px;
+        transform: rotate(-8deg);
+        background:
+            repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 10px,
+                #c4444f 10px,
+                #c4444f 13px,
+                transparent 13px,
+                transparent 24px
+            );
+        mask-image: radial-gradient(circle at 0% 50%, black 58%, transparent 60%);
+        -webkit-mask-image: radial-gradient(circle at 0% 50%, black 58%, transparent 60%);
     }
 
     .section-shell {
@@ -298,7 +376,7 @@ st.markdown(
     .selected-game-label {
         color: var(--muted-2);
         font-size: 11px;
-        font-weight: 600;
+        font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.09em;
         margin-bottom: 6px;
@@ -307,10 +385,10 @@ st.markdown(
     .section-title {
         color: var(--text);
         font-family: var(--font-body) !important;
-        font-size: 23px;
+        font-size: 22px;
         line-height: 1.15;
-        font-weight: 600;
-        letter-spacing: 0;
+        font-weight: 500;
+        letter-spacing: 0.01em;
         margin-bottom: 0;
     }
 
@@ -331,8 +409,8 @@ st.markdown(
     }
 
     .slate-item {
-        min-height: 76px;
-        padding: 13px 16px;
+        min-height: 72px;
+        padding: 12px 15px;
         border-right: 1px solid var(--line);
         display: flex;
         flex-direction: column;
@@ -345,9 +423,9 @@ st.markdown(
 
     .slate-value {
         color: var(--text);
-        font-size: 24px;
-        font-weight: 600;
-        line-height: 1.05;
+        font-size: 22px;
+        font-weight: 500;
+        line-height: 1.08;
         letter-spacing: 0;
         margin-top: 4px;
     }
@@ -379,7 +457,7 @@ st.markdown(
         color: var(--muted);
         background: transparent;
         font-weight: 500;
-        letter-spacing: 0;
+        letter-spacing: 0.01em;
     }
 
     .stTabs [aria-selected="true"] {
@@ -431,7 +509,7 @@ st.markdown(
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3 {
         color: #111827 !important;
-        font-weight: 600 !important;
+        font-weight: 500 !important;
     }
 
     section[data-testid="stSidebar"] p,
@@ -603,7 +681,7 @@ st.markdown(
 
         .brand-hero {
             padding: 28px 22px 30px 22px;
-            min-height: 260px;
+            min-height: 250px;
         }
 
         .hero-brand {
@@ -612,6 +690,42 @@ st.markdown(
 
         .hero-headline {
             font-size: 17px;
+        }
+
+        .hero-baseball-wrap {
+            width: 250px;
+            height: 250px;
+            right: -86px;
+            opacity: 0.55;
+        }
+
+        .hero-baseball::before,
+        .hero-baseball::after {
+            top: 28px;
+            bottom: 28px;
+            width: 64px;
+        }
+
+        .hero-baseball::before {
+            left: 44px;
+        }
+
+        .hero-baseball::after {
+            right: 44px;
+        }
+
+        .seam-stitches-left {
+            left: 79px;
+            top: 43px;
+            bottom: 43px;
+            width: 18px;
+        }
+
+        .seam-stitches-right {
+            right: 79px;
+            top: 43px;
+            bottom: 43px;
+            width: 18px;
         }
 
         .slate-strip {
@@ -1243,6 +1357,13 @@ with main_tab:
                 <p class="hero-headline">
                     Daily MLB matchup research built around probable pitchers, hitter splits, and strikeout targets.
                 </p>
+            </div>
+
+            <div class="hero-baseball-wrap">
+                <div class="hero-baseball-shadow"></div>
+                <div class="hero-baseball"></div>
+                <div class="seam-stitches-left"></div>
+                <div class="seam-stitches-right"></div>
             </div>
         </section>
         """,
