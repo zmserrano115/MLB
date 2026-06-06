@@ -12,6 +12,22 @@ from src.stat_data import (
     get_hitter_vs_hand_stats
 )
 
+def is_valid_player_id(value):
+    if value is None:
+        return False
+
+    try:
+        if pd.isna(value):
+            return False
+    except Exception:
+        pass
+
+    text_value = str(value).strip().lower()
+
+    if text_value in ["", "nan", "none", "null"]:
+        return False
+
+    return True
 
 def get_team_batters(batters_df, team_id, min_pa=100):
     """
@@ -69,7 +85,7 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
 
         for _, batter in home_batters.iterrows():
             batter_id = batter.get("player_id")
-
+            
             stats = get_hitter_vs_pitcher_stats(
                 batter_id=batter_id,
                 pitcher_id=away_pitcher_id,

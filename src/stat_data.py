@@ -474,11 +474,39 @@ def clean_stat_result(stat):
 def get_hitter_vs_pitcher_stats(batter_id, pitcher_id, season):
     """
     Pulls exact batter vs opposing pitcher matchup for the selected season.
+
+    If the pitcher ID is missing, it returns an empty stat result instead
+    of crashing the GitHub Action refresh.
     """
-    if batter_id is None or pitcher_id is None:
+    if is_missing(batter_id) or is_missing(pitcher_id):
         return clean_stat_result({})
 
-    cache_key = f"bvp_{season}_{int(batter_id)}_{int(pitcher_id)}"
+    try:
+        batter_id = int(batter_id)
+        pitcher_id = int(pitcher_id)
+    except Exception:
+        return clean_stat_result({})
+    
+    if batter_id is None or pitcher_id is None or pd.isna(batter_id) or pd.isna(pitcher_id):
+        return {
+            "PA": 0,
+            "AB": 0,
+            "H": 0,
+            "BB": 0,
+            "HBP": 0,
+            "SO": 0,
+            "HR": 0,
+            "RBI": 0,
+            "AVG": 0.000,
+            "OBP": 0.000,
+            "SLG": 0.000,
+            "OPS": 0.000,
+            "K%": 0.00,
+            "BB%": 0.00,
+            "matchup_grade": "No Pitcher ID"
+    }
+
+    cache_key = f"bvp_{season}_{batter_id}_{pitcher_id}"
 
     if cache_key in MATCHUP_CACHE:
         return MATCHUP_CACHE[cache_key]
@@ -486,14 +514,14 @@ def get_hitter_vs_pitcher_stats(batter_id, pitcher_id, season):
     params = {
         "stats": "vsPlayer",
         "group": "hitting",
-        "opposingPlayerId": int(pitcher_id),
+        "opposingPlayerId": pitcher_id,
         "sportId": 1,
         "season": int(season)
     }
 
     try:
         response = requests.get(
-            PLAYER_STATS_URL.format(int(batter_id)),
+            PLAYER_STATS_URL.format(batter_id),
             params=params,
             timeout=20
         )
@@ -764,11 +792,14 @@ def get_batter_vs_pitcher_game_log(batter_id, pitcher_id, season=None):
     """
     Pulls career game-log history for one batter vs one pitcher.
     """
-    if batter_id is None or pitcher_id is None:
+    if is_missing(batter_id) or is_missing(pitcher_id):
         return pd.DataFrame()
 
-    batter_id = int(batter_id)
-    pitcher_id = int(pitcher_id)
+    try:
+        batter_id = int(batter_id)
+        pitcher_id = int(pitcher_id)
+    except Exception:
+        return pd.DataFrame()
 
     cache_key = f"gamelog_career_pybaseball_{batter_id}_{pitcher_id}"
 
