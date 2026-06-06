@@ -1,37 +1,52 @@
-name: All Rise Data Refresh
+name: Refresh MLB matchup data
 
 on:
   schedule:
-    # Morning refresh
-    - cron: "30 12 * * *"
+    # 1:30 PM Mountain Time - refresh today's slate
+    - cron: "30 13 * * *"
+      timezone: "America/Denver"
 
-    # Midday refresh
-    - cron: "30 18 * * *"
+    # 11:30 PM Mountain Time - refresh tomorrow's slate
+    - cron: "30 23 * * *"
+      timezone: "America/Denver"
 
   workflow_dispatch:
     inputs:
-      min_pa:
-        description: "Minimum season PA to include hitters"
+      game_date:
+        description: "Optional game date in YYYY-MM-DD format. Leave blank to use today's date."
         required: false
-        default: "100"
+        type: string
+
       build_game_logs:
-        description: "Preload Batter vs Pitcher career game logs"
-        required: false
+        description: "Build game logs?"
+        required: true
         default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
       max_game_logs:
-        description: "Maximum number of BvP game logs to preload"
-        required: false
+        description: "Maximum game logs to build"
+        required: true
         default: "50"
+        type: string
+
+      minimum_pa:
+        description: "Minimum PA"
+        required: true
+        default: "100"
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: all-rise-data-refresh
-  cancel-in-progress: true
+  group: refresh-mlb-data
+  cancel-in-progress: false
 
 jobs:
-  refresh-data:
+  refresh:
     runs-on: ubuntu-latest
 
     steps:
@@ -39,90 +54,91 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: "pip"
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run MLB refresh
+      - name: Choose refresh date
+        id: choose_date
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            MIN_PA="${{ github.event.inputs.min_pa }}"
-            BUILD_GAME_LOGS="${{ github.event.inputs.build_game_logs }}"
-            MAX_GAME_LOGS="${{ github.event.inputs.max_game_logs }}"
+          MANUAL_GAME_DATE="${{ github.event.inputs.game_date }}"
+
+          if [ -n "$MANUAL_GAME_DATE" ]; then
+            GAME_DATE="$MANUAL_GAME_DATE"
+            REFRESH_TYPE="manual custom date"
+
+          elif [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" = "30 23 * * *" ]; then
+            GAME_DATE=$(TZ="America/Denver" date -d "tomorrow" +"%Y-%m-%d")
+            REFRESH_TYPE="scheduled 11:30 PM tomorrow slate"
+
           else
-            MIN_PA="100"
+            GAME_DATE=$(TZ="America/Denver" date +"%Y-%m-%d")
+            REFRESH_TYPE="scheduled/manual today slate"
+          fi
+
+          echo "GAME_DATE=$GAME_DATE" >> "$GITHUB_ENV"
+          echo "REFRESH_TYPE=$REFRESH_TYPE" >> "$GITHUB_ENV"
+
+          echo "Selected game date: $GAME_DATE"
+          echo "Refresh type: $REFRESH_TYPE"
+
+      - name: Refresh MLB data
+        shell: bash
+        run: |
+          BUILD_GAME_LOGS="${{ github.event.inputs.build_game_logs }}"
+          MAX_GAME_LOGS="${{ github.event.inputs.max_game_logs }}"
+          MINIMUM_PA="${{ github.event.inputs.minimum_pa }}"
+
+          if [ -z "$BUILD_GAME_LOGS" ]; then
             BUILD_GAME_LOGS="true"
+          fi
+
+          if [ -z "$MAX_GAME_LOGS" ]; then
             MAX_GAME_LOGS="50"
           fi
 
+          if [ -z "$MINIMUM_PA" ]; then
+            MINIMUM_PA="100"
+          fi
+
+          echo "Running refresh for game date: $GAME_DATE"
+          echo "Build game logs: $BUILD_GAME_LOGS"
+          echo "Max game logs: $MAX_GAME_LOGS"
+          echo "Minimum PA: $MINIMUM_PA"
+
           if [ "$BUILD_GAME_LOGS" = "true" ]; then
-            python refresh_nightly.py --min-pa "$MIN_PA" --build-game-logs --max-game-logs "$MAX_GAME_LOGS"
+            python refresh_nightly.py \
+              --game-date "$GAME_DATE" \
+              --minimum-pa "$MINIMUM_PA" \
+              --build-game-logs \
+              --max-game-logs "$MAX_GAME_LOGS"
           else
-            python refresh_nightly.py --min-pa "$MIN_PA"
+            python refresh_nightly.py \
+              --game-date "$GAME_DATE" \
+              --minimum-pa "$MINIMUM_PA" \
+              --max-game-logs "$MAX_GAME_LOGS"
           fi
 
-      - name: Save refreshed files temporarily
-        run: |
-          mkdir -p /tmp/refreshed_data
-
-          if [ -d "data/precomputed" ]; then
-            cp -r data/precomputed /tmp/refreshed_data/precomputed
-          fi
-
-          if [ -f "data/matchup_cache.json" ]; then
-            cp data/matchup_cache.json /tmp/refreshed_data/matchup_cache.json
-          fi
-
-      - name: Commit refreshed data safely
+      - name: Commit refreshed data
+        shell: bash
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          for attempt in 1 2 3
-          do
-            echo "Push attempt $attempt"
+          git add data
 
-            git fetch origin main
-            git reset --hard origin/main
-
-            mkdir -p data
-
-            if [ -d "/tmp/refreshed_data/precomputed" ]; then
-              rm -rf data/precomputed
-              cp -r /tmp/refreshed_data/precomputed data/precomputed
-            fi
-
-            if [ -f "/tmp/refreshed_data/matchup_cache.json" ]; then
-              cp /tmp/refreshed_data/matchup_cache.json data/matchup_cache.json
-            fi
-
-            git add data/precomputed/
-            git add data/matchup_cache.json || true
-
-            if git diff --cached --quiet; then
-              echo "No refreshed data changes to commit."
-              exit 0
-            fi
-
-            git commit -m "Refresh MLB matchup data"
-
-            if git push origin main; then
-              echo "Push succeeded."
-              exit 0
-            fi
-
-            echo "Push failed. Retrying..."
-            sleep 5
-          done
-
-          echo "Failed to push after 3 attempts."
-          exit 1
+          if git diff --cached --quiet; then
+            echo "No refreshed data changes to commit."
+          else
+            git commit -m "Refresh MLB matchup data for $GAME_DATE"
+            git pull --rebase origin main
+            git push origin main
+          fi
