@@ -29,7 +29,7 @@ on:
       max_game_logs:
         description: "Maximum game logs to build"
         required: true
-        default: "50"
+        default: "100"
         type: string
 
       minimum_pa:
@@ -102,7 +102,7 @@ jobs:
           fi
 
           if [ -z "$MAX_GAME_LOGS" ]; then
-            MAX_GAME_LOGS="50"
+            MAX_GAME_LOGS="100"
           fi
 
           if [ -z "$MINIMUM_PA" ]; then
