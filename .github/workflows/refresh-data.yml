@@ -38,6 +38,15 @@ on:
         default: "100"
         type: string
 
+      test_only:
+        description: "Test workflow only without refreshing data?"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
 permissions:
   contents: write
 
@@ -66,7 +75,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Test workflow without refresh
+        if: ${{ github.event.inputs.test_only == 'true' }}
+        shell: bash
+        run: |
+          echo "Testing Python syntax and refresh script arguments..."
+          python -m py_compile refresh_nightly.py src/stat_data.py src/matchups.py src/mlb_schedule.py src/scoring.py app.py
+          python refresh_nightly.py --help
+          echo "Workflow test passed. Skipping full refresh."
+
       - name: Choose refresh date
+        if: ${{ github.event.inputs.test_only != 'true' }}
         shell: bash
         run: |
           MANUAL_GAME_DATE="${{ github.event.inputs.game_date }}"
@@ -91,6 +110,7 @@ jobs:
           echo "Refresh type: $REFRESH_TYPE"
 
       - name: Refresh MLB data
+        if: ${{ github.event.inputs.test_only != 'true' }}
         shell: bash
         run: |
           BUILD_GAME_LOGS="${{ github.event.inputs.build_game_logs }}"
@@ -128,20 +148,20 @@ jobs:
           fi
 
       - name: Commit refreshed data and cache
+        if: ${{ github.event.inputs.test_only != 'true' }}
         shell: bash
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Make sure we are on the newest remote before committing refreshed files.
-          # Autostash prevents the "unstaged changes" rebase error.
+          # Pull latest remote before committing. Autostash prevents unstaged-change rebase errors.
           git pull --rebase --autostash origin main
 
-          # Remove Python cache files so they do not get committed or block rebase.
+          # Remove Python cache files so they do not get committed or block the action.
           find . -type d -name "__pycache__" -prune -exec rm -rf {} +
           find . -name "*.pyc" -delete
 
-          # Stage only real app data files.
+          # Stage only refreshed data files.
           git add data
 
           if git diff --cached --quiet; then
