@@ -372,18 +372,93 @@ st.markdown(
         color: var(--text);
     }
 
-    div[data-testid="stSidebar"] {
-        background: #06172b;
-        border-right: 1px solid rgba(255,255,255,0.08);
+    section[data-testid="stSidebar"] {
+        background: #ffffff !important;
+        border-right: 1px solid #cfd7e2 !important;
+        box-shadow: 6px 0 22px rgba(15, 23, 42, 0.10);
     }
 
-    div[data-testid="stSidebar"] * {
-        color: #f8fafc;
+    section[data-testid="stSidebar"] > div {
+        background: #ffffff !important;
+        padding-top: 1.25rem;
     }
 
-    div[data-testid="stSidebar"] input,
-    div[data-testid="stSidebar"] textarea,
-    div[data-testid="stSidebar"] select {
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 {
+        color: #111827 !important;
+        font-weight: 750 !important;
+    }
+
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] {
+        color: #111827 !important;
+    }
+
+    section[data-testid="stSidebar"] label p {
+        color: #374151 !important;
+        font-size: 13px !important;
+        font-weight: 650 !important;
+    }
+
+    section[data-testid="stSidebar"] small {
+        color: #4b5563 !important;
+    }
+
+    section[data-testid="stSidebar"] input {
+        background: #f8fafc !important;
+        color: #111827 !important;
+        border: 1px solid #cfd7e2 !important;
+        border-radius: 5px !important;
+    }
+
+    section[data-testid="stSidebar"] [data-baseweb="select"] > div {
+        background: #f8fafc !important;
+        color: #111827 !important;
+        border: 1px solid #cfd7e2 !important;
+        border-radius: 5px !important;
+    }
+
+    section[data-testid="stSidebar"] [data-baseweb="select"] span {
+        color: #111827 !important;
+    }
+
+    section[data-testid="stSidebar"] button {
+        background: #0f3b66 !important;
+        color: #ffffff !important;
+        border: 1px solid #0f3b66 !important;
+        border-radius: 5px !important;
+        font-weight: 650 !important;
+    }
+
+    section[data-testid="stSidebar"] button:hover {
+        background: #145083 !important;
+        border-color: #145083 !important;
+        color: #ffffff !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stNumberInput"] button {
+        background: #eef3f8 !important;
+        color: #111827 !important;
+        border: 1px solid #cfd7e2 !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stCheckbox"] label {
+        background: #f8fafc !important;
+        border: 1px solid #d8dee6 !important;
+        border-radius: 6px !important;
+        padding: 8px 10px !important;
+        width: 100%;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stCheckbox"] p {
+        color: #111827 !important;
+        font-weight: 650 !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stDateInput"] input {
         color: #111827 !important;
     }
     </style>
@@ -559,25 +634,63 @@ def is_missing_value(value):
 def table_column_config():
     return {
         "grade_bar": st.column_config.ImageColumn("", width=18),
+
         "team_logo": st.column_config.ImageColumn("", width=36),
         "opponent_logo": st.column_config.ImageColumn("", width=36),
         "away_logo": st.column_config.ImageColumn("", width=36),
         "home_logo": st.column_config.ImageColumn("", width=36),
         "pitcher_team_logo": st.column_config.ImageColumn("", width=36),
-        "AVG": st.column_config.NumberColumn("AVG", format="%.3f"),
-        "OBP": st.column_config.NumberColumn("OBP", format="%.3f"),
-        "SLG": st.column_config.NumberColumn("SLG", format="%.3f"),
+
+        "away_team": st.column_config.TextColumn("Away Team"),
+        "home_team": st.column_config.TextColumn("Home Team"),
+        "team": st.column_config.TextColumn("Team"),
+        "opponent": st.column_config.TextColumn("Opponent"),
+        "opponent_team": st.column_config.TextColumn("Opponent"),
+
+        "away_probable_pitcher": st.column_config.TextColumn("Away Pitcher"),
+        "home_probable_pitcher": st.column_config.TextColumn("Home Pitcher"),
+        "away_pitcher_hand": st.column_config.TextColumn("Away Throwing Hand"),
+        "home_pitcher_hand": st.column_config.TextColumn("Home Throwing Hand"),
+
+        "batter": st.column_config.TextColumn("Batter"),
+        "pitcher": st.column_config.TextColumn("Pitcher"),
+        "opposing_pitcher": st.column_config.TextColumn("Pitcher"),
+        "pitcher_hand": st.column_config.TextColumn("Throwing Hand"),
+        "opposing_pitcher_hand": st.column_config.TextColumn("Throwing Hand"),
+        "split": st.column_config.TextColumn("Split"),
+        "home_away": st.column_config.TextColumn("Home/Away"),
+        "game_date": st.column_config.TextColumn("Date"),
+        "matchup_grade": st.column_config.TextColumn("Matchup Grade"),
+        "k_matchup_grade": st.column_config.TextColumn("K Matchup Grade"),
+
+        "PA": st.column_config.NumberColumn("Plate Appearances", format="%d"),
+        "AB": st.column_config.NumberColumn("At-Bats", format="%d"),
+        "H": st.column_config.NumberColumn("Hits", format="%d"),
+        "BB": st.column_config.NumberColumn("Walks", format="%d"),
+        "HBP": st.column_config.NumberColumn("Hit By Pitch", format="%d"),
+        "SO": st.column_config.NumberColumn("Strikeouts", format="%d"),
+        "HR": st.column_config.NumberColumn("Home Runs", format="%d"),
+        "RBI": st.column_config.NumberColumn("Runs Batted In", format="%d"),
+        "BF": st.column_config.NumberColumn("Batters Faced", format="%d"),
+        "R": st.column_config.NumberColumn("Runs Allowed", format="%d"),
+        "IP": st.column_config.NumberColumn("Innings Pitched", format="%.1f"),
+        "Pitch Count": st.column_config.NumberColumn("Pitch Count", format="%d"),
+
+        "AVG": st.column_config.NumberColumn("Average", format="%.3f"),
+        "OBP": st.column_config.NumberColumn("On-Base %", format="%.3f"),
+        "SLG": st.column_config.NumberColumn("Slugging %", format="%.3f"),
         "OPS": st.column_config.NumberColumn("OPS", format="%.3f"),
-        "K%": st.column_config.NumberColumn("K%", format="%.2f"),
-        "BB%": st.column_config.NumberColumn("BB%", format="%.2f"),
-        "Projected IP": st.column_config.NumberColumn("Proj IP", format="%.2f"),
-        "Projected Pitch Count": st.column_config.NumberColumn("Proj Pitches", format="%.0f"),
-        "Projected Ks": st.column_config.NumberColumn("Proj Ks", format="%.2f"),
+        "K%": st.column_config.NumberColumn("Strikeout %", format="%.2f"),
+        "BB%": st.column_config.NumberColumn("Walk %", format="%.2f"),
+
+        "Projected IP": st.column_config.NumberColumn("Projected Innings", format="%.2f"),
+        "Projected Pitch Count": st.column_config.NumberColumn("Projected Pitch Count", format="%.0f"),
+        "Projected Ks": st.column_config.NumberColumn("Projected Strikeouts", format="%.2f"),
         "ERA": st.column_config.NumberColumn("ERA", format="%.2f"),
         "WHIP": st.column_config.NumberColumn("WHIP", format="%.2f"),
         "K/9": st.column_config.NumberColumn("K/9", format="%.2f"),
-        "opponent_avg_k%": st.column_config.NumberColumn("Opp K%", format="%.2f"),
-        "k_matchup_score": st.column_config.NumberColumn("K Score", format="%.2f"),
+        "opponent_avg_k%": st.column_config.NumberColumn("Opponent Strikeout %", format="%.2f"),
+        "k_matchup_score": st.column_config.NumberColumn("K Matchup Score", format="%.2f"),
     }
 
 
@@ -1033,7 +1146,7 @@ with matchup_tab:
             st.warning("No batter vs pitcher matchup data was found for this selection.")
         else:
             min_bvp_pa = st.slider(
-                "Minimum PA vs Opposing Pitcher",
+                "Minimum Plate Appearances vs Pitcher",
                 min_value=0,
                 max_value=50,
                 value=0,
@@ -1120,7 +1233,7 @@ with matchup_tab:
             st.warning("No batter vs pitcher-hand split data was found for this selection.")
         else:
             min_hand_pa = st.slider(
-                "Minimum PA vs Pitcher Hand",
+                "Minimum Plate Appearances vs Throwing Hand",
                 min_value=0,
                 max_value=300,
                 value=20,
@@ -1128,7 +1241,7 @@ with matchup_tab:
             )
 
             min_hand_obp = st.slider(
-                "Minimum OBP vs Pitcher Hand",
+                "Minimum On-Base Percentage vs Throwing Hand",
                 min_value=0.150,
                 max_value=0.500,
                 value=0.320,
@@ -1272,7 +1385,8 @@ with info_tab:
             <div class="section-label">Reference</div>
             <div class="section-title">Methodology & Status</div>
             <div class="section-copy">
-                A quick explanation of how the tables should be read and the current refresh state.
+                A quick explanation of how the tables should be read, what each abbreviation means,
+                and the current data refresh state.
             </div>
         </div>
         """,
@@ -1281,6 +1395,8 @@ with info_tab:
 
     st.markdown(
         """
+        ### How the matchup tables work
+
         **Hitter vs Pitcher**
         - Direct hitter history against today's probable pitcher.
         - Best used with sample size context.
@@ -1300,6 +1416,43 @@ with info_tab:
         - Red bar = avoid
         - Blue bar = small sample
         - Gray bar = no history
+        """
+    )
+
+    st.markdown(
+        """
+        ### Glossary
+
+        | Abbreviation | Meaning |
+        |---|---|
+        | **PA** | Plate Appearances |
+        | **AB** | At-Bats |
+        | **H** | Hits |
+        | **BB** | Walks |
+        | **HBP** | Hit By Pitch |
+        | **SO** | Strikeouts |
+        | **HR** | Home Runs |
+        | **RBI** | Runs Batted In |
+        | **AVG** | Batting Average |
+        | **OBP** | On-Base Percentage |
+        | **SLG** | Slugging Percentage |
+        | **OPS** | On-Base Plus Slugging |
+        | **K%** | Strikeout Percentage |
+        | **BB%** | Walk Percentage |
+        | **IP** | Innings Pitched |
+        | **BF** | Batters Faced |
+        | **R** | Runs Allowed |
+        | **ERA** | Earned Run Average |
+        | **WHIP** | Walks plus Hits per Inning Pitched |
+        | **K/9** | Strikeouts per 9 Innings |
+        | **Opp K%** | Opponent Average Strikeout Percentage |
+        | **Projected IP** | Estimated innings for today's start |
+        | **Projected Pitch Count** | Estimated pitch count for today's start |
+        | **Projected Ks** | Estimated strikeouts for today's start |
+        | **K Score** | Strikeout matchup score |
+        | **RHP** | Right-Handed Pitcher |
+        | **LHP** | Left-Handed Pitcher |
+        | **Home/Away** | Whether the player/team was home or away in that game |
         """
     )
 
