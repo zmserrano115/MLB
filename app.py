@@ -107,6 +107,8 @@ TEAM_ID_BY_ABBR = {
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap');
+
     :root {
         --bg: #f3f5f7;
         --nav: #06172b;
@@ -116,6 +118,10 @@ st.markdown(
         --muted-2: #7b8794;
         --line: #d8dee6;
         --accent: #0f3b66;
+    }
+
+    html, body, .stApp {
+        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
     }
 
     .stApp {
@@ -129,8 +135,24 @@ st.markdown(
         max-width: 1500px;
     }
 
-    h1, h2, h3, p, li {
+    h1, h2, h3, h4, h5, h6,
+    .hero-title,
+    .section-title,
+    .metric-value,
+    .metric-label,
+    .selected-game-value,
+    .selected-game-label,
+    .custom-label-text,
+    header[data-testid="stHeader"]::before,
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 {
+        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
         color: var(--text);
+    }
+
+    p, li, span, label, div {
+        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     header[data-testid="stHeader"] {
@@ -146,28 +168,22 @@ st.markdown(
         left: 80px;
         color: #ffffff;
         font-size: 20px;
-        font-weight: 750;
-        letter-spacing: -0.03em;
+        font-weight: 800;
+        letter-spacing: -0.04em;
         z-index: 999999;
         pointer-events: none;
     }
 
     header[data-testid="stHeader"]::after {
-        content: "MLB matchup research";
-        position: fixed;
-        top: 20px;
-        left: 300px;
-        color: #c4d0de;
-        font-size: 13px;
-        font-weight: 500;
-        z-index: 999999;
-        pointer-events: none;
+        content: "";
+        display: none;
     }
 
     header[data-testid="stHeader"] button,
     header[data-testid="stHeader"] button *,
     div[data-testid="collapsedControl"] button,
     div[data-testid="collapsedControl"] button *,
+    div[data-testid="collapsedControl"] svg,
     button[data-testid="baseButton-header"],
     button[data-testid="baseButton-header"] * {
         color: #ffffff !important;
@@ -196,7 +212,7 @@ st.markdown(
     .hero-kicker {
         color: var(--muted-2);
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 800;
         margin-bottom: 10px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
@@ -206,8 +222,8 @@ st.markdown(
         color: var(--text);
         font-size: 40px;
         line-height: 1.08;
-        font-weight: 760;
-        letter-spacing: -0.04em;
+        font-weight: 800;
+        letter-spacing: -0.045em;
         margin-bottom: 12px;
         max-width: 900px;
     }
@@ -233,7 +249,7 @@ st.markdown(
         border-radius: 3px;
         padding: 7px 10px;
         font-size: 13px;
-        font-weight: 650;
+        font-weight: 700;
     }
 
     .content-card {
@@ -254,7 +270,7 @@ st.markdown(
     .metric-label {
         color: var(--muted-2);
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 800;
         margin-bottom: 8px;
         text-transform: uppercase;
         letter-spacing: 0.05em;
@@ -263,8 +279,9 @@ st.markdown(
     .metric-value {
         color: var(--text);
         font-size: 30px;
-        font-weight: 760;
+        font-weight: 800;
         line-height: 1.05;
+        letter-spacing: -0.04em;
     }
 
     .metric-note {
@@ -276,7 +293,7 @@ st.markdown(
     .section-label {
         color: var(--muted-2);
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.07em;
         margin-bottom: 7px;
@@ -286,8 +303,8 @@ st.markdown(
         color: var(--text);
         font-size: 24px;
         line-height: 1.15;
-        font-weight: 740;
-        letter-spacing: -0.035em;
+        font-weight: 800;
+        letter-spacing: -0.04em;
         margin-bottom: 8px;
     }
 
@@ -307,7 +324,7 @@ st.markdown(
         color: var(--muted-2);
         font-size: 12px;
         text-transform: uppercase;
-        font-weight: 700;
+        font-weight: 800;
         letter-spacing: 0.07em;
         margin-bottom: 4px;
     }
@@ -315,8 +332,8 @@ st.markdown(
     .selected-game-value {
         color: var(--text);
         font-size: 19px;
-        font-weight: 720;
-        letter-spacing: -0.02em;
+        font-weight: 800;
+        letter-spacing: -0.03em;
     }
 
     .status-box,
@@ -342,7 +359,7 @@ st.markdown(
         padding-right: 16px;
         color: var(--muted);
         background: transparent;
-        font-weight: 650;
+        font-weight: 700;
     }
 
     .stTabs [aria-selected="true"] {
@@ -369,7 +386,7 @@ st.markdown(
         border: 1px solid var(--line);
         background: #eef3f8;
         color: var(--text);
-        font-weight: 650;
+        font-weight: 700;
         box-shadow: none;
     }
 
@@ -394,7 +411,7 @@ st.markdown(
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3 {
         color: #111827 !important;
-        font-weight: 750 !important;
+        font-weight: 800 !important;
     }
 
     section[data-testid="stSidebar"] p,
@@ -407,7 +424,7 @@ st.markdown(
     section[data-testid="stSidebar"] label p {
         color: #374151 !important;
         font-size: 13px !important;
-        font-weight: 650 !important;
+        font-weight: 700 !important;
     }
 
     section[data-testid="stSidebar"] small {
@@ -437,7 +454,7 @@ st.markdown(
         color: #ffffff !important;
         border: 1px solid #0f3b66 !important;
         border-radius: 5px !important;
-        font-weight: 650 !important;
+        font-weight: 700 !important;
     }
 
     section[data-testid="stSidebar"] button * {
@@ -498,7 +515,7 @@ st.markdown(
     .custom-label-text {
         color: #111827 !important;
         font-size: 13px;
-        font-weight: 650;
+        font-weight: 700;
         line-height: 1.2;
     }
 
@@ -564,12 +581,18 @@ st.markdown(
 )
 
 
+def format_display_date(value):
+    try:
+        return pd.to_datetime(value).strftime("%B %d, %Y").replace(" 0", " ")
+    except Exception:
+        return str(value)
+
+
 def team_logo_url(team_value):
     if team_value is None or pd.isna(team_value):
         return ""
 
     team_value = str(team_value).strip()
-
     team_id = TEAM_ID_BY_NAME.get(team_value)
 
     if team_id is None:
@@ -664,25 +687,20 @@ def make_light_table(df):
 def show_table(df, key=None, selectable=False):
     table_data = make_light_table(df)
 
-    if selectable:
-        return st.dataframe(
-            table_data,
-            width="stretch",
-            hide_index=True,
-            column_config=table_column_config(),
-            on_select="rerun",
-            selection_mode="single-row",
-            key=key,
-            row_height=42
-        )
+    kwargs = {
+        "data": table_data,
+        "width": "stretch",
+        "hide_index": True,
+        "column_config": table_column_config(),
+        "row_height": 42
+    }
 
-    return st.dataframe(
-        table_data,
-        width="stretch",
-        hide_index=True,
-        column_config=table_column_config(),
-        row_height=42
-    )
+    if selectable:
+        kwargs["on_select"] = "rerun"
+        kwargs["selection_mode"] = "single-row"
+        kwargs["key"] = key
+
+    return st.dataframe(**kwargs)
 
 
 def read_precomputed_csv(file_name):
@@ -1146,6 +1164,12 @@ filtered_hand_matchups = filter_by_game(hand_matchups, selected_game)
 filtered_pitcher_k_matchups = filter_by_game(pitcher_k_matchups, selected_game)
 
 
+if use_precomputed and has_precomputed:
+    display_game_date = format_display_date(metadata.get("game_date", selected_date))
+else:
+    display_game_date = format_display_date(selected_date)
+
+
 main_tab, matchup_tab, info_tab = st.tabs([
     "Overview",
     "Matchups",
@@ -1225,10 +1249,10 @@ with main_tab:
     )
 
     st.markdown(
-        """
+        f"""
         <div class="content-card">
             <div class="section-label">Schedule</div>
-            <div class="section-title">Today's Games</div>
+            <div class="section-title">Today's Games — {display_game_date}</div>
             <div class="section-copy">
                 Use the game filter in the sidebar to narrow the schedule and matchup tables.
             </div>
@@ -1280,10 +1304,10 @@ with matchup_tab:
 
     with tab1:
         st.markdown(
-            """
+            f"""
             <div class="content-card-soft">
                 <div class="section-label">Direct History</div>
-                <div class="section-title">Hitter vs Pitcher</div>
+                <div class="section-title">Hitter vs Pitcher — {display_game_date}</div>
                 <div class="section-copy">
                     Direct matchup history between each hitter and today's opposing probable pitcher.
                 </div>
@@ -1363,10 +1387,10 @@ with matchup_tab:
 
     with tab2:
         st.markdown(
-            """
+            f"""
             <div class="content-card-soft">
                 <div class="section-label">Splits</div>
-                <div class="section-title">Hitter vs Throwing Hand</div>
+                <div class="section-title">Hitter vs Throwing Hand — {display_game_date}</div>
                 <div class="section-copy">
                     Hitter performance against the same throwing hand as today's opposing probable pitcher.
                 </div>
@@ -1433,10 +1457,10 @@ with matchup_tab:
 
     with tab3:
         st.markdown(
-            """
+            f"""
             <div class="content-card-soft">
                 <div class="section-label">Pitching</div>
-                <div class="section-title">Strikeout Targets</div>
+                <div class="section-title">Strikeout Targets — {display_game_date}</div>
                 <div class="section-copy">
                     Pitcher strikeout opportunities using projected workload and opposing hitter strikeout tendencies.
                 </div>
