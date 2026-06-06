@@ -1221,7 +1221,7 @@ main_tab, matchup_tab, info_tab = st.tabs(
     [
         "Overview",
         "Matchups",
-        "Methodology & Status",
+        "Details",
     ]
 )
 
