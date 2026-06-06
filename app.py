@@ -1330,25 +1330,22 @@ main_tab, matchup_tab, info_tab = st.tabs([
 
 with main_tab:
     st.markdown(
-        """
-        <section class="brand-hero">
-            <div class="hero-content">
-                <div class="hero-brand">All Rise Analytics</div>
-                <div class="hero-line"></div>
-                <p class="hero-headline">
-                    Daily MLB matchup research built around probable pitchers, hitter splits, and strikeout targets.
-                </p>
-            </div>
-
-            <div class="hero-baseball-wrap">
-                <div class="hero-baseball-shadow"></div>
-                <div class="hero-baseball"></div>
-                <div class="seam-stitches-left"></div>
-                <div class="seam-stitches-right"></div>
-            </div>
-        </section>
-        """,
-        unsafe_allow_html=True
+    """<section class="brand-hero">
+        <div class="hero-content">
+            <div class="hero-brand">All Rise Analytics</div>
+            <div class="hero-line"></div>
+            <p class="hero-headline">
+                Daily MLB matchup research built around probable pitchers, hitter splits, and strikeout targets.
+            </p>
+        </div>
+        <div class="hero-baseball-wrap">
+            <div class="hero-baseball-shadow"></div>
+            <div class="hero-baseball"></div>
+            <div class="seam-stitches-left"></div>
+            <div class="seam-stitches-right"></div>
+        </div>
+    </section>""",
+    unsafe_allow_html=True
     )
 
     selected_game_display = selected_game if selected_game != "All Games" else "Full slate"
