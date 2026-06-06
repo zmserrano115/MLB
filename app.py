@@ -1236,61 +1236,6 @@ with main_tab:
             Daily MLB matchup research built around probable pitchers, hitter splits, and strikeout targets.
         </p>
     </div>
-
-    <div class="hero-baseball-wrap">
-        <div class="hero-ball-shadow"></div>
-        <svg class="hero-ball-svg" viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <defs>
-                <radialGradient id="ballFill" cx="32%" cy="28%" r="72%">
-                    <stop offset="0%" stop-color="#ffffff"/>
-                    <stop offset="55%" stop-color="#f4f7fb"/>
-                    <stop offset="100%" stop-color="#d9e3ee"/>
-                </radialGradient>
-            </defs>
-
-            <circle cx="210" cy="210" r="155" fill="url(#ballFill)" stroke="rgba(255,255,255,0.8)" stroke-width="2"/>
-
-            <path
-                d="M150 88
-                   C118 118, 112 162, 116 210
-                   C120 258, 118 304, 148 334"
-                fill="none"
-                stroke="#b44e63"
-                stroke-width="6"
-                stroke-linecap="round"
-            />
-
-            <path
-                d="M270 88
-                   C302 118, 308 162, 304 210
-                   C300 258, 302 304, 272 334"
-                fill="none"
-                stroke="#b44e63"
-                stroke-width="6"
-                stroke-linecap="round"
-            />
-
-            <g stroke="#b44e63" stroke-width="4" stroke-linecap="round">
-                <path d="M138 118 l18 6"/>
-                <path d="M128 150 l22 6"/>
-                <path d="M124 184 l24 4"/>
-                <path d="M124 218 l24 0"/>
-                <path d="M126 252 l24 -4"/>
-                <path d="M132 286 l22 -6"/>
-                <path d="M142 318 l18 -8"/>
-            </g>
-
-            <g stroke="#b44e63" stroke-width="4" stroke-linecap="round">
-                <path d="M282 118 l-18 6"/>
-                <path d="M292 150 l-22 6"/>
-                <path d="M296 184 l-24 4"/>
-                <path d="M296 218 l-24 0"/>
-                <path d="M294 252 l-24 -4"/>
-                <path d="M288 286 l-22 -6"/>
-                <path d="M278 318 l-18 -8"/>
-            </g>
-        </svg>
-    </div>
 </section>""",
         unsafe_allow_html=True,
     )
