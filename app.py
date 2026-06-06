@@ -449,6 +449,8 @@ st.markdown(
 
     section[data-testid="stSidebar"] button * {
         color: #ffffff !important;
+        fill: #ffffff !important;
+        stroke: #ffffff !important;
     }
 
     section[data-testid="stSidebar"] button:hover {
@@ -459,6 +461,8 @@ st.markdown(
 
     section[data-testid="stSidebar"] button:hover * {
         color: #ffffff !important;
+        fill: #ffffff !important;
+        stroke: #ffffff !important;
     }
 
     section[data-testid="stSidebar"] [data-testid="stNumberInput"] button {
@@ -469,6 +473,8 @@ st.markdown(
 
     section[data-testid="stSidebar"] [data-testid="stNumberInput"] button * {
         color: #111827 !important;
+        fill: #111827 !important;
+        stroke: #111827 !important;
     }
 
     section[data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover {
@@ -479,6 +485,8 @@ st.markdown(
 
     section[data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover * {
         color: #111827 !important;
+        fill: #111827 !important;
+        stroke: #111827 !important;
     }
 
     section[data-testid="stSidebar"] [data-testid="stCheckbox"] label {
@@ -496,6 +504,23 @@ st.markdown(
 
     section[data-testid="stSidebar"] [data-testid="stDateInput"] input {
         color: #111827 !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] {
+        background: #0f3b66 !important;
+        color: #ffffff !important;
+        border: 1px solid #0f3b66 !important;
+        border-radius: 999px !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] * {
+        color: #ffffff !important;
+        fill: #ffffff !important;
+        stroke: #ffffff !important;
+    }
+
+    section[data-testid="stSidebar"] svg {
+        color: #ffffff !important;
     }
     </style>
     """,
@@ -895,16 +920,11 @@ def display_pitcher_vs_team_game_log(selected_row):
 
 current_year = date.today().year
 has_precomputed = precomputed_files_available()
+use_precomputed = has_precomputed
 
 
 with st.sidebar:
     st.header("Controls")
-
-    use_precomputed = st.checkbox(
-        "Use cloud data",
-        value=has_precomputed,
-        help="Uses data refreshed by GitHub Actions instead of rebuilding live."
-    )
 
     selected_date = st.date_input("Game Date", value=date.today())
 
@@ -964,9 +984,6 @@ if use_precomputed and has_precomputed:
     """
 
 else:
-    if use_precomputed and not has_precomputed:
-        st.warning("Precomputed cloud data files were not found. The app will build live data instead.")
-
     schedule_df = load_schedule(selected_date)
 
     if schedule_df.empty:
