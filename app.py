@@ -1,5 +1,3 @@
-# app.py
-
 from datetime import date
 from pathlib import Path
 import json
@@ -21,209 +19,232 @@ from src.matchups import (
     build_pitcher_k_matchups
 )
 
-
 st.set_page_config(
     page_title="All Rise Analytics",
     layout="wide"
 )
 
-
 PRECOMPUTED_DIR = Path("data") / "precomputed"
-
 
 st.markdown(
     """
     <style>
     .stApp {
-        background: #080d16;
+        background: #04152b;
         color: #f8fafc;
     }
 
     .block-container {
-        padding-top: 1.4rem;
-        padding-bottom: 2.5rem;
+        padding-top: 1.2rem;
+        padding-bottom: 2rem;
         max-width: 1280px;
     }
 
     h1, h2, h3 {
-        letter-spacing: -0.03em;
+        letter-spacing: -0.02em;
     }
 
-    p {
-        color: #cbd5e1;
+    p, li {
+        color: #d6dde7;
     }
 
-    .top-bar {
-        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-        padding-bottom: 18px;
-        margin-bottom: 22px;
+    .site-header {
+        padding: 8px 0 22px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        margin-bottom: 26px;
     }
 
-    .brand-title {
-        font-size: 34px;
+    .site-brand {
+        font-size: 32px;
         font-weight: 750;
-        color: #f8fafc;
-        margin-bottom: 2px;
-        letter-spacing: -0.04em;
+        color: #ffffff;
+        margin-bottom: 6px;
     }
 
-    .brand-subtitle {
+    .site-tagline {
         font-size: 15px;
-        color: #94a3b8;
-        max-width: 850px;
+        color: #c7d2de;
+        max-width: 900px;
         line-height: 1.55;
     }
 
-    .section-card {
-        background: rgba(15, 23, 42, 0.62);
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 16px;
-        padding: 20px 22px;
+    .hero-panel {
+        background: #07203d;
+        border-radius: 18px;
+        padding: 30px 32px;
         margin-bottom: 18px;
+        border: 1px solid rgba(255,255,255,0.08);
     }
 
-    .small-card {
-        background: rgba(15, 23, 42, 0.50);
-        border: 1px solid rgba(148, 163, 184, 0.14);
-        border-radius: 14px;
-        padding: 16px 18px;
-        min-height: 112px;
+    .hero-kicker {
+        color: #d9e3ef;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        letter-spacing: 0.01em;
     }
 
-    .card-label {
-        color: #94a3b8;
-        font-size: 13px;
-        font-weight: 650;
-        letter-spacing: 0.02em;
-        margin-bottom: 8px;
-    }
-
-    .card-value {
-        color: #f8fafc;
-        font-size: 30px;
+    .hero-title {
+        color: #ffffff;
+        font-size: 42px;
         font-weight: 760;
-        line-height: 1.1;
+        line-height: 1.05;
+        margin-bottom: 12px;
     }
 
-    .card-note {
-        color: #94a3b8;
-        font-size: 13px;
-        margin-top: 6px;
+    .hero-text {
+        color: #d6dde7;
+        font-size: 16px;
+        line-height: 1.65;
+        max-width: 880px;
     }
 
-    .home-title {
-        font-size: 24px;
-        font-weight: 720;
-        color: #f8fafc;
-        margin-bottom: 10px;
-    }
-
-    .home-copy {
-        font-size: 15px;
-        color: #cbd5e1;
-        line-height: 1.6;
-    }
-
-    .pill-row {
+    .pill-wrap {
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
-        margin-top: 14px;
+        margin-top: 20px;
     }
 
     .pill {
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        color: #cbd5e1;
-        background: rgba(2, 6, 23, 0.28);
+        background: #17365c;
+        color: #f3f6fa;
+        padding: 8px 12px;
         border-radius: 999px;
-        padding: 7px 11px;
         font-size: 13px;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .info-card {
+        background: #0a1c34;
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px;
+        padding: 18px 20px;
+        margin-bottom: 18px;
+    }
+
+    .metric-card {
+        background: #0a1c34;
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px;
+        padding: 18px 20px;
+        min-height: 110px;
+    }
+
+    .metric-label {
+        color: #b9c6d4;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .metric-value {
+        color: #ffffff;
+        font-size: 30px;
+        font-weight: 750;
+        line-height: 1.1;
+    }
+
+    .metric-note {
+        color: #b9c6d4;
+        font-size: 13px;
+        margin-top: 8px;
+    }
+
+    .section-title {
+        color: #ffffff;
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+
+    .section-copy {
+        color: #d6dde7;
+        font-size: 15px;
+        line-height: 1.6;
+    }
+
+    .status-box {
+        background: #0a1c34;
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px;
+        padding: 16px 18px;
+        margin-top: 12px;
+        margin-bottom: 16px;
+        color: #d6dde7;
+        font-size: 14px;
+        line-height: 1.65;
+    }
+
+    .disclaimer-box {
+        background: #0a1c34;
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px;
+        padding: 16px 18px;
+        margin-top: 16px;
+        color: #d6dde7;
+        font-size: 14px;
+        line-height: 1.6;
     }
 
     .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        background: transparent;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-        padding-bottom: 0px;
+        gap: 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        padding-bottom: 4px;
     }
 
     .stTabs [data-baseweb="tab"] {
-        height: 44px;
-        white-space: nowrap;
-        border-radius: 10px 10px 0px 0px;
+        height: 42px;
+        border-radius: 10px 10px 0 0;
         padding-left: 18px;
         padding-right: 18px;
+        color: #b9c6d4;
         background: transparent;
-        color: #94a3b8;
-        border: 1px solid transparent;
     }
 
     .stTabs [aria-selected="true"] {
-        background: rgba(15, 23, 42, 0.72) !important;
-        color: #f8fafc !important;
-        border: 1px solid rgba(148, 163, 184, 0.16) !important;
-        border-bottom: 1px solid rgba(15, 23, 42, 0.72) !important;
+        color: #ffffff !important;
+        background: #0a1c34 !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        border-bottom: 1px solid #0a1c34 !important;
     }
 
     div[data-testid="stDataFrame"] {
-        border: 1px solid rgba(148, 163, 184, 0.16);
+        border: 1px solid rgba(255,255,255,0.08);
         border-radius: 14px;
         overflow: hidden;
-        background: rgba(15, 23, 42, 0.42);
-    }
-
-    div[data-testid="stSidebar"] {
-        background: #0b1220;
-        border-right: 1px solid rgba(148, 163, 184, 0.14);
+        background: #0a1c34;
     }
 
     .stButton > button {
         border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        background: rgba(15, 23, 42, 0.85);
-        color: #f8fafc;
+        border: 1px solid rgba(255,255,255,0.10);
+        background: #17365c;
+        color: #ffffff;
     }
 
     .stButton > button:hover {
-        border-color: rgba(203, 213, 225, 0.40);
-        color: white;
+        border-color: rgba(255,255,255,0.20);
+        background: #1d4473;
+        color: #ffffff;
     }
 
-    .status-box {
-        background: rgba(15, 23, 42, 0.52);
-        border: 1px solid rgba(148, 163, 184, 0.14);
-        border-radius: 14px;
-        padding: 14px 16px;
-        margin-top: 16px;
-        margin-bottom: 12px;
-        color: #cbd5e1;
-        font-size: 14px;
-        line-height: 1.6;
-    }
-
-    .disclaimer-box {
-        background: rgba(15, 23, 42, 0.48);
-        border: 1px solid rgba(148, 163, 184, 0.14);
-        border-radius: 14px;
-        padding: 14px 16px;
-        margin-top: 18px;
-        color: #cbd5e1;
-        font-size: 14px;
-        line-height: 1.55;
+    div[data-testid="stSidebar"] {
+        background: #071a31;
+        border-right: 1px solid rgba(255,255,255,0.07);
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-
 st.markdown(
     """
-    <div class="top-bar">
-        <div class="brand-title">All Rise Analytics</div>
-        <div class="brand-subtitle">
-            MLB matchup research dashboard for hitter history, handedness splits,
-            and pitcher strikeout context.
+    <div class="site-header">
+        <div class="site-brand">All Rise Analytics</div>
+        <div class="site-tagline">
+            Daily MLB matchup research for hitter history, handedness splits,
+            and pitcher strikeout opportunities.
         </div>
     </div>
     """,
@@ -233,7 +254,6 @@ st.markdown(
 
 def read_precomputed_csv(file_name):
     file_path = PRECOMPUTED_DIR / file_name
-
     if not file_path.exists():
         return pd.DataFrame()
 
@@ -265,7 +285,6 @@ def precomputed_files_available():
         PRECOMPUTED_DIR / "latest_batter_vs_hand.csv",
         PRECOMPUTED_DIR / "latest_pitcher_k_matchups.csv"
     ]
-
     return all(file.exists() for file in required_files)
 
 
@@ -275,7 +294,6 @@ def load_precomputed_data():
     hand_matchups = read_precomputed_csv("latest_batter_vs_hand.csv")
     pitcher_k_matchups = read_precomputed_csv("latest_pitcher_k_matchups.csv")
     metadata = read_precomputed_metadata()
-
     return schedule_df, bvp_matchups, hand_matchups, pitcher_k_matchups, metadata
 
 
@@ -302,7 +320,6 @@ def get_game_options(schedule_df):
 
     games = schedule_df["game"].dropna().unique().tolist()
     games = sorted(games)
-
     return ["All Games"] + games
 
 
@@ -329,26 +346,26 @@ def row_color_by_grade(row):
     base_style = (
         "color: #111827; "
         "font-weight: 650; "
-        "border-bottom: 1px solid rgba(15,23,42,0.10); "
+        "border-bottom: 1px solid rgba(0,0,0,0.08); "
         "font-size: 14px;"
     )
 
     if "elite" in grade_lower or "strong" in grade_lower:
-        style = "background-color: #bbf7d0; border-left: 5px solid #16a34a; " + base_style
+        style = "background-color: #cdeed9; border-left: 5px solid #169c52; " + base_style
     elif "good" in grade_lower:
-        style = "background-color: #dcfce7; border-left: 5px solid #22c55e; " + base_style
+        style = "background-color: #e0f5e8; border-left: 5px solid #32b66d; " + base_style
     elif "avoid" in grade_lower:
-        style = "background-color: #fecaca; border-left: 5px solid #dc2626; " + base_style
+        style = "background-color: #f6cccc; border-left: 5px solid #d64545; " + base_style
     elif "neutral" in grade_lower:
-        style = "background-color: #fef3c7; border-left: 5px solid #ca8a04; " + base_style
+        style = "background-color: #f4e6b4; border-left: 5px solid #c79b16; " + base_style
     elif "small sample" in grade_lower:
-        style = "background-color: #dbeafe; border-left: 5px solid #2563eb; " + base_style
+        style = "background-color: #d7e7fb; border-left: 5px solid #3f7fd8; " + base_style
     elif "no history" in grade_lower:
         style = "background-color: #e5e7eb; border-left: 5px solid #6b7280; " + base_style
     else:
         style = (
-            "background-color: rgba(15, 23, 42, 0.86); "
-            "color: #e5e7eb; "
+            "background-color: #0a1c34; "
+            "color: #f8fafc; "
             "border-bottom: 1px solid rgba(255,255,255,0.05); "
             "font-size: 14px;"
         )
@@ -391,11 +408,11 @@ def style_matchup_table(df):
             {
                 "selector": "th",
                 "props": [
-                    ("background-color", "#111827"),
-                    ("color", "#e5e7eb"),
+                    ("background-color", "#10233f"),
+                    ("color", "#f8fafc"),
                     ("font-weight", "700"),
                     ("font-size", "13px"),
-                    ("border-bottom", "1px solid rgba(148,163,184,0.22)"),
+                    ("border-bottom", "1px solid rgba(255,255,255,0.08)"),
                     ("padding", "10px 12px")
                 ]
             },
@@ -508,7 +525,6 @@ def display_pitcher_vs_team_game_log(selected_row):
 current_year = date.today().year
 has_precomputed = precomputed_files_available()
 
-
 with st.sidebar:
     st.header("Filters")
 
@@ -574,7 +590,6 @@ if use_precomputed and has_precomputed:
         <b>Minimum PA:</b> {metadata.get("minimum_pa", "Unknown")}
     </div>
     """
-
 else:
     if use_precomputed and not has_precomputed:
         st.warning("Precomputed cloud data files were not found. The app will build live data instead.")
@@ -619,11 +634,9 @@ else:
             min_pa=min_pa
         )
 
-
 if schedule_df.empty:
     st.warning("No schedule data available.")
     st.stop()
-
 
 schedule_df = add_game_column(schedule_df)
 
@@ -641,27 +654,26 @@ filtered_bvp_matchups = filter_by_game(bvp_matchups, selected_game)
 filtered_hand_matchups = filter_by_game(hand_matchups, selected_game)
 filtered_pitcher_k_matchups = filter_by_game(pitcher_k_matchups, selected_game)
 
-
 main_tab, matchup_tab, info_tab = st.tabs([
     "Home",
     "Matchups",
     "Methodology & Status"
 ])
 
-
 with main_tab:
     st.markdown(
         """
-        <div class="section-card">
-            <div class="home-title">Daily MLB matchup board</div>
-            <div class="home-copy">
-                This dashboard organizes current MLB games into practical matchup views:
-                hitter history against probable pitchers, batter splits by pitcher hand,
-                and pitcher strikeout opportunities against opposing lineups.
+        <div class="hero-panel">
+            <div class="hero-kicker">MLB Matchup Dashboard</div>
+            <div class="hero-title">Empowering smarter matchup research</div>
+            <div class="hero-text">
+                Review direct batter-versus-pitcher history, handedness splits, and
+                strikeout opportunities in one clean interface. Use the Matchups tab
+                to analyze player-specific tables and game logs.
             </div>
-            <div class="pill-row">
+            <div class="pill-wrap">
                 <span class="pill">Batter vs Pitcher</span>
-                <span class="pill">Handedness Splits</span>
+                <span class="pill">Batter vs Hand</span>
                 <span class="pill">Strikeout Targets</span>
                 <span class="pill">Career Game Logs</span>
             </div>
@@ -675,10 +687,10 @@ with main_tab:
     with metric_col1:
         st.markdown(
             f"""
-            <div class="small-card">
-                <div class="card-label">Games on Slate</div>
-                <div class="card-value">{len(schedule_df)}</div>
-                <div class="card-note">Current schedule board</div>
+            <div class="metric-card">
+                <div class="metric-label">Games on Slate</div>
+                <div class="metric-value">{len(schedule_df)}</div>
+                <div class="metric-note">Current day schedule</div>
             </div>
             """,
             unsafe_allow_html=True
@@ -687,10 +699,10 @@ with main_tab:
     with metric_col2:
         st.markdown(
             f"""
-            <div class="small-card">
-                <div class="card-label">BvP Rows</div>
-                <div class="card-value">{len(filtered_bvp_matchups)}</div>
-                <div class="card-note">Based on selected game filter</div>
+            <div class="metric-card">
+                <div class="metric-label">Filtered BvP Rows</div>
+                <div class="metric-value">{len(filtered_bvp_matchups)}</div>
+                <div class="metric-note">Direct hitter vs pitcher rows</div>
             </div>
             """,
             unsafe_allow_html=True
@@ -699,16 +711,26 @@ with main_tab:
     with metric_col3:
         st.markdown(
             f"""
-            <div class="small-card">
-                <div class="card-label">Strikeout Rows</div>
-                <div class="card-value">{len(filtered_pitcher_k_matchups)}</div>
-                <div class="card-note">Probable pitcher K board</div>
+            <div class="metric-card">
+                <div class="metric-label">Strikeout Targets</div>
+                <div class="metric-value">{len(filtered_pitcher_k_matchups)}</div>
+                <div class="metric-note">Probable pitcher K rows</div>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-    st.subheader("Today's Games")
+    st.markdown(
+        """
+        <div class="info-card">
+            <div class="section-title">Today's Games</div>
+            <div class="section-copy">
+                Use the game filter in the sidebar to focus the matchup tables on one matchup or view the full slate.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     schedule_display_cols = [
         "away_team",
@@ -718,7 +740,6 @@ with main_tab:
         "home_probable_pitcher",
         "home_pitcher_hand"
     ]
-
     schedule_display_cols = [
         col for col in schedule_display_cols if col in filtered_schedule_df.columns
     ]
@@ -729,11 +750,18 @@ with main_tab:
         hide_index=True
     )
 
-    st.info("Open the Matchups tab to view hitter tables, strikeout targets, and clickable game logs.")
-
-
 with matchup_tab:
-    st.subheader("Matchup Tables")
+    st.markdown(
+        """
+        <div class="info-card">
+            <div class="section-title">Matchup Tables</div>
+            <div class="section-copy">
+                Explore hitter history, pitcher-hand splits, and strikeout targets. Click supported rows to open career game logs.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     batter_cols = [
         "game",
@@ -765,14 +793,12 @@ with matchup_tab:
     ])
 
     with tab1:
-        st.markdown("Direct hitter history against today's opposing probable pitcher.")
+        st.write("Direct hitter history against today's opposing probable pitcher.")
 
         if filtered_bvp_matchups.empty:
             st.warning("No batter vs pitcher matchup data was found for this selection.")
         else:
-            available_cols = [
-                col for col in batter_cols if col in filtered_bvp_matchups.columns
-            ]
+            available_cols = [col for col in batter_cols if col in filtered_bvp_matchups.columns]
 
             min_bvp_pa = st.slider(
                 "Minimum PA vs Opposing Pitcher",
@@ -803,7 +829,6 @@ with matchup_tab:
 
             try:
                 selected_rows = bvp_event.selection.rows
-
                 if selected_rows:
                     selected_row = display_bvp.iloc[selected_rows[0]]
             except Exception:
@@ -817,16 +842,12 @@ with matchup_tab:
                 st.info("Select a batter-vs-pitcher row above to view the game log.")
 
     with tab2:
-        st.markdown(
-            "Hitter splits against the same throwing hand as today's opposing probable pitcher."
-        )
+        st.write("Hitter splits against the same throwing hand as today's opposing probable pitcher.")
 
         if filtered_hand_matchups.empty:
             st.warning("No batter vs pitcher-hand split data was found for this selection.")
         else:
-            available_cols = [
-                col for col in batter_cols if col in filtered_hand_matchups.columns
-            ]
+            available_cols = [col for col in batter_cols if col in filtered_hand_matchups.columns]
 
             min_hand_pa = st.slider(
                 "Minimum PA vs Pitcher Hand",
@@ -858,9 +879,7 @@ with matchup_tab:
             )
 
     with tab3:
-        st.markdown(
-            "Pitcher strikeout opportunities using projected workload and opposing hitter K tendencies."
-        )
+        st.write("Pitcher strikeout opportunities using projected workload and opposing hitter K tendencies.")
 
         if filtered_pitcher_k_matchups.empty:
             st.warning("No pitcher strikeout matchups were created for this selection.")
@@ -900,9 +919,7 @@ with matchup_tab:
                 "k_matchup_grade"
             ]
 
-            k_cols = [
-                col for col in k_cols if col in filtered_pitcher_k_matchups.columns
-            ]
+            k_cols = [col for col in k_cols if col in filtered_pitcher_k_matchups.columns]
 
             display_k = filtered_pitcher_k_matchups.head(int(top_n)).copy()
 
@@ -921,7 +938,6 @@ with matchup_tab:
 
             try:
                 selected_rows = k_event.selection.rows
-
                 if selected_rows:
                     selected_pitcher_row = display_k.iloc[selected_rows[0]]
             except Exception:
@@ -934,9 +950,18 @@ with matchup_tab:
             else:
                 st.info("Select a pitcher row above to view his career game log against that opponent.")
 
-
 with info_tab:
-    st.subheader("How the matchup tables work")
+    st.markdown(
+        """
+        <div class="info-card">
+            <div class="section-title">How the tables work</div>
+            <div class="section-copy">
+                This section explains how the matchup views should be interpreted and shows the current data refresh state.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.markdown(
         """
