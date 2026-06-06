@@ -54,6 +54,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -126,14 +127,21 @@ jobs:
               --max-game-logs "$MAX_GAME_LOGS"
           fi
 
-      - name: Commit refreshed data
+      - name: Commit refreshed data and cache
         shell: bash
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git pull --rebase origin main
+          # Make sure we are on the newest remote before committing refreshed files.
+          # Autostash prevents the "unstaged changes" rebase error.
+          git pull --rebase --autostash origin main
 
+          # Remove Python cache files so they do not get committed or block rebase.
+          find . -type d -name "__pycache__" -prune -exec rm -rf {} +
+          find . -name "*.pyc" -delete
+
+          # Stage only real app data files.
           git add data
 
           if git diff --cached --quiet; then
