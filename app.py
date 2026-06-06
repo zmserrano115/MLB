@@ -1288,7 +1288,6 @@ with matchup_tab:
     st.markdown(
         """
         <div class="section-shell">
-]            <div class="section-title">Matchup Tables</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1306,8 +1305,7 @@ with matchup_tab:
         st.markdown(
             f"""
             <div class="section-shell">
-                <div class="section-label">Direct History</div>
-                <div class="section-title">Hitter vs Pitcher <span class="title-date">{display_game_date}</span></div>
+            <div class="section-title">{display_game_date}</span></div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1386,8 +1384,7 @@ with matchup_tab:
         st.markdown(
             f"""
             <div class="section-shell">
-                <div class="section-label">Splits</div>
-                <div class="section-title">Hitter vs Throwing Hand <span class="title-date">{display_game_date}</span></div>
+                <div class="section-title">{display_game_date}</span></div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1453,8 +1450,7 @@ with matchup_tab:
         st.markdown(
             f"""
             <div class="section-shell">
-                <div class="section-label">Pitching</div>
-                <div class="section-title">Strikeout Targets <span class="title-date">{display_game_date}</span></div>
+                <div class="section-title">{display_game_date}</span></div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1535,7 +1531,6 @@ with info_tab:
     st.markdown(
         """
         <div class="section-shell">
-            <div class="section-title">Methodology & Status</div>
         </div>
         """,
         unsafe_allow_html=True,
