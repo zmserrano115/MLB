@@ -31,21 +31,95 @@ st.set_page_config(
 PRECOMPUTED_DIR = Path("data") / "precomputed"
 
 
+TEAM_ID_BY_NAME = {
+    "Arizona Diamondbacks": 109,
+    "Atlanta Braves": 144,
+    "Baltimore Orioles": 110,
+    "Boston Red Sox": 111,
+    "Chicago Cubs": 112,
+    "Chicago White Sox": 145,
+    "Cincinnati Reds": 113,
+    "Cleveland Guardians": 114,
+    "Colorado Rockies": 115,
+    "Detroit Tigers": 116,
+    "Houston Astros": 117,
+    "Kansas City Royals": 118,
+    "Los Angeles Angels": 108,
+    "Los Angeles Dodgers": 119,
+    "Miami Marlins": 146,
+    "Milwaukee Brewers": 158,
+    "Minnesota Twins": 142,
+    "New York Mets": 121,
+    "New York Yankees": 147,
+    "Athletics": 133,
+    "Oakland Athletics": 133,
+    "Philadelphia Phillies": 143,
+    "Pittsburgh Pirates": 134,
+    "San Diego Padres": 135,
+    "San Francisco Giants": 137,
+    "Seattle Mariners": 136,
+    "St. Louis Cardinals": 138,
+    "Tampa Bay Rays": 139,
+    "Texas Rangers": 140,
+    "Toronto Blue Jays": 141,
+    "Washington Nationals": 120,
+}
+
+TEAM_ID_BY_ABBR = {
+    "ARI": 109,
+    "AZ": 109,
+    "ATL": 144,
+    "BAL": 110,
+    "BOS": 111,
+    "CHC": 112,
+    "CWS": 145,
+    "CIN": 113,
+    "CLE": 114,
+    "COL": 115,
+    "DET": 116,
+    "HOU": 117,
+    "KC": 118,
+    "KCR": 118,
+    "LAA": 108,
+    "LAD": 119,
+    "MIA": 146,
+    "MIL": 158,
+    "MIN": 142,
+    "NYM": 121,
+    "NYY": 147,
+    "ATH": 133,
+    "OAK": 133,
+    "PHI": 143,
+    "PIT": 134,
+    "SD": 135,
+    "SDP": 135,
+    "SF": 137,
+    "SFG": 137,
+    "SEA": 136,
+    "STL": 138,
+    "TB": 139,
+    "TBR": 139,
+    "TEX": 140,
+    "TOR": 141,
+    "WSH": 120,
+}
+
+
 st.markdown(
     """
     <style>
     :root {
-        --bg: #04152b;
-        --nav: #031124;
-        --panel: #071a31;
-        --panel-2: #09213c;
-        --table-head: #0b2442;
-        --text: #ffffff;
-        --muted: #b7c4d4;
-        --muted-2: #8798aa;
-        --line: rgba(255, 255, 255, 0.10);
-        --line-soft: rgba(255, 255, 255, 0.06);
-        --accent: #2563eb;
+        --bg: #f4f6f8;
+        --nav: #06172b;
+        --panel: #ffffff;
+        --panel-2: #f8fafc;
+        --text: #111827;
+        --muted: #5b6775;
+        --muted-2: #7b8794;
+        --line: #d8dee6;
+        --line-soft: #e7ebf0;
+        --header: #eef1f5;
+        --accent: #0f3b66;
     }
 
     .stApp {
@@ -56,21 +130,16 @@ st.markdown(
     .block-container {
         padding-top: 4.8rem;
         padding-bottom: 2.5rem;
-        max-width: 1280px;
+        max-width: 1320px;
     }
 
-    h1, h2, h3 {
-        letter-spacing: -0.03em;
+    h1, h2, h3, p, li {
+        color: var(--text);
     }
 
-    p, li {
-        color: var(--muted);
-    }
-
-    /* Locked Streamlit top header */
     header[data-testid="stHeader"] {
         background: var(--nav);
-        border-bottom: 1px solid var(--line);
+        border-bottom: 1px solid rgba(255,255,255,0.12);
         height: 58px;
     }
 
@@ -92,7 +161,7 @@ st.markdown(
         position: fixed;
         top: 20px;
         left: 240px;
-        color: var(--muted-2);
+        color: #b8c7d8;
         font-size: 13px;
         font-weight: 500;
         z-index: 999999;
@@ -102,34 +171,34 @@ st.markdown(
     .hero {
         background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 6px;
-        padding: 28px 30px;
-        margin-bottom: 22px;
+        border-radius: 3px;
+        padding: 26px 28px;
+        margin-bottom: 20px;
         box-shadow: none;
     }
 
     .hero-kicker {
         color: var(--muted-2);
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
     }
 
     .hero-title {
-        color: #ffffff;
-        font-size: 42px;
-        line-height: 1.05;
+        color: var(--text);
+        font-size: 40px;
+        line-height: 1.08;
         font-weight: 760;
-        letter-spacing: -0.05em;
+        letter-spacing: -0.04em;
         margin-bottom: 12px;
         max-width: 900px;
     }
 
     .hero-copy {
         color: var(--muted);
-        font-size: 16px;
+        font-size: 15px;
         line-height: 1.6;
         max-width: 900px;
     }
@@ -138,17 +207,17 @@ st.markdown(
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
-        margin-top: 20px;
+        margin-top: 18px;
     }
 
     .pill {
-        background: #0c2a4d;
-        color: #f4f8fc;
+        background: #eef3f8;
+        color: #18324d;
         border: 1px solid var(--line);
-        border-radius: 4px;
+        border-radius: 3px;
         padding: 7px 10px;
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 650;
     }
 
     .content-card,
@@ -159,28 +228,28 @@ st.markdown(
     .disclaimer-box {
         background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 6px;
+        border-radius: 3px;
         box-shadow: none;
     }
 
     .content-card {
         padding: 18px 20px;
-        margin-bottom: 18px;
+        margin-bottom: 16px;
     }
 
     .content-card-soft {
-        padding: 18px 20px;
-        margin-bottom: 18px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
     }
 
     .metric-card {
-        padding: 18px 20px;
-        min-height: 112px;
+        padding: 16px 18px;
+        min-height: 104px;
     }
 
     .metric-label {
         color: var(--muted-2);
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
         margin-bottom: 8px;
         text-transform: uppercase;
@@ -188,8 +257,8 @@ st.markdown(
     }
 
     .metric-value {
-        color: #ffffff;
-        font-size: 32px;
+        color: var(--text);
+        font-size: 30px;
         font-weight: 760;
         line-height: 1.05;
     }
@@ -202,37 +271,37 @@ st.markdown(
 
     .section-label {
         color: var(--muted-2);
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.07em;
-        margin-bottom: 8px;
+        margin-bottom: 7px;
     }
 
     .section-title {
-        color: #ffffff;
-        font-size: 25px;
+        color: var(--text);
+        font-size: 24px;
         line-height: 1.15;
         font-weight: 740;
-        letter-spacing: -0.04em;
+        letter-spacing: -0.035em;
         margin-bottom: 8px;
     }
 
     .section-copy {
         color: var(--muted);
         font-size: 15px;
-        line-height: 1.6;
+        line-height: 1.55;
         max-width: 900px;
     }
 
     .selected-game-box {
-        padding: 16px 18px;
-        margin-bottom: 18px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
     }
 
     .selected-game-label {
         color: var(--muted-2);
-        font-size: 13px;
+        font-size: 12px;
         text-transform: uppercase;
         font-weight: 700;
         letter-spacing: 0.07em;
@@ -240,8 +309,8 @@ st.markdown(
     }
 
     .selected-game-value {
-        color: #ffffff;
-        font-size: 20px;
+        color: var(--text);
+        font-size: 19px;
         font-weight: 720;
         letter-spacing: -0.02em;
     }
@@ -257,23 +326,23 @@ st.markdown(
     }
 
     .stTabs [data-baseweb="tab-list"] {
-        gap: 4px;
+        gap: 2px;
         border-bottom: 1px solid var(--line);
         padding-bottom: 0px;
     }
 
     .stTabs [data-baseweb="tab"] {
         height: 42px;
-        border-radius: 4px 4px 0 0;
+        border-radius: 0;
         padding-left: 16px;
         padding-right: 16px;
-        color: var(--muted-2);
+        color: var(--muted);
         background: transparent;
         font-weight: 650;
     }
 
     .stTabs [aria-selected="true"] {
-        color: #ffffff !important;
+        color: var(--text) !important;
         background: var(--panel) !important;
         border: 1px solid var(--line) !important;
         border-bottom: 1px solid var(--panel) !important;
@@ -281,41 +350,104 @@ st.markdown(
 
     div[data-testid="stDataFrame"] {
         border: 1px solid var(--line);
-        border-radius: 6px;
+        border-radius: 3px;
         overflow: hidden;
         background: var(--panel);
         box-shadow: none;
     }
 
     .stButton > button {
-        border-radius: 4px;
+        border-radius: 3px;
         border: 1px solid var(--line);
-        background: #0c2a4d;
-        color: #ffffff;
+        background: #eef3f8;
+        color: var(--text);
         font-weight: 650;
         box-shadow: none;
     }
 
     .stButton > button:hover {
-        border-color: rgba(255,255,255,0.22);
-        background: #123761;
-        color: #ffffff;
+        border-color: #b9c3cf;
+        background: #e2eaf3;
+        color: var(--text);
     }
 
     div[data-testid="stSidebar"] {
-        background: #06162a;
-        border-right: 1px solid var(--line-soft);
+        background: #06172b;
+        border-right: 1px solid rgba(255,255,255,0.08);
     }
 
-    div[data-testid="stSidebar"] h1,
-    div[data-testid="stSidebar"] h2,
-    div[data-testid="stSidebar"] h3 {
-        color: #ffffff;
+    div[data-testid="stSidebar"] * {
+        color: #f8fafc;
+    }
+
+    div[data-testid="stSidebar"] input,
+    div[data-testid="stSidebar"] textarea,
+    div[data-testid="stSidebar"] select {
+        color: #111827 !important;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
+
+
+def team_logo_url(team_value):
+    if team_value is None or pd.isna(team_value):
+        return ""
+
+    team_value = str(team_value).strip()
+
+    team_id = TEAM_ID_BY_NAME.get(team_value)
+
+    if team_id is None:
+        team_id = TEAM_ID_BY_ABBR.get(team_value.upper())
+
+    if team_id is None:
+        return ""
+
+    return f"https://www.mlbstatic.com/team-logos/{team_id}.svg"
+
+
+def opponent_from_game(game, team):
+    if pd.isna(game) or pd.isna(team):
+        return ""
+
+    game = str(game)
+    team = str(team)
+
+    if " @ " not in game:
+        return ""
+
+    away_team, home_team = game.split(" @ ", 1)
+
+    if team == away_team:
+        return home_team
+
+    if team == home_team:
+        return away_team
+
+    return ""
+
+
+def grade_marker(grade):
+    grade = str(grade).lower()
+
+    if "elite" in grade or "strong" in grade or "good" in grade:
+        return "🟢"
+
+    if "neutral" in grade:
+        return "🟡"
+
+    if "avoid" in grade:
+        return "🔴"
+
+    if "small sample" in grade:
+        return "🔵"
+
+    if "no history" in grade:
+        return "⚪"
+
+    return "⚪"
 
 
 def read_precomputed_csv(file_name):
@@ -419,100 +551,79 @@ def is_missing_value(value):
     return False
 
 
-def row_color_by_grade(row):
-    grade = ""
+def table_column_config():
+    return {
+        "grade_marker": st.column_config.TextColumn("", width="small"),
+        "team_logo": st.column_config.ImageColumn("", width="small"),
+        "opponent_logo": st.column_config.ImageColumn("", width="small"),
+        "away_logo": st.column_config.ImageColumn("", width="small"),
+        "home_logo": st.column_config.ImageColumn("", width="small"),
+        "pitcher_team_logo": st.column_config.ImageColumn("", width="small"),
+        "AVG": st.column_config.NumberColumn("AVG", format="%.3f"),
+        "OBP": st.column_config.NumberColumn("OBP", format="%.3f"),
+        "SLG": st.column_config.NumberColumn("SLG", format="%.3f"),
+        "OPS": st.column_config.NumberColumn("OPS", format="%.3f"),
+        "K%": st.column_config.NumberColumn("K%", format="%.2f"),
+        "BB%": st.column_config.NumberColumn("BB%", format="%.2f"),
+        "Projected IP": st.column_config.NumberColumn("Proj IP", format="%.2f"),
+        "Projected Pitch Count": st.column_config.NumberColumn("Proj Pitches", format="%.0f"),
+        "Projected Ks": st.column_config.NumberColumn("Proj Ks", format="%.2f"),
+        "ERA": st.column_config.NumberColumn("ERA", format="%.2f"),
+        "WHIP": st.column_config.NumberColumn("WHIP", format="%.2f"),
+        "K/9": st.column_config.NumberColumn("K/9", format="%.2f"),
+        "opponent_avg_k%": st.column_config.NumberColumn("Opp K%", format="%.2f"),
+        "k_matchup_score": st.column_config.NumberColumn("K Score", format="%.2f"),
+    }
 
-    if "matchup_grade" in row:
-        grade = str(row["matchup_grade"])
-    elif "k_matchup_grade" in row:
-        grade = str(row["k_matchup_grade"])
 
-    grade_lower = grade.lower()
+def prepare_schedule_display(df):
+    df = df.copy()
 
-    base_style = (
-        "color: #111827; "
-        "font-weight: 650; "
-        "border-bottom: 1px solid rgba(0,0,0,0.08); "
-        "font-size: 14px;"
-    )
+    if "away_team" in df.columns:
+        df["away_logo"] = df["away_team"].apply(team_logo_url)
 
-    if "elite" in grade_lower or "strong" in grade_lower:
-        style = "background-color: #cfead9; border-left: 5px solid #16834a; " + base_style
-    elif "good" in grade_lower:
-        style = "background-color: #e1f3e8; border-left: 5px solid #279a5c; " + base_style
-    elif "avoid" in grade_lower:
-        style = "background-color: #f2c7c7; border-left: 5px solid #c63f3f; " + base_style
-    elif "neutral" in grade_lower:
-        style = "background-color: #f1e3b5; border-left: 5px solid #b98b13; " + base_style
-    elif "small sample" in grade_lower:
-        style = "background-color: #d8e6f7; border-left: 5px solid #3d73bd; " + base_style
-    elif "no history" in grade_lower:
-        style = "background-color: #e5e7eb; border-left: 5px solid #6b7280; " + base_style
+    if "home_team" in df.columns:
+        df["home_logo"] = df["home_team"].apply(team_logo_url)
+
+    return df
+
+
+def prepare_batter_display(df):
+    df = df.copy()
+
+    if "matchup_grade" in df.columns:
+        df["grade_marker"] = df["matchup_grade"].apply(grade_marker)
     else:
-        style = (
-            "background-color: #071a31; "
-            "color: #f8fafc; "
-            "border-bottom: 1px solid rgba(255,255,255,0.05); "
-            "font-size: 14px;"
+        df["grade_marker"] = "⚪"
+
+    if "team" in df.columns:
+        df["team_logo"] = df["team"].apply(team_logo_url)
+
+    if "game" in df.columns and "team" in df.columns:
+        df["opponent_team"] = df.apply(
+            lambda row: opponent_from_game(row.get("game"), row.get("team")),
+            axis=1
         )
+        df["opponent_logo"] = df["opponent_team"].apply(team_logo_url)
 
-    return [style] * len(row)
+    return df
 
 
-def style_matchup_table(df):
-    if df.empty:
-        return df
+def prepare_pitcher_display(df):
+    df = df.copy()
 
-    format_dict = {}
+    if "k_matchup_grade" in df.columns:
+        df["grade_marker"] = df["k_matchup_grade"].apply(grade_marker)
+    else:
+        df["grade_marker"] = "⚪"
 
-    for col in ["AVG", "OBP", "SLG", "OPS"]:
-        if col in df.columns:
-            format_dict[col] = "{:.3f}"
+    if "pitcher_team" in df.columns:
+        df["pitcher_team_logo"] = df["pitcher_team"].apply(team_logo_url)
 
-    for col in [
-        "K%",
-        "BB%",
-        "opponent_avg_k%",
-        "k_matchup_score",
-        "Season IP",
-        "Projected IP",
-        "Projected Pitch Count",
-        "Projected Ks",
-        "Pitch Count"
-    ]:
-        if col in df.columns:
-            format_dict[col] = "{:.2f}"
+    if "opponent" in df.columns:
+        df["opponent_logo"] = df["opponent"].apply(team_logo_url)
 
-    for col in ["ERA", "WHIP", "K/9"]:
-        if col in df.columns:
-            format_dict[col] = "{:.2f}"
-
-    styler = df.style.apply(row_color_by_grade, axis=1).format(format_dict, na_rep="")
-
-    styler = styler.set_table_styles(
-        [
-            {
-                "selector": "th",
-                "props": [
-                    ("background-color", "#0b2442"),
-                    ("color", "#f8fafc"),
-                    ("font-weight", "700"),
-                    ("font-size", "13px"),
-                    ("border-bottom", "1px solid rgba(255,255,255,0.08)"),
-                    ("padding", "10px 12px")
-                ]
-            },
-            {
-                "selector": "td",
-                "props": [
-                    ("padding", "9px 12px"),
-                    ("white-space", "nowrap")
-                ]
-            }
-        ]
-    )
-
-    return styler
+    return df
 
 
 def display_bvp_game_log(selected_row, season):
@@ -538,11 +649,19 @@ def display_bvp_game_log(selected_row, season):
         st.warning("No individual career game-log history was found for this matchup.")
         return
 
+    if "team" in game_log_df.columns:
+        game_log_df["team_logo"] = game_log_df["team"].apply(team_logo_url)
+
+    if "opponent" in game_log_df.columns:
+        game_log_df["opponent_logo"] = game_log_df["opponent"].apply(team_logo_url)
+
     game_log_cols = [
         "game_date",
-        "home_away",
+        "team_logo",
         "team",
+        "opponent_logo",
         "opponent",
+        "home_away",
         "PA",
         "AB",
         "H",
@@ -562,9 +681,10 @@ def display_bvp_game_log(selected_row, season):
     game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
 
     st.dataframe(
-        style_matchup_table(game_log_df[game_log_cols]),
+        game_log_df[game_log_cols],
         width="stretch",
-        hide_index=True
+        hide_index=True,
+        column_config=table_column_config()
     )
 
 
@@ -589,8 +709,12 @@ def display_pitcher_vs_team_game_log(selected_row):
         st.warning("No pitcher-vs-team career game-log history was found for this matchup.")
         return
 
+    if "opponent" in game_log_df.columns:
+        game_log_df["opponent_logo"] = game_log_df["opponent"].apply(team_logo_url)
+
     game_log_cols = [
         "game_date",
+        "opponent_logo",
         "opponent",
         "IP",
         "Pitch Count",
@@ -606,9 +730,10 @@ def display_pitcher_vs_team_game_log(selected_row):
     game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
 
     st.dataframe(
-        style_matchup_table(game_log_df[game_log_cols]),
+        game_log_df[game_log_cols],
         width="stretch",
-        hide_index=True
+        hide_index=True,
+        column_config=table_column_config()
     )
 
 
@@ -760,10 +885,10 @@ with main_tab:
         """
         <div class="hero">
             <div class="hero-kicker">MLB Matchup Dashboard</div>
-            <div class="hero-title">Smarter matchup research for the daily slate</div>
+            <div class="hero-title">Daily matchup board</div>
             <div class="hero-copy">
                 Review current MLB games, compare hitter advantages, evaluate pitcher-hand splits,
-                and identify strikeout opportunities through a cleaner daily workflow.
+                and identify strikeout opportunities through a clean daily workflow.
             </div>
             <div class="pill-row">
                 <span class="pill">Batter vs Pitcher</span>
@@ -839,8 +964,12 @@ with main_tab:
         unsafe_allow_html=True
     )
 
+    schedule_display = prepare_schedule_display(filtered_schedule_df)
+
     schedule_display_cols = [
+        "away_logo",
         "away_team",
+        "home_logo",
         "home_team",
         "away_probable_pitcher",
         "away_pitcher_hand",
@@ -849,13 +978,14 @@ with main_tab:
     ]
 
     schedule_display_cols = [
-        col for col in schedule_display_cols if col in filtered_schedule_df.columns
+        col for col in schedule_display_cols if col in schedule_display.columns
     ]
 
     st.dataframe(
-        filtered_schedule_df[schedule_display_cols],
+        schedule_display[schedule_display_cols],
         width="stretch",
-        hide_index=True
+        hide_index=True,
+        column_config=table_column_config()
     )
 
 
@@ -873,29 +1003,6 @@ with matchup_tab:
         """,
         unsafe_allow_html=True
     )
-
-    batter_cols = [
-        "game",
-        "team",
-        "batter",
-        "opposing_pitcher",
-        "opposing_pitcher_hand",
-        "split",
-        "PA",
-        "AB",
-        "H",
-        "BB",
-        "SO",
-        "HR",
-        "RBI",
-        "AVG",
-        "OBP",
-        "SLG",
-        "OPS",
-        "K%",
-        "BB%",
-        "matchup_grade"
-    ]
 
     tab1, tab2, tab3 = st.tabs([
         "Hitter vs Pitcher",
@@ -920,10 +1027,6 @@ with matchup_tab:
         if filtered_bvp_matchups.empty:
             st.warning("No batter vs pitcher matchup data was found for this selection.")
         else:
-            available_cols = [
-                col for col in batter_cols if col in filtered_bvp_matchups.columns
-            ]
-
             min_bvp_pa = st.slider(
                 "Minimum PA vs Opposing Pitcher",
                 min_value=0,
@@ -937,13 +1040,41 @@ with matchup_tab:
             ].copy()
 
             display_bvp = display_bvp.head(int(top_n))
+            display_bvp = prepare_batter_display(display_bvp)
+
+            bvp_cols = [
+                "grade_marker",
+                "team_logo",
+                "team",
+                "batter",
+                "opponent_logo",
+                "opposing_pitcher",
+                "opposing_pitcher_hand",
+                "PA",
+                "AB",
+                "H",
+                "BB",
+                "SO",
+                "HR",
+                "RBI",
+                "AVG",
+                "OBP",
+                "SLG",
+                "OPS",
+                "K%",
+                "BB%",
+                "matchup_grade"
+            ]
+
+            bvp_cols = [col for col in bvp_cols if col in display_bvp.columns]
 
             st.write("Click one row below to view its career matchup game log.")
 
             bvp_event = st.dataframe(
-                style_matchup_table(display_bvp[available_cols]),
+                display_bvp[bvp_cols],
                 width="stretch",
                 hide_index=True,
+                column_config=table_column_config(),
                 on_select="rerun",
                 selection_mode="single-row",
                 key="bvp_table"
@@ -983,10 +1114,6 @@ with matchup_tab:
         if filtered_hand_matchups.empty:
             st.warning("No batter vs pitcher-hand split data was found for this selection.")
         else:
-            available_cols = [
-                col for col in batter_cols if col in filtered_hand_matchups.columns
-            ]
-
             min_hand_pa = st.slider(
                 "Minimum PA vs Pitcher Hand",
                 min_value=0,
@@ -1009,11 +1136,40 @@ with matchup_tab:
             ].copy()
 
             display_hand = display_hand.head(int(top_n))
+            display_hand = prepare_batter_display(display_hand)
+
+            hand_cols = [
+                "grade_marker",
+                "team_logo",
+                "team",
+                "batter",
+                "opponent_logo",
+                "opposing_pitcher",
+                "opposing_pitcher_hand",
+                "split",
+                "PA",
+                "AB",
+                "H",
+                "BB",
+                "SO",
+                "HR",
+                "RBI",
+                "AVG",
+                "OBP",
+                "SLG",
+                "OPS",
+                "K%",
+                "BB%",
+                "matchup_grade"
+            ]
+
+            hand_cols = [col for col in hand_cols if col in display_hand.columns]
 
             st.dataframe(
-                style_matchup_table(display_hand[available_cols]),
+                display_hand[hand_cols],
                 width="stretch",
-                hide_index=True
+                hide_index=True,
+                column_config=table_column_config()
             )
 
     with tab3:
@@ -1050,11 +1206,15 @@ with matchup_tab:
                     "Run the GitHub Action refresh, then reboot the Streamlit app."
                 )
 
+            display_k = filtered_pitcher_k_matchups.head(int(top_n)).copy()
+            display_k = prepare_pitcher_display(display_k)
+
             k_cols = [
-                "game",
+                "grade_marker",
+                "pitcher_team_logo",
                 "pitcher",
-                "pitcher_team",
                 "pitcher_hand",
+                "opponent_logo",
                 "opponent",
                 "Projected IP",
                 "Projected Pitch Count",
@@ -1068,18 +1228,15 @@ with matchup_tab:
                 "k_matchup_grade"
             ]
 
-            k_cols = [
-                col for col in k_cols if col in filtered_pitcher_k_matchups.columns
-            ]
-
-            display_k = filtered_pitcher_k_matchups.head(int(top_n)).copy()
+            k_cols = [col for col in k_cols if col in display_k.columns]
 
             st.write("Click one pitcher row below to view his career game log against that opponent.")
 
             k_event = st.dataframe(
-                style_matchup_table(display_k[k_cols]),
+                display_k[k_cols],
                 width="stretch",
                 hide_index=True,
+                column_config=table_column_config(),
                 on_select="rerun",
                 selection_mode="single-row",
                 key="pitcher_k_table"
@@ -1132,12 +1289,12 @@ with info_tab:
           and opponent hitter strikeout tendencies.
         - Click a pitcher row to view career game logs against that opponent.
 
-        **Row Colors**
-        - Green = favorable
-        - Yellow = neutral
-        - Red = avoid
-        - Blue = small sample
-        - Gray = no history
+        **Row Markers**
+        - 🟢 favorable
+        - 🟡 neutral
+        - 🔴 avoid
+        - 🔵 small sample
+        - ⚪ no history
         """
     )
 
