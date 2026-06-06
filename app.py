@@ -35,146 +35,181 @@ st.markdown(
     """
     <style>
     .stApp {
-        background: linear-gradient(180deg, #040816 0%, #071122 100%);
+        background: #080d16;
+        color: #f8fafc;
     }
 
     .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
+        padding-top: 1.4rem;
+        padding-bottom: 2.5rem;
+        max-width: 1280px;
     }
 
     h1, h2, h3 {
-        letter-spacing: 0.2px;
+        letter-spacing: -0.03em;
     }
 
-    .hero-box {
-        background: linear-gradient(135deg, rgba(12, 25, 48, 0.95), rgba(7, 15, 28, 0.90));
-        border: 1px solid rgba(125, 211, 252, 0.25);
-        border-radius: 18px;
-        padding: 26px 30px;
-        margin-bottom: 20px;
-        box-shadow: 0 0 22px rgba(14, 165, 233, 0.08);
-    }
-
-    .hero-title {
-        font-size: 40px;
-        font-weight: 800;
-        color: #f8fbff;
-        margin-bottom: 4px;
-        letter-spacing: 0.5px;
-    }
-
-    .hero-subtitle {
-        font-size: 18px;
-        color: #9bdcff;
-        font-weight: 600;
-        margin-bottom: 10px;
-    }
-
-    .hero-text {
-        font-size: 15px;
+    p {
         color: #cbd5e1;
-        max-width: 900px;
-        line-height: 1.5;
     }
 
-    .metric-card {
-        background: rgba(12, 20, 35, 0.78);
-        border: 1px solid rgba(125, 211, 252, 0.20);
-        border-radius: 15px;
-        padding: 16px 18px;
+    .top-bar {
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        padding-bottom: 18px;
+        margin-bottom: 22px;
+    }
+
+    .brand-title {
+        font-size: 34px;
+        font-weight: 750;
+        color: #f8fafc;
+        margin-bottom: 2px;
+        letter-spacing: -0.04em;
+    }
+
+    .brand-subtitle {
+        font-size: 15px;
+        color: #94a3b8;
+        max-width: 850px;
+        line-height: 1.55;
+    }
+
+    .section-card {
+        background: rgba(15, 23, 42, 0.62);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 16px;
+        padding: 20px 22px;
         margin-bottom: 18px;
     }
 
-    .metric-label {
-        color: #9ca3af;
-        font-size: 13px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
+    .small-card {
+        background: rgba(15, 23, 42, 0.50);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 14px;
+        padding: 16px 18px;
+        min-height: 112px;
     }
 
-    .metric-value {
+    .card-label {
+        color: #94a3b8;
+        font-size: 13px;
+        font-weight: 650;
+        letter-spacing: 0.02em;
+        margin-bottom: 8px;
+    }
+
+    .card-value {
         color: #f8fafc;
-        font-size: 28px;
-        font-weight: 800;
-        margin-top: 3px;
+        font-size: 30px;
+        font-weight: 760;
+        line-height: 1.1;
     }
 
-    .metric-note {
-        color: #7dd3fc;
+    .card-note {
+        color: #94a3b8;
         font-size: 13px;
-        margin-top: 2px;
+        margin-top: 6px;
+    }
+
+    .home-title {
+        font-size: 24px;
+        font-weight: 720;
+        color: #f8fafc;
+        margin-bottom: 10px;
+    }
+
+    .home-copy {
+        font-size: 15px;
+        color: #cbd5e1;
+        line-height: 1.6;
+    }
+
+    .pill-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+    }
+
+    .pill {
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        color: #cbd5e1;
+        background: rgba(2, 6, 23, 0.28);
+        border-radius: 999px;
+        padding: 7px 11px;
+        font-size: 13px;
     }
 
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background: rgba(10, 18, 30, 0.55);
-        padding: 8px;
-        border-radius: 14px;
-        border: 1px solid rgba(95, 170, 255, 0.16);
-        backdrop-filter: blur(6px);
+        gap: 6px;
+        background: transparent;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        padding-bottom: 0px;
     }
 
     .stTabs [data-baseweb="tab"] {
         height: 44px;
         white-space: nowrap;
-        border-radius: 10px;
-        padding-left: 16px;
-        padding-right: 16px;
-        background: rgba(255, 255, 255, 0.05);
-        color: #d8e7ff;
-        border: 1px solid rgba(120, 170, 255, 0.10);
+        border-radius: 10px 10px 0px 0px;
+        padding-left: 18px;
+        padding-right: 18px;
+        background: transparent;
+        color: #94a3b8;
+        border: 1px solid transparent;
     }
 
     .stTabs [aria-selected="true"] {
-        background: rgba(30, 50, 85, 0.90) !important;
-        color: #7dd3fc !important;
-        border: 1px solid rgba(125, 211, 252, 0.40) !important;
+        background: rgba(15, 23, 42, 0.72) !important;
+        color: #f8fafc !important;
+        border: 1px solid rgba(148, 163, 184, 0.16) !important;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.72) !important;
     }
 
     div[data-testid="stDataFrame"] {
-        border: 1px solid rgba(120, 170, 255, 0.16);
+        border: 1px solid rgba(148, 163, 184, 0.16);
         border-radius: 14px;
         overflow: hidden;
-        background: rgba(8, 14, 24, 0.35);
-        backdrop-filter: blur(6px);
+        background: rgba(15, 23, 42, 0.42);
     }
 
     div[data-testid="stSidebar"] {
-        background: rgba(7, 15, 28, 0.96);
+        background: #0b1220;
+        border-right: 1px solid rgba(148, 163, 184, 0.14);
     }
 
     .stButton > button {
         border-radius: 10px;
-        border: 1px solid rgba(125, 211, 252, 0.25);
-        background: rgba(20, 35, 60, 0.85);
-        color: #e6f1ff;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.85);
+        color: #f8fafc;
     }
 
     .stButton > button:hover {
-        border-color: rgba(125, 211, 252, 0.50);
+        border-color: rgba(203, 213, 225, 0.40);
         color: white;
     }
 
-    .cloud-box {
-        background: rgba(12, 20, 35, 0.75);
-        border: 1px solid rgba(125, 211, 252, 0.22);
+    .status-box {
+        background: rgba(15, 23, 42, 0.52);
+        border: 1px solid rgba(148, 163, 184, 0.14);
         border-radius: 14px;
-        padding: 14px 18px;
-        margin-top: 20px;
-        margin-bottom: 18px;
+        padding: 14px 16px;
+        margin-top: 16px;
+        margin-bottom: 12px;
+        color: #cbd5e1;
+        font-size: 14px;
+        line-height: 1.6;
     }
 
     .disclaimer-box {
-        background: rgba(15, 23, 42, 0.75);
-        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(15, 23, 42, 0.48);
+        border: 1px solid rgba(148, 163, 184, 0.14);
         border-radius: 14px;
-        padding: 15px 18px;
+        padding: 14px 16px;
         margin-top: 18px;
         color: #cbd5e1;
         font-size: 14px;
-        line-height: 1.5;
+        line-height: 1.55;
     }
     </style>
     """,
@@ -184,13 +219,11 @@ st.markdown(
 
 st.markdown(
     """
-    <div class="hero-box">
-        <div class="hero-title">All Rise Analytics</div>
-        <div class="hero-subtitle">Daily MLB Matchup Intelligence</div>
-        <div class="hero-text">
-            Analyze hitter-vs-pitcher history, handedness splits, and pitcher strikeout opportunities
-            using current MLB matchup data. Use the filters to focus on a specific game, compare batter
-            advantages, and review matchup history.
+    <div class="top-bar">
+        <div class="brand-title">All Rise Analytics</div>
+        <div class="brand-subtitle">
+            MLB matchup research dashboard for hitter history, handedness splits,
+            and pitcher strikeout context.
         </div>
     </div>
     """,
@@ -294,53 +327,29 @@ def row_color_by_grade(row):
     grade_lower = grade.lower()
 
     base_style = (
-        "color: #05070a; "
-        "font-weight: 700; "
-        "border-bottom: 1px solid rgba(0,0,0,0.12); "
+        "color: #111827; "
+        "font-weight: 650; "
+        "border-bottom: 1px solid rgba(15,23,42,0.10); "
         "font-size: 14px;"
     )
 
     if "elite" in grade_lower or "strong" in grade_lower:
-        style = (
-            "background-color: #86efac; "
-            "border-left: 6px solid #16a34a; "
-            + base_style
-        )
+        style = "background-color: #bbf7d0; border-left: 5px solid #16a34a; " + base_style
     elif "good" in grade_lower:
-        style = (
-            "background-color: #bbf7d0; "
-            "border-left: 6px solid #22c55e; "
-            + base_style
-        )
+        style = "background-color: #dcfce7; border-left: 5px solid #22c55e; " + base_style
     elif "avoid" in grade_lower:
-        style = (
-            "background-color: #fca5a5; "
-            "border-left: 6px solid #dc2626; "
-            + base_style
-        )
+        style = "background-color: #fecaca; border-left: 5px solid #dc2626; " + base_style
     elif "neutral" in grade_lower:
-        style = (
-            "background-color: #fde68a; "
-            "border-left: 6px solid #ca8a04; "
-            + base_style
-        )
+        style = "background-color: #fef3c7; border-left: 5px solid #ca8a04; " + base_style
     elif "small sample" in grade_lower:
-        style = (
-            "background-color: #bfdbfe; "
-            "border-left: 6px solid #2563eb; "
-            + base_style
-        )
+        style = "background-color: #dbeafe; border-left: 5px solid #2563eb; " + base_style
     elif "no history" in grade_lower:
-        style = (
-            "background-color: #e5e7eb; "
-            "border-left: 6px solid #6b7280; "
-            + base_style
-        )
+        style = "background-color: #e5e7eb; border-left: 5px solid #6b7280; " + base_style
     else:
         style = (
-            "background-color: rgba(15, 23, 42, 0.85); "
-            "color: #e8eef9; "
-            "border-bottom: 1px solid rgba(255,255,255,0.06); "
+            "background-color: rgba(15, 23, 42, 0.86); "
+            "color: #e5e7eb; "
+            "border-bottom: 1px solid rgba(255,255,255,0.05); "
             "font-size: 14px;"
         )
 
@@ -383,10 +392,10 @@ def style_matchup_table(df):
                 "selector": "th",
                 "props": [
                     ("background-color", "#111827"),
-                    ("color", "#e5f0ff"),
+                    ("color", "#e5e7eb"),
                     ("font-weight", "700"),
-                    ("font-size", "14px"),
-                    ("border-bottom", "2px solid rgba(125,211,252,0.35)"),
+                    ("font-size", "13px"),
+                    ("border-bottom", "1px solid rgba(148,163,184,0.22)"),
                     ("padding", "10px 12px")
                 ]
             },
@@ -419,9 +428,7 @@ def display_bvp_game_log(selected_row, season):
         )
 
     if game_log_df.empty:
-        st.warning(
-            "No individual career game-log history was found for this matchup."
-        )
+        st.warning("No individual career game-log history was found for this matchup.")
         return
 
     game_log_cols = [
@@ -445,9 +452,7 @@ def display_bvp_game_log(selected_row, season):
         "BB%"
     ]
 
-    game_log_cols = [
-        col for col in game_log_cols if col in game_log_df.columns
-    ]
+    game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
 
     st.dataframe(
         style_matchup_table(game_log_df[game_log_cols]),
@@ -474,9 +479,7 @@ def display_pitcher_vs_team_game_log(selected_row):
         )
 
     if game_log_df.empty:
-        st.warning(
-            "No pitcher-vs-team career game-log history was found for this matchup."
-        )
+        st.warning("No pitcher-vs-team career game-log history was found for this matchup.")
         return
 
     game_log_cols = [
@@ -493,9 +496,7 @@ def display_pitcher_vs_team_game_log(selected_row):
         "R"
     ]
 
-    game_log_cols = [
-        col for col in game_log_cols if col in game_log_df.columns
-    ]
+    game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
 
     st.dataframe(
         style_matchup_table(game_log_df[game_log_cols]),
@@ -562,12 +563,11 @@ cloud_status_html = ""
 
 if use_precomputed and has_precomputed:
     schedule_df, bvp_matchups, hand_matchups, pitcher_k_matchups, metadata = load_precomputed_data()
-
     season = int(metadata.get("season", season))
 
     cloud_status_html = f"""
-    <div class="cloud-box">
-        <b>Cloud Data Mode:</b> Using precomputed GitHub Actions data.<br>
+    <div class="status-box">
+        <b>Data Mode:</b> Cloud precomputed data<br>
         <b>Last refreshed:</b> {metadata.get("last_refreshed", "Unknown")}<br>
         <b>Game date:</b> {metadata.get("game_date", "Unknown")} |
         <b>Season:</b> {metadata.get("season", "Unknown")} |
@@ -577,9 +577,7 @@ if use_precomputed and has_precomputed:
 
 else:
     if use_precomputed and not has_precomputed:
-        st.warning(
-            "Precomputed cloud data files were not found. The app will build live data instead."
-        )
+        st.warning("Precomputed cloud data files were not found. The app will build live data instead.")
 
     schedule_df = load_schedule(selected_date)
 
@@ -591,13 +589,13 @@ else:
     pitchers_df = load_pitcher_stats(season, force_refresh)
 
     cloud_status_html = """
-    <div class="cloud-box">
-        <b>Live Data Mode:</b> Building data directly from MLB sources.<br>
-        This mode may take longer because the app is not using precomputed cloud files.
+    <div class="status-box">
+        <b>Data Mode:</b> Live data build<br>
+        Live mode may take longer because the app is not using precomputed cloud files.
     </div>
     """
 
-    with st.spinner("Building batter vs pitcher matchups... first run may take a few minutes."):
+    with st.spinner("Building batter vs pitcher matchups..."):
         bvp_matchups = build_batter_vs_pitcher_matchups(
             schedule_df=schedule_df,
             batters_df=batters_df,
@@ -629,11 +627,9 @@ if schedule_df.empty:
 
 schedule_df = add_game_column(schedule_df)
 
-st.header("Today's Games and Probable Pitchers")
-
 game_options = get_game_options(schedule_df)
 
-selected_game = st.selectbox(
+selected_game = st.sidebar.selectbox(
     "Select Game",
     game_options,
     index=0,
@@ -646,313 +642,337 @@ filtered_hand_matchups = filter_by_game(hand_matchups, selected_game)
 filtered_pitcher_k_matchups = filter_by_game(pitcher_k_matchups, selected_game)
 
 
-metric_col1, metric_col2, metric_col3 = st.columns(3)
-
-with metric_col1:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">Games on Slate</div>
-            <div class="metric-value">{len(schedule_df)}</div>
-            <div class="metric-note">Current matchup board</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-with metric_col2:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">BvP Matchups</div>
-            <div class="metric-value">{len(filtered_bvp_matchups)}</div>
-            <div class="metric-note">Filtered to selected game</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-with metric_col3:
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">K Matchups</div>
-            <div class="metric-value">{len(filtered_pitcher_k_matchups)}</div>
-            <div class="metric-note">Probable pitcher strikeout board</div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-schedule_display_cols = [
-    "away_team",
-    "home_team",
-    "away_probable_pitcher",
-    "away_pitcher_hand",
-    "home_probable_pitcher",
-    "home_pitcher_hand"
-]
-
-schedule_display_cols = [
-    col for col in schedule_display_cols if col in filtered_schedule_df.columns
-]
-
-st.dataframe(
-    filtered_schedule_df[schedule_display_cols],
-    width="stretch",
-    hide_index=True
-)
-
-
-st.header("Matchup Tables")
-
-
-batter_cols = [
-    "game",
-    "team",
-    "batter",
-    "opposing_pitcher",
-    "opposing_pitcher_hand",
-    "split",
-    "PA",
-    "AB",
-    "H",
-    "BB",
-    "SO",
-    "HR",
-    "RBI",
-    "AVG",
-    "OBP",
-    "SLG",
-    "OPS",
-    "K%",
-    "BB%",
-    "matchup_grade"
-]
-
-
-tab1, tab2, tab3 = st.tabs([
-    "Hitter vs Pitcher",
-    "Hitter vs Throwing Hand",
-    "Strikeout Targets"
+main_tab, matchup_tab, info_tab = st.tabs([
+    "Home",
+    "Matchups",
+    "Methodology & Status"
 ])
 
 
-with tab1:
-    st.subheader("Hitter vs Pitcher")
-    st.write(
-        "This section shows each hitter's direct history against today's opposing probable pitcher."
+with main_tab:
+    st.markdown(
+        """
+        <div class="section-card">
+            <div class="home-title">Daily MLB matchup board</div>
+            <div class="home-copy">
+                This dashboard organizes current MLB games into practical matchup views:
+                hitter history against probable pitchers, batter splits by pitcher hand,
+                and pitcher strikeout opportunities against opposing lineups.
+            </div>
+            <div class="pill-row">
+                <span class="pill">Batter vs Pitcher</span>
+                <span class="pill">Handedness Splits</span>
+                <span class="pill">Strikeout Targets</span>
+                <span class="pill">Career Game Logs</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    if filtered_bvp_matchups.empty:
-        st.warning("No batter vs pitcher matchup data was found for this selection.")
-    else:
-        available_cols = [
-            col for col in batter_cols if col in filtered_bvp_matchups.columns
-        ]
+    metric_col1, metric_col2, metric_col3 = st.columns(3)
 
-        min_bvp_pa = st.slider(
-            "Minimum PA vs Opposing Pitcher",
-            min_value=0,
-            max_value=50,
-            value=0,
-            step=1
+    with metric_col1:
+        st.markdown(
+            f"""
+            <div class="small-card">
+                <div class="card-label">Games on Slate</div>
+                <div class="card-value">{len(schedule_df)}</div>
+                <div class="card-note">Current schedule board</div>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-        display_bvp = filtered_bvp_matchups[
-            filtered_bvp_matchups["PA"] >= min_bvp_pa
-        ].copy()
-
-        display_bvp = display_bvp.head(int(top_n))
-
-        st.write("Click one row below to view its career matchup game log.")
-
-        bvp_event = st.dataframe(
-            style_matchup_table(display_bvp[available_cols]),
-            width="stretch",
-            hide_index=True,
-            on_select="rerun",
-            selection_mode="single-row",
-            key="bvp_table"
+    with metric_col2:
+        st.markdown(
+            f"""
+            <div class="small-card">
+                <div class="card-label">BvP Rows</div>
+                <div class="card-value">{len(filtered_bvp_matchups)}</div>
+                <div class="card-note">Based on selected game filter</div>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-        selected_row = None
+    with metric_col3:
+        st.markdown(
+            f"""
+            <div class="small-card">
+                <div class="card-label">Strikeout Rows</div>
+                <div class="card-value">{len(filtered_pitcher_k_matchups)}</div>
+                <div class="card-note">Probable pitcher K board</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-        try:
-            selected_rows = bvp_event.selection.rows
+    st.subheader("Today's Games")
 
-            if selected_rows:
-                selected_row = display_bvp.iloc[selected_rows[0]]
-        except Exception:
-            selected_row = None
+    schedule_display_cols = [
+        "away_team",
+        "home_team",
+        "away_probable_pitcher",
+        "away_pitcher_hand",
+        "home_probable_pitcher",
+        "home_pitcher_hand"
+    ]
 
-        st.divider()
+    schedule_display_cols = [
+        col for col in schedule_display_cols if col in filtered_schedule_df.columns
+    ]
 
-        if selected_row is not None:
-            display_bvp_game_log(selected_row, season)
+    st.dataframe(
+        filtered_schedule_df[schedule_display_cols],
+        width="stretch",
+        hide_index=True
+    )
+
+    st.info("Open the Matchups tab to view hitter tables, strikeout targets, and clickable game logs.")
+
+
+with matchup_tab:
+    st.subheader("Matchup Tables")
+
+    batter_cols = [
+        "game",
+        "team",
+        "batter",
+        "opposing_pitcher",
+        "opposing_pitcher_hand",
+        "split",
+        "PA",
+        "AB",
+        "H",
+        "BB",
+        "SO",
+        "HR",
+        "RBI",
+        "AVG",
+        "OBP",
+        "SLG",
+        "OPS",
+        "K%",
+        "BB%",
+        "matchup_grade"
+    ]
+
+    tab1, tab2, tab3 = st.tabs([
+        "Hitter vs Pitcher",
+        "Hitter vs Throwing Hand",
+        "Strikeout Targets"
+    ])
+
+    with tab1:
+        st.markdown("Direct hitter history against today's opposing probable pitcher.")
+
+        if filtered_bvp_matchups.empty:
+            st.warning("No batter vs pitcher matchup data was found for this selection.")
         else:
-            st.info("Select a batter-vs-pitcher row above to view the game log.")
+            available_cols = [
+                col for col in batter_cols if col in filtered_bvp_matchups.columns
+            ]
 
-
-with tab2:
-    st.subheader("Hitter vs Throwing Hand")
-    st.write(
-        "This section shows each hitter's split against the same throwing hand "
-        "as today's opposing probable pitcher."
-    )
-
-    if filtered_hand_matchups.empty:
-        st.warning("No batter vs pitcher-hand split data was found for this selection.")
-    else:
-        available_cols = [
-            col for col in batter_cols if col in filtered_hand_matchups.columns
-        ]
-
-        min_hand_pa = st.slider(
-            "Minimum PA vs Pitcher Hand",
-            min_value=0,
-            max_value=300,
-            value=20,
-            step=5
-        )
-
-        min_hand_obp = st.slider(
-            "Minimum OBP vs Pitcher Hand",
-            min_value=0.150,
-            max_value=0.500,
-            value=0.320,
-            step=0.005
-        )
-
-        display_hand = filtered_hand_matchups[
-            (filtered_hand_matchups["PA"] >= min_hand_pa) &
-            (filtered_hand_matchups["OBP"] >= min_hand_obp)
-        ].copy()
-
-        display_hand = display_hand.head(int(top_n))
-
-        st.dataframe(
-            style_matchup_table(display_hand[available_cols]),
-            width="stretch",
-            hide_index=True
-        )
-
-
-with tab3:
-    st.subheader("Strikeout Targets")
-
-    if filtered_pitcher_k_matchups.empty:
-        st.warning("No pitcher strikeout matchups were created for this selection.")
-    else:
-        required_projected_cols = [
-            "Projected IP",
-            "Projected Pitch Count",
-            "Projected Ks"
-        ]
-
-        missing_projected_cols = [
-            col for col in required_projected_cols
-            if col not in filtered_pitcher_k_matchups.columns
-        ]
-
-        if missing_projected_cols:
-            st.warning(
-                "The cloud data has not been refreshed with the newest pitcher projection columns yet. "
-                "Run the GitHub Action refresh, then reboot the Streamlit app."
+            min_bvp_pa = st.slider(
+                "Minimum PA vs Opposing Pitcher",
+                min_value=0,
+                max_value=50,
+                value=0,
+                step=1
             )
 
-        k_cols = [
-            "game",
-            "pitcher",
-            "pitcher_team",
-            "pitcher_hand",
-            "opponent",
-            "Projected IP",
-            "Projected Pitch Count",
-            "Projected Ks",
-            "ERA",
-            "WHIP",
-            "K%",
-            "K/9",
-            "opponent_avg_k%",
-            "k_matchup_score",
-            "k_matchup_grade"
-        ]
+            display_bvp = filtered_bvp_matchups[
+                filtered_bvp_matchups["PA"] >= min_bvp_pa
+            ].copy()
 
-        k_cols = [
-            col for col in k_cols if col in filtered_pitcher_k_matchups.columns
-        ]
+            display_bvp = display_bvp.head(int(top_n))
 
-        display_k = filtered_pitcher_k_matchups.head(int(top_n)).copy()
+            st.write("Click one row below to view its career matchup game log.")
 
-        st.write("Click one pitcher row below to view his career game log against that opponent.")
+            bvp_event = st.dataframe(
+                style_matchup_table(display_bvp[available_cols]),
+                width="stretch",
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row",
+                key="bvp_table"
+            )
 
-        k_event = st.dataframe(
-            style_matchup_table(display_k[k_cols]),
-            width="stretch",
-            hide_index=True,
-            on_select="rerun",
-            selection_mode="single-row",
-            key="pitcher_k_table"
+            selected_row = None
+
+            try:
+                selected_rows = bvp_event.selection.rows
+
+                if selected_rows:
+                    selected_row = display_bvp.iloc[selected_rows[0]]
+            except Exception:
+                selected_row = None
+
+            st.divider()
+
+            if selected_row is not None:
+                display_bvp_game_log(selected_row, season)
+            else:
+                st.info("Select a batter-vs-pitcher row above to view the game log.")
+
+    with tab2:
+        st.markdown(
+            "Hitter splits against the same throwing hand as today's opposing probable pitcher."
         )
 
-        selected_pitcher_row = None
+        if filtered_hand_matchups.empty:
+            st.warning("No batter vs pitcher-hand split data was found for this selection.")
+        else:
+            available_cols = [
+                col for col in batter_cols if col in filtered_hand_matchups.columns
+            ]
 
-        try:
-            selected_rows = k_event.selection.rows
+            min_hand_pa = st.slider(
+                "Minimum PA vs Pitcher Hand",
+                min_value=0,
+                max_value=300,
+                value=20,
+                step=5
+            )
 
-            if selected_rows:
-                selected_pitcher_row = display_k.iloc[selected_rows[0]]
-        except Exception:
+            min_hand_obp = st.slider(
+                "Minimum OBP vs Pitcher Hand",
+                min_value=0.150,
+                max_value=0.500,
+                value=0.320,
+                step=0.005
+            )
+
+            display_hand = filtered_hand_matchups[
+                (filtered_hand_matchups["PA"] >= min_hand_pa) &
+                (filtered_hand_matchups["OBP"] >= min_hand_obp)
+            ].copy()
+
+            display_hand = display_hand.head(int(top_n))
+
+            st.dataframe(
+                style_matchup_table(display_hand[available_cols]),
+                width="stretch",
+                hide_index=True
+            )
+
+    with tab3:
+        st.markdown(
+            "Pitcher strikeout opportunities using projected workload and opposing hitter K tendencies."
+        )
+
+        if filtered_pitcher_k_matchups.empty:
+            st.warning("No pitcher strikeout matchups were created for this selection.")
+        else:
+            required_projected_cols = [
+                "Projected IP",
+                "Projected Pitch Count",
+                "Projected Ks"
+            ]
+
+            missing_projected_cols = [
+                col for col in required_projected_cols
+                if col not in filtered_pitcher_k_matchups.columns
+            ]
+
+            if missing_projected_cols:
+                st.warning(
+                    "The cloud data has not been refreshed with the newest pitcher projection columns yet. "
+                    "Run the GitHub Action refresh, then reboot the Streamlit app."
+                )
+
+            k_cols = [
+                "game",
+                "pitcher",
+                "pitcher_team",
+                "pitcher_hand",
+                "opponent",
+                "Projected IP",
+                "Projected Pitch Count",
+                "Projected Ks",
+                "ERA",
+                "WHIP",
+                "K%",
+                "K/9",
+                "opponent_avg_k%",
+                "k_matchup_score",
+                "k_matchup_grade"
+            ]
+
+            k_cols = [
+                col for col in k_cols if col in filtered_pitcher_k_matchups.columns
+            ]
+
+            display_k = filtered_pitcher_k_matchups.head(int(top_n)).copy()
+
+            st.write("Click one pitcher row below to view his career game log against that opponent.")
+
+            k_event = st.dataframe(
+                style_matchup_table(display_k[k_cols]),
+                width="stretch",
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row",
+                key="pitcher_k_table"
+            )
+
             selected_pitcher_row = None
 
-        st.divider()
+            try:
+                selected_rows = k_event.selection.rows
 
-        if selected_pitcher_row is not None:
-            display_pitcher_vs_team_game_log(selected_pitcher_row)
-        else:
-            st.info("Select a pitcher row above to view his career game log against that opponent.")
+                if selected_rows:
+                    selected_pitcher_row = display_k.iloc[selected_rows[0]]
+            except Exception:
+                selected_pitcher_row = None
+
+            st.divider()
+
+            if selected_pitcher_row is not None:
+                display_pitcher_vs_team_game_log(selected_pitcher_row)
+            else:
+                st.info("Select a pitcher row above to view his career game log against that opponent.")
 
 
-st.header("How the Matchup Tables Work")
+with info_tab:
+    st.subheader("How the matchup tables work")
 
-st.markdown(
-    """
-    **Hitter vs Pitcher**
-    - Direct hitter history against today's probable pitcher.
-    - Click a row to see the career matchup game log.
+    st.markdown(
+        """
+        **Hitter vs Pitcher**
+        - Direct hitter history against today's probable pitcher.
+        - Best used with sample size context.
 
-    **Hitter vs Throwing Hand**
-    - Hitter split against right-handed or left-handed pitchers.
-    - Usually more reliable than direct batter-vs-pitcher history.
+        **Hitter vs Throwing Hand**
+        - Hitter split against right-handed or left-handed pitchers.
+        - Usually more reliable than direct batter-vs-pitcher history because the sample is larger.
 
-    **Strikeout Targets**
-    - Uses projected innings, projected pitch count, pitcher strikeout ability,
-      and opponent hitter strikeout tendencies.
-    - Click a pitcher row to see that pitcher's career game log against that opponent.
+        **Strikeout Targets**
+        - Uses projected innings, projected pitch count, pitcher strikeout ability,
+          and opponent hitter strikeout tendencies.
+        - Click a pitcher row to view career game logs against that opponent.
 
-    **Row Colors**
-    - Dark green = Strong or Elite
-    - Light green = Good
-    - Yellow = Neutral
-    - Red = Avoid
-    - Blue = Small Sample
-    - Gray = No History
-    """
-)
+        **Row Colors**
+        - Green = favorable
+        - Yellow = neutral
+        - Red = avoid
+        - Blue = small sample
+        - Gray = no history
+        """
+    )
 
-st.markdown(
-    """
-    <div class="disclaimer-box">
-        <b>Disclaimer:</b> This dashboard is for sports analytics and research purposes only.
-        Matchup history can have small sample sizes, so direct hitter-vs-pitcher results should
-        not be treated as guarantees. Handedness splits usually provide a larger sample and may
-        be more useful for evaluating matchup context.
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+    st.markdown(
+        """
+        <div class="disclaimer-box">
+            <b>Disclaimer:</b> This dashboard is for sports analytics and research purposes only.
+            Matchup history can have small sample sizes, so direct hitter-vs-pitcher results should
+            not be treated as guarantees. Handedness splits usually provide a larger sample and may
+            be more useful for evaluating matchup context.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-st.header("Data Refresh Status")
-st.markdown(cloud_status_html, unsafe_allow_html=True)
+    st.subheader("Data Refresh Status")
+    st.markdown(cloud_status_html, unsafe_allow_html=True)
