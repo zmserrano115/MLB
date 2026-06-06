@@ -107,53 +107,51 @@ TEAM_ID_BY_ABBR = {
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700&display=swap');
+
     :root {
         --bg: #f3f5f7;
         --nav: #06172b;
         --panel: #ffffff;
         --text: #111827;
-        --muted: #5b6775;
+        --muted: #526171;
         --muted-2: #7b8794;
         --line: #d8dee6;
+        --line-dark: #b9c3cf;
         --accent: #0f3b66;
-        --font-stack: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-                      Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji",
-                      "Segoe UI Emoji", "Segoe UI Symbol";
+        --accent-2: #173f68;
+        --field: #0b2a3f;
+        --font-body: "Manrope", "Segoe UI", Helvetica, sans-serif;
+        --font-display: "Bebas Neue", "Arial Narrow", sans-serif;
     }
 
     html, body, .stApp {
-        font-family: var(--font-stack) !important;
+        font-family: var(--font-body) !important;
     }
 
     .stApp {
-        background: var(--bg);
+        background:
+            linear-gradient(180deg, rgba(6, 23, 43, 0.035), rgba(243, 245, 247, 0) 360px),
+            repeating-linear-gradient(
+                135deg,
+                rgba(6, 23, 43, 0.018) 0px,
+                rgba(6, 23, 43, 0.018) 1px,
+                transparent 1px,
+                transparent 18px
+            ),
+            var(--bg);
         color: var(--text);
     }
 
     .block-container {
-        padding-top: 4.8rem;
-        padding-bottom: 2.5rem;
-        max-width: 1500px;
+        padding-top: 4.6rem;
+        padding-bottom: 2.2rem;
+        max-width: 1480px;
     }
 
     h1, h2, h3, h4, h5, h6,
-    .hero-title,
-    .section-title,
-    .metric-value,
-    .metric-label,
-    .selected-game-value,
-    .selected-game-label,
-    .custom-label-text,
-    header[data-testid="stHeader"]::before,
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3 {
-        font-family: var(--font-stack) !important;
-        color: var(--text);
-    }
-
     p, li, span, label, div {
-        font-family: var(--font-stack);
+        font-family: var(--font-body);
     }
 
     header[data-testid="stHeader"] {
@@ -165,12 +163,13 @@ st.markdown(
     header[data-testid="stHeader"]::before {
         content: "All Rise Analytics";
         position: fixed;
-        top: 15px;
-        left: 80px;
+        top: 12px;
+        left: 78px;
         color: #ffffff;
-        font-size: 20px;
-        font-weight: 800;
-        letter-spacing: -0.01em;
+        font-family: var(--font-display) !important;
+        font-size: 28px;
+        font-weight: 400;
+        letter-spacing: 0.02em;
         z-index: 999999;
         pointer-events: none;
     }
@@ -192,135 +191,178 @@ st.markdown(
         stroke: #ffffff !important;
     }
 
-    .hero,
-    .content-card,
-    .content-card-soft,
-    .metric-card,
-    .selected-game-box,
-    .status-box,
-    .disclaimer-box {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 0;
-        box-shadow: none;
-    }
-
-    .hero,
-    .content-card,
-    .content-card-soft,
-    .metric-card,
-    .selected-game-box,
-    .status-box,
-    .disclaimer-box {
-        padding: 20px 22px;
-    }
-
-    .hero,
-    .content-card,
-    .content-card-soft,
-    .selected-game-box,
-    .status-box,
-    .disclaimer-box {
-        margin-bottom: 16px;
-    }
-
-    .metric-card {
-        min-height: 132px;
-        height: 100%;
+    .brand-hero {
+        position: relative;
+        margin: 0 0 18px 0;
+        padding: 34px 34px 38px 34px;
+        min-height: 285px;
         display: flex;
-        flex-direction: column;
-        justify-content: space-between;
+        align-items: center;
+        overflow: hidden;
+        border: 1px solid #08223a;
+        background:
+            linear-gradient(90deg, rgba(6, 23, 43, 0.96), rgba(8, 38, 62, 0.88)),
+            radial-gradient(circle at 78% 34%, rgba(255,255,255,0.16), transparent 24%),
+            linear-gradient(135deg, #06172b 0%, #0c2f4d 52%, #123f61 100%);
     }
 
-    .hero-kicker,
+    .brand-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(115deg, transparent 0%, transparent 56%, rgba(255,255,255,0.08) 56%, rgba(255,255,255,0.08) 57%, transparent 57%),
+            repeating-linear-gradient(
+                90deg,
+                rgba(255,255,255,0.04) 0px,
+                rgba(255,255,255,0.04) 1px,
+                transparent 1px,
+                transparent 64px
+            );
+        opacity: 0.65;
+        animation: heroShift 16s linear infinite;
+    }
+
+    .brand-hero::after {
+        content: "";
+        position: absolute;
+        right: -80px;
+        bottom: -120px;
+        width: 520px;
+        height: 320px;
+        border: 1px solid rgba(255,255,255,0.18);
+        transform: rotate(-12deg);
+        background:
+            repeating-linear-gradient(
+                0deg,
+                rgba(255,255,255,0.055) 0px,
+                rgba(255,255,255,0.055) 1px,
+                transparent 1px,
+                transparent 24px
+            );
+    }
+
+    @keyframes heroShift {
+        from { background-position: 0 0, 0 0; }
+        to { background-position: 220px 0, 160px 0; }
+    }
+
+    .hero-content {
+        position: relative;
+        z-index: 2;
+        max-width: 850px;
+    }
+
+    .hero-brand {
+        font-family: var(--font-display) !important;
+        color: #ffffff;
+        font-size: clamp(62px, 8vw, 118px);
+        line-height: 0.88;
+        font-weight: 400;
+        letter-spacing: 0.018em;
+        margin: 0 0 16px 0;
+    }
+
+    .hero-line {
+        width: 92px;
+        height: 3px;
+        background: #ffffff;
+        margin: 0 0 18px 0;
+        opacity: 0.9;
+        animation: lineIn 900ms ease-out both;
+    }
+
+    @keyframes lineIn {
+        from { width: 0; opacity: 0; }
+        to { width: 92px; opacity: 0.9; }
+    }
+
+    .hero-headline {
+        color: #dbe7f4;
+        font-size: 20px;
+        line-height: 1.45;
+        font-weight: 500;
+        max-width: 760px;
+        margin: 0;
+    }
+
+    .section-shell {
+        margin: 18px 0 10px 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+    }
+
     .section-label,
     .metric-label,
     .selected-game-label {
         color: var(--muted-2);
-        font-size: 12px;
-        font-weight: 800;
+        font-size: 11px;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
-    }
-
-    .hero-kicker {
-        margin-bottom: 10px;
-    }
-
-    .hero-title {
-        color: var(--text);
-        font-size: 40px;
-        line-height: 1.08;
-        font-weight: 800;
-        letter-spacing: -0.01em;
-        margin-bottom: 0;
-        max-width: 900px;
-    }
-
-    .pill-row {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-top: 18px;
-    }
-
-    .pill {
-        background: #eef3f8;
-        color: #18324d;
-        border: 1px solid var(--line);
-        border-radius: 0;
-        padding: 7px 10px;
-        font-size: 13px;
-        font-weight: 700;
-    }
-
-    .metric-label {
+        letter-spacing: 0.09em;
         margin-bottom: 6px;
-    }
-
-    .metric-value {
-        color: var(--text);
-        font-size: 30px;
-        font-weight: 800;
-        line-height: 1.05;
-        letter-spacing: -0.005em;
-        margin-top: 8px;
-    }
-
-    .section-label {
-        margin-bottom: 8px;
     }
 
     .section-title {
         color: var(--text);
-        font-size: 24px;
+        font-family: var(--font-body) !important;
+        font-size: 23px;
         line-height: 1.15;
-        font-weight: 800;
-        letter-spacing: -0.005em;
+        font-weight: 600;
+        letter-spacing: 0;
         margin-bottom: 0;
     }
 
     .title-date {
         color: #64748b !important;
-        font-size: 18px;
-        font-weight: 700;
+        font-size: 17px;
+        font-weight: 500;
         letter-spacing: 0.01em;
         margin-left: 8px;
     }
 
-    .selected-game-value {
+    .slate-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border: 1px solid var(--line);
+        background: var(--panel);
+        margin: 0 0 16px 0;
+    }
+
+    .slate-item {
+        min-height: 76px;
+        padding: 13px 16px;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .slate-item:last-child {
+        border-right: 0;
+    }
+
+    .slate-value {
         color: var(--text);
-        font-size: 19px;
-        font-weight: 800;
-        letter-spacing: -0.005em;
-        margin-top: 8px;
+        font-size: 24px;
+        font-weight: 600;
+        line-height: 1.05;
+        letter-spacing: 0;
+        margin-top: 4px;
     }
 
     .status-box,
     .disclaimer-box {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 0;
+        padding: 14px 16px;
+        margin: 12px 0 16px 0;
         color: var(--muted);
         font-size: 14px;
         line-height: 1.65;
+        box-shadow: none;
     }
 
     .stTabs [data-baseweb="tab-list"] {
@@ -336,7 +378,8 @@ st.markdown(
         padding-right: 20px;
         color: var(--muted);
         background: transparent;
-        font-weight: 700;
+        font-weight: 500;
+        letter-spacing: 0;
     }
 
     .stTabs [aria-selected="true"] {
@@ -363,7 +406,7 @@ st.markdown(
         border: 1px solid var(--line);
         background: #eef3f8;
         color: var(--text);
-        font-weight: 700;
+        font-weight: 500;
         box-shadow: none;
     }
 
@@ -376,7 +419,7 @@ st.markdown(
     section[data-testid="stSidebar"] {
         background: #ffffff !important;
         border-right: 1px solid #cfd7e2 !important;
-        box-shadow: 6px 0 22px rgba(15, 23, 42, 0.10);
+        box-shadow: 6px 0 22px rgba(15, 23, 42, 0.08);
     }
 
     section[data-testid="stSidebar"] > div {
@@ -388,7 +431,7 @@ st.markdown(
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3 {
         color: #111827 !important;
-        font-weight: 800 !important;
+        font-weight: 600 !important;
     }
 
     section[data-testid="stSidebar"] p,
@@ -401,7 +444,7 @@ st.markdown(
     section[data-testid="stSidebar"] label p {
         color: #374151 !important;
         font-size: 13px !important;
-        font-weight: 700 !important;
+        font-weight: 500 !important;
     }
 
     section[data-testid="stSidebar"] small {
@@ -431,7 +474,7 @@ st.markdown(
         color: #ffffff !important;
         border: 1px solid #0f3b66 !important;
         border-radius: 0 !important;
-        font-weight: 700 !important;
+        font-weight: 500 !important;
     }
 
     section[data-testid="stSidebar"] button * {
@@ -492,7 +535,7 @@ st.markdown(
     .custom-label-text {
         color: #111827 !important;
         font-size: 13px;
-        font-weight: 700;
+        font-weight: 500;
         line-height: 1.2;
     }
 
@@ -510,9 +553,9 @@ st.markdown(
         background: #0f3b66;
         color: #ffffff !important;
         border: 1px solid #0f3b66;
-        font-family: var(--font-stack);
+        font-family: var(--font-body);
         font-size: 14px;
-        font-weight: 800;
+        font-weight: 600;
         line-height: 20px;
         text-align: center;
         cursor: default;
@@ -534,7 +577,7 @@ st.markdown(
         border-radius: 0;
         padding: 10px 12px;
         font-size: 13px;
-        font-weight: 500;
+        font-weight: 400;
         line-height: 1.45;
         z-index: 999999;
         box-shadow: 0 8px 22px rgba(15, 23, 42, 0.25);
@@ -551,6 +594,42 @@ st.markdown(
 
     section[data-testid="stSidebar"] .custom-help-dot {
         color: #ffffff !important;
+    }
+
+    @media (max-width: 900px) {
+        .block-container {
+            padding-top: 4.4rem;
+        }
+
+        .brand-hero {
+            padding: 28px 22px 30px 22px;
+            min-height: 260px;
+        }
+
+        .hero-brand {
+            font-size: 64px;
+        }
+
+        .hero-headline {
+            font-size: 17px;
+        }
+
+        .slate-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .slate-item {
+            border-bottom: 1px solid var(--line);
+        }
+
+        .slate-item:nth-child(2) {
+            border-right: 0;
+        }
+
+        .slate-item:nth-child(3),
+        .slate-item:nth-child(4) {
+            border-bottom: 0;
+        }
     }
     </style>
     """,
@@ -644,7 +723,7 @@ def make_light_table(df):
                     "props": [
                         ("background-color", "#eef2f6"),
                         ("color", "#111827"),
-                        ("font-weight", "700"),
+                        ("font-weight", "500"),
                         ("border-color", "#d6dde6"),
                     ],
                 },
@@ -1157,62 +1236,40 @@ main_tab, matchup_tab, info_tab = st.tabs([
 with main_tab:
     st.markdown(
         """
-        <div class="hero">
-            <div class="hero-kicker">MLB Matchup Dashboard</div>
-            <div class="hero-title">Daily matchup board</div>
-            <div class="pill-row">
-                <span class="pill">Batter vs Pitcher</span>
-                <span class="pill">Throwing Hand Splits</span>
-                <span class="pill">Strikeout Targets</span>
-                <span class="pill">Career Logs</span>
+        <section class="brand-hero">
+            <div class="hero-content">
+                <div class="hero-brand">All Rise Analytics</div>
+                <div class="hero-line"></div>
+                <p class="hero-headline">
+                    Daily MLB matchup research built around probable pitchers, hitter splits, and strikeout targets.
+                </p>
             </div>
-        </div>
+        </section>
         """,
         unsafe_allow_html=True
     )
-
-    metric_col1, metric_col2, metric_col3 = st.columns(3)
-
-    with metric_col1:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-label">Games</div>
-                <div class="metric-value">{len(schedule_df)}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with metric_col2:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-label">BvP Rows</div>
-                <div class="metric-value">{len(filtered_bvp_matchups)}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with metric_col3:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-label">K Targets</div>
-                <div class="metric-value">{len(filtered_pitcher_k_matchups)}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
 
     selected_game_display = selected_game if selected_game != "All Games" else "Full slate"
 
     st.markdown(
         f"""
-        <div class="selected-game-box">
-            <div class="selected-game-label">Current View</div>
-            <div class="selected-game-value">{selected_game_display}</div>
+        <div class="slate-strip">
+            <div class="slate-item">
+                <div class="metric-label">Games</div>
+                <div class="slate-value">{len(schedule_df)}</div>
+            </div>
+            <div class="slate-item">
+                <div class="metric-label">BvP Rows</div>
+                <div class="slate-value">{len(filtered_bvp_matchups)}</div>
+            </div>
+            <div class="slate-item">
+                <div class="metric-label">K Targets</div>
+                <div class="slate-value">{len(filtered_pitcher_k_matchups)}</div>
+            </div>
+            <div class="slate-item">
+                <div class="metric-label">Current View</div>
+                <div class="slate-value">{selected_game_display}</div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True
@@ -1220,7 +1277,7 @@ with main_tab:
 
     st.markdown(
         f"""
-        <div class="content-card">
+        <div class="section-shell">
             <div class="section-label">Schedule</div>
             <div class="section-title">Today's Games <span class="title-date">{display_game_date}</span></div>
         </div>
@@ -1251,7 +1308,7 @@ with main_tab:
 with matchup_tab:
     st.markdown(
         """
-        <div class="content-card">
+        <div class="section-shell">
             <div class="section-label">Analysis</div>
             <div class="section-title">Matchup Tables</div>
         </div>
@@ -1268,7 +1325,7 @@ with matchup_tab:
     with tab1:
         st.markdown(
             f"""
-            <div class="content-card-soft">
+            <div class="section-shell">
                 <div class="section-label">Direct History</div>
                 <div class="section-title">Hitter vs Pitcher <span class="title-date">{display_game_date}</span></div>
             </div>
@@ -1320,7 +1377,7 @@ with matchup_tab:
 
             bvp_cols = [col for col in bvp_cols if col in display_bvp.columns]
 
-            st.write("Click one row below to view its career matchup game log.")
+            st.caption("Click one row below to view its career matchup game log.")
 
             bvp_event = show_table(
                 display_bvp[bvp_cols],
@@ -1348,7 +1405,7 @@ with matchup_tab:
     with tab2:
         st.markdown(
             f"""
-            <div class="content-card-soft">
+            <div class="section-shell">
                 <div class="section-label">Splits</div>
                 <div class="section-title">Hitter vs Throwing Hand <span class="title-date">{display_game_date}</span></div>
             </div>
@@ -1415,7 +1472,7 @@ with matchup_tab:
     with tab3:
         st.markdown(
             f"""
-            <div class="content-card-soft">
+            <div class="section-shell">
                 <div class="section-label">Pitching</div>
                 <div class="section-title">Strikeout Targets <span class="title-date">{display_game_date}</span></div>
             </div>
@@ -1467,7 +1524,7 @@ with matchup_tab:
 
             k_cols = [col for col in k_cols if col in display_k.columns]
 
-            st.write("Click one pitcher row below to view his career game log against that opponent.")
+            st.caption("Click one pitcher row below to view his career game log against that opponent.")
 
             k_event = show_table(
                 display_k[k_cols],
@@ -1496,7 +1553,7 @@ with matchup_tab:
 with info_tab:
     st.markdown(
         """
-        <div class="content-card">
+        <div class="section-shell">
             <div class="section-label">Reference</div>
             <div class="section-title">Methodology & Status</div>
         </div>
