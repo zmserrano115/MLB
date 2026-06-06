@@ -36,16 +36,16 @@ st.markdown(
     <style>
     :root {
         --bg: #04152b;
-        --panel: #071d36;
-        --panel-soft: #0a213d;
-        --panel-light: #102a4a;
+        --nav: #031124;
+        --panel: #071a31;
+        --panel-2: #09213c;
+        --table-head: #0b2442;
         --text: #ffffff;
-        --muted: #b8c7d8;
-        --muted-2: #8ea1b7;
-        --line: rgba(255, 255, 255, 0.09);
+        --muted: #b7c4d4;
+        --muted-2: #8798aa;
+        --line: rgba(255, 255, 255, 0.10);
         --line-soft: rgba(255, 255, 255, 0.06);
-        --accent: #1d6ed0;
-        --accent-soft: #17365c;
+        --accent: #2563eb;
     }
 
     .stApp {
@@ -54,7 +54,7 @@ st.markdown(
     }
 
     .block-container {
-        padding-top: 1.1rem;
+        padding-top: 4.8rem;
         padding-bottom: 2.5rem;
         max-width: 1280px;
     }
@@ -67,53 +67,49 @@ st.markdown(
         color: var(--muted);
     }
 
-    .top-nav {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 6px 0 18px 0;
+    /* Locked Streamlit top header */
+    header[data-testid="stHeader"] {
+        background: var(--nav);
         border-bottom: 1px solid var(--line);
-        margin-bottom: 24px;
+        height: 58px;
     }
 
-    .brand-wrap {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-    }
-
-    .brand-name {
-        font-size: 28px;
-        font-weight: 760;
+    header[data-testid="stHeader"]::before {
+        content: "All Rise Analytics";
+        position: fixed;
+        top: 15px;
+        left: 64px;
         color: #ffffff;
-        letter-spacing: -0.04em;
+        font-size: 20px;
+        font-weight: 750;
+        letter-spacing: -0.03em;
+        z-index: 999999;
+        pointer-events: none;
     }
 
-    .brand-line {
-        font-size: 14px;
+    header[data-testid="stHeader"]::after {
+        content: "MLB matchup research";
+        position: fixed;
+        top: 20px;
+        left: 240px;
         color: var(--muted-2);
-    }
-
-    .nav-badge {
-        background: var(--accent-soft);
-        color: #ffffff;
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 999px;
-        padding: 7px 12px;
         font-size: 13px;
-        font-weight: 650;
+        font-weight: 500;
+        z-index: 999999;
+        pointer-events: none;
     }
 
     .hero {
-        background: linear-gradient(180deg, #08213f 0%, #071d36 100%);
+        background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 30px 32px;
+        border-radius: 6px;
+        padding: 28px 30px;
         margin-bottom: 22px;
+        box-shadow: none;
     }
 
     .hero-kicker {
-        color: #d7e7fb;
+        color: var(--muted-2);
         font-size: 13px;
         font-weight: 700;
         margin-bottom: 12px;
@@ -123,58 +119,61 @@ st.markdown(
 
     .hero-title {
         color: #ffffff;
-        font-size: 44px;
-        line-height: 1.04;
-        font-weight: 780;
+        font-size: 42px;
+        line-height: 1.05;
+        font-weight: 760;
         letter-spacing: -0.05em;
         margin-bottom: 12px;
-        max-width: 880px;
+        max-width: 900px;
     }
 
     .hero-copy {
-        color: #d5dfeb;
+        color: var(--muted);
         font-size: 16px;
-        line-height: 1.65;
+        line-height: 1.6;
         max-width: 900px;
     }
 
     .pill-row {
         display: flex;
-        gap: 10px;
+        gap: 8px;
         flex-wrap: wrap;
         margin-top: 20px;
     }
 
     .pill {
-        background: #17365c;
+        background: #0c2a4d;
         color: #f4f8fc;
-        border: 1px solid rgba(255,255,255,0.09);
-        border-radius: 999px;
-        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 7px 10px;
         font-size: 13px;
         font-weight: 600;
     }
 
-    .content-card {
+    .content-card,
+    .content-card-soft,
+    .metric-card,
+    .selected-game-box,
+    .status-box,
+    .disclaimer-box {
         background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 16px;
+        border-radius: 6px;
+        box-shadow: none;
+    }
+
+    .content-card {
         padding: 18px 20px;
         margin-bottom: 18px;
     }
 
     .content-card-soft {
-        background: rgba(7, 29, 54, 0.72);
-        border: 1px solid var(--line-soft);
-        border-radius: 16px;
         padding: 18px 20px;
         margin-bottom: 18px;
     }
 
     .metric-card {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 16px;
         padding: 18px 20px;
         min-height: 112px;
     }
@@ -191,7 +190,7 @@ st.markdown(
     .metric-value {
         color: #ffffff;
         font-size: 32px;
-        font-weight: 780;
+        font-weight: 760;
         line-height: 1.05;
     }
 
@@ -214,7 +213,7 @@ st.markdown(
         color: #ffffff;
         font-size: 25px;
         line-height: 1.15;
-        font-weight: 760;
+        font-weight: 740;
         letter-spacing: -0.04em;
         margin-bottom: 8px;
     }
@@ -227,9 +226,6 @@ st.markdown(
     }
 
     .selected-game-box {
-        background: #08213f;
-        border: 1px solid var(--line);
-        border-radius: 16px;
         padding: 16px 18px;
         margin-bottom: 18px;
     }
@@ -246,14 +242,12 @@ st.markdown(
     .selected-game-value {
         color: #ffffff;
         font-size: 20px;
-        font-weight: 730;
+        font-weight: 720;
         letter-spacing: -0.02em;
     }
 
-    .status-box {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 16px;
+    .status-box,
+    .disclaimer-box {
         padding: 16px 18px;
         margin-top: 12px;
         margin-bottom: 16px;
@@ -262,28 +256,17 @@ st.markdown(
         line-height: 1.65;
     }
 
-    .disclaimer-box {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 16px 18px;
-        margin-top: 16px;
-        color: var(--muted);
-        font-size: 14px;
-        line-height: 1.6;
-    }
-
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 4px;
         border-bottom: 1px solid var(--line);
-        padding-bottom: 4px;
+        padding-bottom: 0px;
     }
 
     .stTabs [data-baseweb="tab"] {
         height: 42px;
-        border-radius: 10px 10px 0 0;
-        padding-left: 18px;
-        padding-right: 18px;
+        border-radius: 4px 4px 0 0;
+        padding-left: 16px;
+        padding-right: 16px;
         color: var(--muted-2);
         background: transparent;
         font-weight: 650;
@@ -298,27 +281,29 @@ st.markdown(
 
     div[data-testid="stDataFrame"] {
         border: 1px solid var(--line);
-        border-radius: 14px;
+        border-radius: 6px;
         overflow: hidden;
         background: var(--panel);
+        box-shadow: none;
     }
 
     .stButton > button {
-        border-radius: 10px;
-        border: 1px solid rgba(255,255,255,0.10);
-        background: var(--accent-soft);
+        border-radius: 4px;
+        border: 1px solid var(--line);
+        background: #0c2a4d;
         color: #ffffff;
         font-weight: 650;
+        box-shadow: none;
     }
 
     .stButton > button:hover {
-        border-color: rgba(255,255,255,0.20);
-        background: #1d4473;
+        border-color: rgba(255,255,255,0.22);
+        background: #123761;
         color: #ffffff;
     }
 
     div[data-testid="stSidebar"] {
-        background: #071a31;
+        background: #06162a;
         border-right: 1px solid var(--line-soft);
     }
 
@@ -327,25 +312,7 @@ st.markdown(
     div[data-testid="stSidebar"] h3 {
         color: #ffffff;
     }
-
-    .block-spacer {
-        height: 12px;
-    }
     </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-st.markdown(
-    """
-    <div class="top-nav">
-        <div class="brand-wrap">
-            <div class="brand-name">All Rise Analytics</div>
-            <div class="brand-line">MLB matchup research dashboard</div>
-        </div>
-        <div class="nav-badge">Daily Matchup Board</div>
-    </div>
     """,
     unsafe_allow_html=True
 )
@@ -483,7 +450,7 @@ def row_color_by_grade(row):
         style = "background-color: #e5e7eb; border-left: 5px solid #6b7280; " + base_style
     else:
         style = (
-            "background-color: #0a213d; "
+            "background-color: #071a31; "
             "color: #f8fafc; "
             "border-bottom: 1px solid rgba(255,255,255,0.05); "
             "font-size: 14px;"
@@ -527,7 +494,7 @@ def style_matchup_table(df):
             {
                 "selector": "th",
                 "props": [
-                    ("background-color", "#102a4a"),
+                    ("background-color", "#0b2442"),
                     ("color", "#f8fafc"),
                     ("font-weight", "700"),
                     ("font-size", "13px"),
