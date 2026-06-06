@@ -1,16 +1,16 @@
 game_date,game_pk,away_team,away_team_id,home_team,home_team_id,away_probable_pitcher,away_probable_pitcher_id,away_pitcher_hand,home_probable_pitcher,home_probable_pitcher_id,home_pitcher_hand
-2026-06-05,824673,San Francisco Giants,137,Chicago Cubs,112,Robbie Ray,592662,L,Edward Cabrera,665795,R
-2026-06-05,824271,Seattle Mariners,136,Detroit Tigers,116,Bryan Woo,693433,R,Framber Valdez,664285,L
-2026-06-05,823455,Chicago White Sox,145,Philadelphia Phillies,143,Anthony Kay,641743,L,Jesús Luzardo,666200,L
-2026-06-05,823538,Boston Red Sox,111,New York Yankees,147,Sonny Gray,543243,R,Ryan Weathers,677960,L
-2026-06-05,822810,Baltimore Orioles,110,Toronto Blue Jays,141,Brandon Young,687064,R,Trey Yesavage,702056,R
-2026-06-05,823860,Tampa Bay Rays,139,Miami Marlins,146,Drew Rasmussen,656876,R,Ryan Gusto,687473,R
-2026-06-05,824914,Pittsburgh Pirates,134,Atlanta Braves,144,Mitch Keller,656605,R,Martín Pérez,527048,L
-2026-06-05,824186,Athletics,133,Houston Astros,117,Jack Perkins,678022,R,Peter Lambert,663567,R
-2026-06-05,823049,Cincinnati Reds,113,St. Louis Cardinals,138,Brady Singer,663903,R,Kyle Leahy,681517,R
-2026-06-05,822892,Cleveland Guardians,114,Texas Rangers,140,Parker Messick,800048,L,Kumar Rocker,677958,R
-2026-06-05,823699,Kansas City Royals,118,Minnesota Twins,142,Michael Wacha,608379,R,Zebby Matthews,805673,R
-2026-06-05,824350,Milwaukee Brewers,158,Colorado Rockies,115,Brandon Sproat,687075,R,Ryan Feltner,663372,R
-2026-06-05,825073,Washington Nationals,120,Arizona Diamondbacks,109,Foster Griffin,656492,L,Merrill Kelly,518876,R
-2026-06-05,823293,New York Mets,121,San Diego Padres,135,Christian Scott,681035,R,Michael King,650633,R
-2026-06-05,823943,Los Angeles Angels,108,Los Angeles Dodgers,119,Reid Detmers,672282,L,Roki Sasaki,808963,R
+2026-06-06,824269,Seattle Mariners,136,Detroit Tigers,116,Bryce Miller,682243,R,Keider Montero,672456.0,R
+2026-06-06,823697,Kansas City Royals,118,Minnesota Twins,142,Luinder Avila,679883,R,Joe Ryan,657746.0,R
+2026-06-06,823048,Cincinnati Reds,113,St. Louis Cardinals,138,Nick Lodolo,666157,L,Matthew Liberatore,669461.0,L
+2026-06-06,824669,San Francisco Giants,137,Chicago Cubs,112,Landen Roupp,694738,R,Ben Brown,676962.0,R
+2026-06-06,822808,Baltimore Orioles,110,Toronto Blue Jays,141,Kyle Bradish,680694,R,,,
+2026-06-06,823454,Chicago White Sox,145,Philadelphia Phillies,143,Brandon Eisert,685126,L,Andrew Painter,691725.0,R
+2026-06-06,825075,Washington Nationals,120,Arizona Diamondbacks,109,Zack Littell,641793,R,Eduardo Rodriguez,593958.0,L
+2026-06-06,824184,Athletics,133,Houston Astros,117,Kade Morris,695034,R,Tatsuya Imai,837227.0,R
+2026-06-06,824915,Pittsburgh Pirates,134,Atlanta Braves,144,Braxton Ashcraft,677952,R,Spencer Strider,675911.0,R
+2026-06-06,823859,Tampa Bay Rays,139,Miami Marlins,146,Shane McClanahan,663556,L,Lake Bachar,669199.0,R
+2026-06-06,822891,Cleveland Guardians,114,Texas Rangers,140,Tanner Bibee,676440,R,Jack Leiter,683004.0,R
+2026-06-06,823539,Boston Red Sox,111,New York Yankees,147,Ranger Suarez,624133,L,Will Warren,701542.0,R
+2026-06-06,824351,Milwaukee Brewers,158,Colorado Rockies,115,Jacob Misiorowski,694819,R,,,
+2026-06-06,823942,Los Angeles Angels,108,Los Angeles Dodgers,119,Jack Kochanowicz,686799,R,Yoshinobu Yamamoto,808967.0,R
+2026-06-06,823292,New York Mets,121,San Diego Padres,135,Nolan McLean,690997,R,Griffin Canning,656288.0,R
