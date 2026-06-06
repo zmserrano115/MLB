@@ -107,8 +107,6 @@ TEAM_ID_BY_ABBR = {
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap');
-
     :root {
         --bg: #f3f5f7;
         --nav: #06172b;
@@ -118,10 +116,13 @@ st.markdown(
         --muted-2: #7b8794;
         --line: #d8dee6;
         --accent: #0f3b66;
+        --font-stack: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                      Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji",
+                      "Segoe UI Emoji", "Segoe UI Symbol";
     }
 
     html, body, .stApp {
-        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        font-family: var(--font-stack) !important;
     }
 
     .stApp {
@@ -147,12 +148,12 @@ st.markdown(
     section[data-testid="stSidebar"] h1,
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3 {
-        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        font-family: var(--font-stack) !important;
         color: var(--text);
     }
 
     p, li, span, label, div {
-        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-family: var(--font-stack);
     }
 
     header[data-testid="stHeader"] {
@@ -169,7 +170,7 @@ st.markdown(
         color: #ffffff;
         font-size: 20px;
         font-weight: 800;
-        letter-spacing: -0.015em;
+        letter-spacing: -0.01em;
         z-index: 999999;
         pointer-events: none;
     }
@@ -200,22 +201,50 @@ st.markdown(
     .disclaimer-box {
         background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 4px;
+        border-radius: 0;
         box-shadow: none;
     }
 
-    .hero {
-        padding: 26px 28px;
-        margin-bottom: 20px;
+    .hero,
+    .content-card,
+    .content-card-soft,
+    .metric-card,
+    .selected-game-box,
+    .status-box,
+    .disclaimer-box {
+        padding: 20px 22px;
     }
 
-    .hero-kicker {
+    .hero,
+    .content-card,
+    .content-card-soft,
+    .selected-game-box,
+    .status-box,
+    .disclaimer-box {
+        margin-bottom: 16px;
+    }
+
+    .metric-card {
+        min-height: 132px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .hero-kicker,
+    .section-label,
+    .metric-label,
+    .selected-game-label {
         color: var(--muted-2);
         font-size: 12px;
         font-weight: 800;
-        margin-bottom: 10px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
+    }
+
+    .hero-kicker {
+        margin-bottom: 10px;
     }
 
     .hero-title {
@@ -223,15 +252,8 @@ st.markdown(
         font-size: 40px;
         line-height: 1.08;
         font-weight: 800;
-        letter-spacing: -0.015em;
-        margin-bottom: 12px;
-        max-width: 900px;
-    }
-
-    .hero-copy {
-        color: var(--muted);
-        font-size: 15px;
-        line-height: 1.6;
+        letter-spacing: -0.01em;
+        margin-bottom: 0;
         max-width: 900px;
     }
 
@@ -246,34 +268,14 @@ st.markdown(
         background: #eef3f8;
         color: #18324d;
         border: 1px solid var(--line);
-        border-radius: 3px;
+        border-radius: 0;
         padding: 7px 10px;
         font-size: 13px;
         font-weight: 700;
     }
 
-    .content-card {
-        padding: 18px 20px;
-        margin-bottom: 16px;
-    }
-
-    .content-card-soft {
-        padding: 16px 18px;
-        margin-bottom: 16px;
-    }
-
-    .metric-card {
-        padding: 16px 18px;
-        min-height: 104px;
-    }
-
     .metric-label {
-        color: var(--muted-2);
-        font-size: 12px;
-        font-weight: 800;
-        margin-bottom: 8px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        margin-bottom: 6px;
     }
 
     .metric-value {
@@ -281,22 +283,12 @@ st.markdown(
         font-size: 30px;
         font-weight: 800;
         line-height: 1.05;
-        letter-spacing: -0.01em;
-    }
-
-    .metric-note {
-        color: var(--muted);
-        font-size: 13px;
+        letter-spacing: -0.005em;
         margin-top: 8px;
     }
 
     .section-label {
-        color: var(--muted-2);
-        font-size: 12px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
-        margin-bottom: 7px;
+        margin-bottom: 8px;
     }
 
     .section-title {
@@ -304,8 +296,8 @@ st.markdown(
         font-size: 24px;
         line-height: 1.15;
         font-weight: 800;
-        letter-spacing: -0.01em;
-        margin-bottom: 8px;
+        letter-spacing: -0.005em;
+        margin-bottom: 0;
     }
 
     .title-date {
@@ -316,55 +308,32 @@ st.markdown(
         margin-left: 8px;
     }
 
-    .section-copy {
-        color: var(--muted);
-        font-size: 15px;
-        line-height: 1.55;
-        max-width: 900px;
-    }
-
-    .selected-game-box {
-        padding: 14px 16px;
-        margin-bottom: 16px;
-    }
-
-    .selected-game-label {
-        color: var(--muted-2);
-        font-size: 12px;
-        text-transform: uppercase;
-        font-weight: 800;
-        letter-spacing: 0.07em;
-        margin-bottom: 4px;
-    }
-
     .selected-game-value {
         color: var(--text);
         font-size: 19px;
         font-weight: 800;
         letter-spacing: -0.005em;
+        margin-top: 8px;
     }
 
     .status-box,
     .disclaimer-box {
-        padding: 16px 18px;
-        margin-top: 12px;
-        margin-bottom: 16px;
         color: var(--muted);
         font-size: 14px;
         line-height: 1.65;
     }
 
     .stTabs [data-baseweb="tab-list"] {
-        gap: 2px;
+        gap: 0;
         border-bottom: 1px solid var(--line);
-        padding-bottom: 0px;
+        padding-bottom: 0;
     }
 
     .stTabs [data-baseweb="tab"] {
         height: 42px;
         border-radius: 0;
-        padding-left: 16px;
-        padding-right: 16px;
+        padding-left: 20px;
+        padding-right: 20px;
         color: var(--muted);
         background: transparent;
         font-weight: 700;
@@ -379,7 +348,7 @@ st.markdown(
 
     div[data-testid="stDataFrame"] {
         border: 1px solid #d6dde6 !important;
-        border-radius: 4px !important;
+        border-radius: 0 !important;
         overflow: hidden !important;
         background: #ffffff !important;
         box-shadow: none !important;
@@ -390,7 +359,7 @@ st.markdown(
     }
 
     .stButton > button {
-        border-radius: 4px;
+        border-radius: 0;
         border: 1px solid var(--line);
         background: #eef3f8;
         color: var(--text);
@@ -443,14 +412,14 @@ st.markdown(
         background: #f8fafc !important;
         color: #111827 !important;
         border: 1px solid #cfd7e2 !important;
-        border-radius: 5px !important;
+        border-radius: 0 !important;
     }
 
     section[data-testid="stSidebar"] [data-baseweb="select"] > div {
         background: #f8fafc !important;
         color: #111827 !important;
         border: 1px solid #cfd7e2 !important;
-        border-radius: 5px !important;
+        border-radius: 0 !important;
     }
 
     section[data-testid="stSidebar"] [data-baseweb="select"] span {
@@ -461,7 +430,7 @@ st.markdown(
         background: #0f3b66 !important;
         color: #ffffff !important;
         border: 1px solid #0f3b66 !important;
-        border-radius: 5px !important;
+        border-radius: 0 !important;
         font-weight: 700 !important;
     }
 
@@ -537,14 +506,14 @@ st.markdown(
     .custom-help-dot {
         width: 22px;
         height: 22px;
-        border-radius: 999px;
+        border-radius: 0;
         background: #0f3b66;
         color: #ffffff !important;
         border: 1px solid #0f3b66;
-        font-family: Arial, sans-serif;
-        font-size: 15px;
+        font-family: var(--font-stack);
+        font-size: 14px;
         font-weight: 800;
-        line-height: 22px;
+        line-height: 20px;
         text-align: center;
         cursor: default;
         user-select: none;
@@ -562,7 +531,7 @@ st.markdown(
         background: #0f172a !important;
         color: #f8fafc !important;
         border: 1px solid #334155;
-        border-radius: 6px;
+        border-radius: 0;
         padding: 10px 12px;
         font-size: 13px;
         font-weight: 500;
@@ -1191,10 +1160,6 @@ with main_tab:
         <div class="hero">
             <div class="hero-kicker">MLB Matchup Dashboard</div>
             <div class="hero-title">Daily matchup board</div>
-            <div class="hero-copy">
-                Review current MLB games, compare hitter advantages, evaluate pitcher-hand splits,
-                and identify strikeout opportunities through a clean daily workflow.
-            </div>
             <div class="pill-row">
                 <span class="pill">Batter vs Pitcher</span>
                 <span class="pill">Throwing Hand Splits</span>
@@ -1214,7 +1179,6 @@ with main_tab:
             <div class="metric-card">
                 <div class="metric-label">Games</div>
                 <div class="metric-value">{len(schedule_df)}</div>
-                <div class="metric-note">Games currently listed on the slate</div>
             </div>
             """,
             unsafe_allow_html=True
@@ -1226,7 +1190,6 @@ with main_tab:
             <div class="metric-card">
                 <div class="metric-label">BvP Rows</div>
                 <div class="metric-value">{len(filtered_bvp_matchups)}</div>
-                <div class="metric-note">Direct hitter vs pitcher rows</div>
             </div>
             """,
             unsafe_allow_html=True
@@ -1238,7 +1201,6 @@ with main_tab:
             <div class="metric-card">
                 <div class="metric-label">K Targets</div>
                 <div class="metric-value">{len(filtered_pitcher_k_matchups)}</div>
-                <div class="metric-note">Pitcher strikeout matchup rows</div>
             </div>
             """,
             unsafe_allow_html=True
@@ -1261,9 +1223,6 @@ with main_tab:
         <div class="content-card">
             <div class="section-label">Schedule</div>
             <div class="section-title">Today's Games <span class="title-date">{display_game_date}</span></div>
-            <div class="section-copy">
-                Use the game filter in the sidebar to narrow the schedule and matchup tables.
-            </div>
         </div>
         """,
         unsafe_allow_html=True
@@ -1295,10 +1254,6 @@ with matchup_tab:
         <div class="content-card">
             <div class="section-label">Analysis</div>
             <div class="section-title">Matchup Tables</div>
-            <div class="section-copy">
-                Explore hitter history, pitcher-hand splits, and strikeout opportunities.
-                Click supported rows to open career game logs.
-            </div>
         </div>
         """,
         unsafe_allow_html=True
@@ -1316,9 +1271,6 @@ with matchup_tab:
             <div class="content-card-soft">
                 <div class="section-label">Direct History</div>
                 <div class="section-title">Hitter vs Pitcher <span class="title-date">{display_game_date}</span></div>
-                <div class="section-copy">
-                    Direct matchup history between each hitter and today's opposing probable pitcher.
-                </div>
             </div>
             """,
             unsafe_allow_html=True
@@ -1399,9 +1351,6 @@ with matchup_tab:
             <div class="content-card-soft">
                 <div class="section-label">Splits</div>
                 <div class="section-title">Hitter vs Throwing Hand <span class="title-date">{display_game_date}</span></div>
-                <div class="section-copy">
-                    Hitter performance against the same throwing hand as today's opposing probable pitcher.
-                </div>
             </div>
             """,
             unsafe_allow_html=True
@@ -1469,9 +1418,6 @@ with matchup_tab:
             <div class="content-card-soft">
                 <div class="section-label">Pitching</div>
                 <div class="section-title">Strikeout Targets <span class="title-date">{display_game_date}</span></div>
-                <div class="section-copy">
-                    Pitcher strikeout opportunities using projected workload and opposing hitter strikeout tendencies.
-                </div>
             </div>
             """,
             unsafe_allow_html=True
@@ -1553,10 +1499,6 @@ with info_tab:
         <div class="content-card">
             <div class="section-label">Reference</div>
             <div class="section-title">Methodology & Status</div>
-            <div class="section-copy">
-                A quick explanation of how the tables should be read, what each abbreviation means,
-                and the current data refresh state.
-            </div>
         </div>
         """,
         unsafe_allow_html=True
