@@ -77,3 +77,128 @@
 [2026-06-06 09:28:37] Saving precomputed data files...
 [2026-06-06 09:28:37] Nightly refresh completed successfully
 [2026-06-06 09:28:37] ========================================
+[2026-06-06 09:29:23] ========================================
+[2026-06-06 09:29:23] Starting nightly MLB data refresh
+[2026-06-06 09:29:23] Game date: 2026-06-06
+[2026-06-06 09:29:23] Season: 2026
+[2026-06-06 09:29:23] Minimum PA: 100
+[2026-06-06 09:29:23] Build game logs: True
+[2026-06-06 09:29:23] Max game logs: 100
+[2026-06-06 09:29:23] Pulling daily schedule...
+[2026-06-06 09:29:24] Games found: 15
+[2026-06-06 09:29:24] Refreshing batter season stats...
+[2026-06-06 09:29:24] Batter rows loaded: 577
+[2026-06-06 09:29:24] Refreshing pitcher season stats...
+[2026-06-06 09:29:24] Pitcher rows loaded: 671
+[2026-06-06 09:29:24] Clearing old matchup cache...
+[2026-06-06 09:29:24] Building batter vs opposing pitcher matchups...
+[2026-06-06 09:29:33] Batter vs pitcher rows built: 320
+[2026-06-06 09:29:33] Building batter vs pitcher-hand matchups...
+[2026-06-06 09:29:43] Batter vs hand rows built: 320
+[2026-06-06 09:29:43] Building pitcher strikeout matchups...
+[2026-06-06 09:29:43] Pitcher K matchup rows built: 27
+[2026-06-06 09:29:43] Preloading 100 career BvP game logs out of 177 matchups with history.
+[2026-06-06 09:29:43] Preloading game log: Marcus Semien vs Griffin Canning
+[2026-06-06 09:30:30] Preloading game log: Vladimir Guerrero Jr. vs Kyle Bradish
+[2026-06-06 09:31:00] Preloading game log: Salvador Perez vs Joe Ryan
+[2026-06-06 09:31:35] Preloading game log: Vinnie Pasquantino vs Joe Ryan
+[2026-06-06 09:32:03] Preloading game log: Jazz Chisholm Jr. vs Ranger Suarez
+[2026-06-06 09:32:31] Preloading game log: Ke'Bryan Hayes vs Matthew Liberatore
+[2026-06-06 09:32:59] Preloading game log: George Springer vs Kyle Bradish
+[2026-06-06 09:33:55] Preloading game log: Maikel Garcia vs Joe Ryan
+[2026-06-06 09:34:17] Preloading game log: Ryan McMahon vs Ranger Suarez
+[2026-06-06 09:34:58] Preloading game log: Amed Rosario vs Ranger Suarez
+[2026-06-06 09:35:35] Preloading game log: Bobby Witt Jr. vs Joe Ryan
+[2026-06-06 09:35:57] Preloading game log: TJ Friedl vs Matthew Liberatore
+[2026-06-06 09:36:20] Preloading game log: Trent Grisham vs Ranger Suarez
+[2026-06-06 09:36:54] Preloading game log: Jarren Duran vs Will Warren
+[2026-06-06 09:37:19] Preloading game log: Carlos Narváez vs Will Warren
+[2026-06-06 09:37:32] Preloading game log: Trevor Story vs Will Warren
+[2026-06-06 09:38:12] Preloading game log: Geraldo Perdomo vs Zack Littell
+[2026-06-06 09:38:37] Preloading game log: Michael Massey vs Joe Ryan
+[2026-06-06 09:38:56] Preloading game log: Gleyber Torres vs Bryce Miller
+[2026-06-06 09:39:39] Preloading game log: Shohei Ohtani vs Jack Kochanowicz
+[2026-06-06 09:40:19] Preloading game log: Andrés Giménez vs Kyle Bradish
+[2026-06-06 09:40:49] Preloading game log: Corbin Carroll vs Zack Littell
+[2026-06-06 09:41:13] Preloading game log: Riley Greene vs Bryce Miller
+[2026-06-06 09:41:38] Preloading game log: Willy Adames vs Ben Brown
+[2026-06-06 09:42:20] Preloading game log: Will Smith vs Jack Kochanowicz
+[2026-06-06 09:42:55] Preloading game log: Zach McKinstry vs Bryce Miller
+[2026-06-06 09:43:18] Preloading game log: Kyle Isbel vs Joe Ryan
+[2026-06-06 09:43:39] Preloading game log: Ceddanne Rafaela vs Will Warren
+[2026-06-06 09:43:59] Preloading game log: Corey Seager vs Tanner Bibee
+[2026-06-06 09:44:46] Preloading game log: Nick Castellanos vs Nolan McLean
+[2026-06-06 09:45:41] Preloading game log: Daulton Varsho vs Kyle Bradish
+[2026-06-06 09:46:08] Preloading game log: Lourdes Gurriel Jr. vs Zack Littell
+[2026-06-06 09:46:45] Preloading game log: Daniel Schneemann vs Jack Leiter
+[2026-06-06 09:47:01] Preloading game log: Steven Kwan vs Jack Leiter
+[2026-06-06 09:47:31] Preloading game log: Mookie Betts vs Jack Kochanowicz
+[2026-06-06 09:48:30] Preloading game log: Masataka Yoshida vs Will Warren
+[2026-06-06 09:48:46] Preloading game log: Gabriel Moreno vs Zack Littell
+[2026-06-06 09:49:05] Preloading game log: Spencer Torkelson vs Bryce Miller
+[2026-06-06 09:49:33] Preloading game log: Jared Triolo vs Spencer Strider
+[2026-06-06 09:49:52] Preloading game log: Randy Arozarena vs Keider Montero
+[2026-06-06 09:50:27] Preloading game log: Kerry Carpenter vs Bryce Miller
+[2026-06-06 09:50:48] Preloading game log: Ernie Clement vs Kyle Bradish
+[2026-06-06 09:51:07] Preloading game log: Bo Bichette vs Griffin Canning
+[2026-06-06 09:51:40] Preloading game log: Eugenio Suárez vs Matthew Liberatore
+[2026-06-06 09:52:34] Preloading game log: Cal Raleigh vs Keider Montero
+[2026-06-06 09:53:01] Preloading game log: Mark Vientos vs Griffin Canning
+[2026-06-06 09:53:20] Preloading game log: Michael Conforto vs Landen Roupp
+[2026-06-06 09:54:03] Preloading game log: Aaron Judge vs Ranger Suarez
+[2026-06-06 09:54:58] Preloading game log: Luis Arraez vs Ben Brown
+[2026-06-06 09:55:39] Preloading game log: Spencer Steer vs Matthew Liberatore
+[2026-06-06 09:56:02] Preloading game log: Matt McLain vs Matthew Liberatore
+[2026-06-06 09:56:24] Preloading game log: Matt Vierling vs Bryce Miller
+[2026-06-06 09:56:48] Preloading game log: Alek Thomas vs Zack Littell
+[2026-06-06 09:57:08] Preloading game log: Ezequiel Duran vs Tanner Bibee
+[2026-06-06 09:57:27] Preloading game log: Jake Burger vs Tanner Bibee
+[2026-06-06 09:57:51] Preloading game log: Zach Neto vs Yoshinobu Yamamoto
+[2026-06-06 09:58:09] Preloading game log: Max Muncy vs Jack Kochanowicz
+[2026-06-06 09:58:54] Preloading game log: MJ Melendez vs Griffin Canning
+[2026-06-06 09:59:16] Preloading game log: Juan Soto vs Griffin Canning
+[2026-06-06 10:00:00] Preloading game log: Brendan Donovan vs Keider Montero
+[2026-06-06 10:00:24] Preloading game log: Jac Caglianone vs Joe Ryan
+[2026-06-06 10:00:37] Preloading game log: Keibert Ruiz vs Eduardo Rodriguez
+[2026-06-06 10:01:01] Preloading game log: Spencer Horwitz vs Spencer Strider
+[2026-06-06 10:01:21] Preloading game log: Yoán Moncada vs Yoshinobu Yamamoto
+[2026-06-06 10:01:56] Preloading game log: Nick Kurtz vs Tatsuya Imai
+[2026-06-06 10:02:11] Preloading game log: José Caballero vs Ranger Suarez
+[2026-06-06 10:02:30] Preloading game log: Mike Trout vs Yoshinobu Yamamoto
+[2026-06-06 10:03:19] Preloading game log: Sal Stewart vs Matthew Liberatore
+[2026-06-06 10:03:30] Preloading game log: Nathaniel Lowe vs Matthew Liberatore
+[2026-06-06 10:04:06] Preloading game log: Ian Happ vs Landen Roupp
+[2026-06-06 10:04:52] Preloading game log: Teoscar Hernández vs Jack Kochanowicz
+[2026-06-06 10:05:39] Preloading game log: Nick Loftin vs Joe Ryan
+[2026-06-06 10:05:51] Preloading game log: Nick Gonzales vs Spencer Strider
+[2026-06-06 10:06:06] Preloading game log: Paul Goldschmidt vs Ranger Suarez
+[2026-06-06 10:07:06] Preloading game log: Roman Anthony vs Will Warren
+[2026-06-06 10:07:18] Preloading game log: Alec Burleson vs Nick Lodolo
+[2026-06-06 10:07:39] Preloading game log: Masyn Winn vs Nick Lodolo
+[2026-06-06 10:07:59] Preloading game log: Dane Myers vs Matthew Liberatore
+[2026-06-06 10:08:14] Preloading game log: Nolan Arenado vs Zack Littell
+[2026-06-06 10:09:10] Preloading game log: Ketel Marte vs Zack Littell
+[2026-06-06 10:09:57] Preloading game log: Bryan Reynolds vs Spencer Strider
+[2026-06-06 10:10:39] Preloading game log: Francisco Alvarez vs Griffin Canning
+[2026-06-06 10:10:56] Preloading game log: Matt Chapman vs Ben Brown
+[2026-06-06 10:11:43] Preloading game log: Kazuma Okamoto vs Kyle Bradish
+[2026-06-06 10:11:55] Preloading game log: José Tena vs Eduardo Rodriguez
+[2026-06-06 10:12:08] Preloading game log: Tyler Soderstrom vs Tatsuya Imai
+[2026-06-06 10:12:24] Preloading game log: Brent Rooker vs Tatsuya Imai
+[2026-06-06 10:12:49] Preloading game log: Kyle Tucker vs Jack Kochanowicz
+[2026-06-06 10:13:23] Preloading game log: Nolan Schanuel vs Yoshinobu Yamamoto
+[2026-06-06 10:13:41] Preloading game log: Colt Keith vs Bryce Miller
+[2026-06-06 10:13:59] Preloading game log: Dillon Dingler vs Bryce Miller
+[2026-06-06 10:14:16] Preloading game log: Seiya Suzuki vs Landen Roupp
+[2026-06-06 10:14:44] Preloading game log: Michael Busch vs Landen Roupp
+[2026-06-06 10:15:06] Preloading game log: Jung Hoo Lee vs Ben Brown
+[2026-06-06 10:15:22] Preloading game log: Brandon Valenzuela vs Kyle Bradish
+[2026-06-06 10:15:33] Preloading game log: Lenyn Sosa vs Kyle Bradish
+[2026-06-06 10:15:52] Preloading game log: CJ Abrams vs Eduardo Rodriguez
+[2026-06-06 10:16:17] Preloading game log: Curtis Mead vs Eduardo Rodriguez
+[2026-06-06 10:16:34] Preloading game log: Shea Langeliers vs Tatsuya Imai
+[2026-06-06 10:17:00] Preloading game log: Ryan O'Hearn vs Spencer Strider
+[2026-06-06 10:17:32] Career game logs successfully preloaded: 100
+[2026-06-06 10:17:32] Saving precomputed data files...
+[2026-06-06 10:17:32] Nightly refresh completed successfully
+[2026-06-06 10:17:32] ========================================
