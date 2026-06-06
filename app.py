@@ -111,72 +111,12 @@ st.markdown(
         --bg: #f3f5f7;
         --nav: #06172b;
         --panel: #ffffff;
-        --panel-soft: #f8fafc;
         --text: #111827;
         --muted: #5b6775;
         --muted-2: #7b8794;
         --line: #d8dee6;
-        --line-soft: #e7ebf0;
         --accent: #0f3b66;
     }
-    .custom-label-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: -8px;
-    margin-top: 14px;
-    }
-
-.custom-label-text {
-    color: #111827;
-    font-size: 13px;
-    font-weight: 650;
-    }
-
-.custom-help-wrap {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    }
-
-.custom-help-dot {
-    width: 20px;
-    height: 20px;
-    border-radius: 999px;
-    background: #0f3b66;
-    color: #ffffff;
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-    font-weight: 800;
-    line-height: 20px;
-    text-align: center;
-    cursor: default;
-    user-select: none;
-    }
-
-.custom-help-tooltip {
-    display: none;
-    position: absolute;
-    right: 0;
-    top: 27px;
-    width: 240px;
-    background: #0f172a;
-    color: #f8fafc;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1.45;
-    z-index: 999999;
-    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.25); 
-    }
-
-.custom-help-wrap:hover .custom-help-tooltip {
-    display: block;
-    }
-    
 
     .stApp {
         background: var(--bg);
@@ -193,7 +133,6 @@ st.markdown(
         color: var(--text);
     }
 
-    /* Top header */
     header[data-testid="stHeader"] {
         background: var(--nav);
         border-bottom: 1px solid rgba(255,255,255,0.12);
@@ -225,7 +164,17 @@ st.markdown(
         pointer-events: none;
     }
 
-    /* Cards */
+    header[data-testid="stHeader"] button,
+    header[data-testid="stHeader"] button *,
+    div[data-testid="collapsedControl"] button,
+    div[data-testid="collapsedControl"] button *,
+    button[data-testid="baseButton-header"],
+    button[data-testid="baseButton-header"] * {
+        color: #ffffff !important;
+        fill: #ffffff !important;
+        stroke: #ffffff !important;
+    }
+
     .hero,
     .content-card,
     .content-card-soft,
@@ -380,7 +329,6 @@ st.markdown(
         line-height: 1.65;
     }
 
-    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2px;
         border-bottom: 1px solid var(--line);
@@ -404,20 +352,18 @@ st.markdown(
         border-bottom: 1px solid var(--panel) !important;
     }
 
-    /* Dataframes - LIGHTER, but not broken */
     div[data-testid="stDataFrame"] {
         border: 1px solid #d6dde6 !important;
         border-radius: 4px !important;
         overflow: hidden !important;
-        background: #fbfcfe !important;
+        background: #ffffff !important;
         box-shadow: none !important;
     }
 
     div[data-testid="stDataFrame"] > div {
-        background: #fbfcfe !important;
+        background: #ffffff !important;
     }
 
-    /* Buttons */
     .stButton > button {
         border-radius: 4px;
         border: 1px solid var(--line);
@@ -433,7 +379,6 @@ st.markdown(
         color: var(--text);
     }
 
-    /* Sidebar */
     section[data-testid="stSidebar"] {
         background: #ffffff !important;
         border-right: 1px solid #cfd7e2 !important;
@@ -541,47 +486,77 @@ st.markdown(
         color: #111827 !important;
     }
 
-    /* Help icon: full navy circle + white clean icon */
-    section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] {
-        background: #0f3b66 !important;
-        border: 1px solid #0f3b66 !important;
-        border-radius: 999px !important;
-        width: 18px !important;
-        height: 18px !important;
-        min-width: 18px !important;
-        min-height: 18px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-shadow: none !important;
+    .custom-label-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 18px;
+        margin-bottom: 6px;
+        width: 100%;
     }
 
-    section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] svg {
-        width: 11px !important;
-        height: 11px !important;
-        stroke: #ffffff !important;
-        fill: none !important;
-        stroke-width: 2.2 !important;
-        stroke-linecap: round !important;
-        stroke-linejoin: round !important;
+    .custom-label-text {
+        color: #111827 !important;
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.2;
     }
 
-    /* Tooltip popup text */
-    div[data-baseweb="tooltip"],
-    div[role="tooltip"],
-    div[data-testid="stTooltipContent"] {
+    .custom-help-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .custom-help-dot {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        background: #0f3b66;
+        color: #ffffff !important;
+        border: 1px solid #0f3b66;
+        font-family: Arial, sans-serif;
+        font-size: 15px;
+        font-weight: 800;
+        line-height: 22px;
+        text-align: center;
+        cursor: default;
+        user-select: none;
+        box-shadow: none;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: geometricPrecision;
+    }
+
+    .custom-help-tooltip {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: 29px;
+        width: 250px;
         background: #0f172a !important;
         color: #f8fafc !important;
-        border: 1px solid #334155 !important;
-        border-radius: 6px !important;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.25) !important;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1.45;
+        z-index: 999999;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.25);
     }
 
-    div[data-baseweb="tooltip"] *,
-    div[role="tooltip"] *,
-    div[data-testid="stTooltipContent"] * {
+    .custom-help-wrap:hover .custom-help-tooltip {
+        display: block;
+    }
+
+    section[data-testid="stSidebar"] .custom-help-tooltip,
+    section[data-testid="stSidebar"] .custom-help-tooltip * {
         color: #f8fafc !important;
-        fill: #f8fafc !important;
+    }
+
+    section[data-testid="stSidebar"] .custom-help-dot {
+        color: #ffffff !important;
     }
     </style>
     """,
@@ -650,6 +625,64 @@ def grade_bar_url(grade):
     )
 
     return "data:image/svg+xml;utf8," + quote(svg)
+
+
+def make_light_table(df):
+    return (
+        df.style
+        .set_properties(
+            **{
+                "background-color": "#ffffff",
+                "color": "#111827",
+                "border-color": "#d6dde6"
+            }
+        )
+        .set_table_styles(
+            [
+                {
+                    "selector": "th",
+                    "props": [
+                        ("background-color", "#eef2f6"),
+                        ("color", "#111827"),
+                        ("font-weight", "700"),
+                        ("border-color", "#d6dde6"),
+                    ],
+                },
+                {
+                    "selector": "td",
+                    "props": [
+                        ("background-color", "#ffffff"),
+                        ("color", "#111827"),
+                        ("border-color", "#e5e7eb"),
+                    ],
+                },
+            ]
+        )
+    )
+
+
+def show_table(df, key=None, selectable=False):
+    table_data = make_light_table(df)
+
+    if selectable:
+        return st.dataframe(
+            table_data,
+            width="stretch",
+            hide_index=True,
+            column_config=table_column_config(),
+            on_select="rerun",
+            selection_mode="single-row",
+            key=key,
+            row_height=42
+        )
+
+    return st.dataframe(
+        table_data,
+        width="stretch",
+        hide_index=True,
+        column_config=table_column_config(),
+        row_height=42
+    )
 
 
 def read_precomputed_csv(file_name):
@@ -920,13 +953,7 @@ def display_bvp_game_log(selected_row, season):
 
     game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
 
-    st.dataframe(
-        game_log_df[game_log_cols],
-        width="stretch",
-        hide_index=True,
-        column_config=table_column_config(),
-        row_height=42
-    )
+    show_table(game_log_df[game_log_cols])
 
 
 def display_pitcher_vs_team_game_log(selected_row):
@@ -970,13 +997,7 @@ def display_pitcher_vs_team_game_log(selected_row):
 
     game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
 
-    st.dataframe(
-        game_log_df[game_log_cols],
-        width="stretch",
-        hide_index=True,
-        column_config=table_column_config(),
-        row_height=42
-    )
+    show_table(game_log_df[game_log_cols])
 
 
 current_year = date.today().year
@@ -1094,6 +1115,7 @@ if schedule_df.empty:
 schedule_df = add_game_column(schedule_df)
 game_options = get_game_options(schedule_df)
 
+
 with st.sidebar:
     st.markdown(
         """
@@ -1116,6 +1138,7 @@ with st.sidebar:
         index=0,
         label_visibility="collapsed"
     )
+
 
 filtered_schedule_df = filter_by_game(schedule_df, selected_game)
 filtered_bvp_matchups = filter_by_game(bvp_matchups, selected_game)
@@ -1231,13 +1254,7 @@ with main_tab:
         col for col in schedule_display_cols if col in schedule_display.columns
     ]
 
-    st.dataframe(
-        schedule_display[schedule_display_cols],
-        width="stretch",
-        hide_index=True,
-        column_config=table_column_config(),
-        row_height=42
-    )
+    show_table(schedule_display[schedule_display_cols])
 
 
 with matchup_tab:
@@ -1321,15 +1338,10 @@ with matchup_tab:
 
             st.write("Click one row below to view its career matchup game log.")
 
-            bvp_event = st.dataframe(
+            bvp_event = show_table(
                 display_bvp[bvp_cols],
-                width="stretch",
-                hide_index=True,
-                column_config=table_column_config(),
-                on_select="rerun",
-                selection_mode="single-row",
                 key="bvp_table",
-                row_height=42
+                selectable=True
             )
 
             selected_row = None
@@ -1417,13 +1429,7 @@ with matchup_tab:
 
             hand_cols = [col for col in hand_cols if col in display_hand.columns]
 
-            st.dataframe(
-                display_hand[hand_cols],
-                width="stretch",
-                hide_index=True,
-                column_config=table_column_config(),
-                row_height=42
-            )
+            show_table(display_hand[hand_cols])
 
     with tab3:
         st.markdown(
@@ -1485,15 +1491,10 @@ with matchup_tab:
 
             st.write("Click one pitcher row below to view his career game log against that opponent.")
 
-            k_event = st.dataframe(
+            k_event = show_table(
                 display_k[k_cols],
-                width="stretch",
-                hide_index=True,
-                column_config=table_column_config(),
-                on_select="rerun",
-                selection_mode="single-row",
                 key="pitcher_k_table",
-                row_height=42
+                selectable=True
             )
 
             selected_pitcher_row = None
