@@ -119,7 +119,9 @@ st.markdown(
         --muted-2: #7b8794;
         --line: #d8dee6;
         --line-soft: #e7ebf0;
-        --header: #eef1f5;
+        --table-bg: #ffffff;
+        --table-head: #eef2f6;
+        --table-line: #d6dde6;
         --accent: #0f3b66;
     }
 
@@ -350,11 +352,23 @@ st.markdown(
     }
 
     div[data-testid="stDataFrame"] {
-        border: 1px solid var(--line);
-        border-radius: 3px;
-        overflow: hidden;
-        background: var(--panel);
-        box-shadow: none;
+        border: 1px solid var(--table-line) !important;
+        border-radius: 3px !important;
+        overflow: hidden !important;
+        background: var(--table-bg) !important;
+        box-shadow: none !important;
+    }
+
+    div[data-testid="stDataFrame"] > div {
+        background: var(--table-bg) !important;
+    }
+
+    div[data-testid="stDataFrame"] [role="grid"] {
+        background: var(--table-bg) !important;
+    }
+
+    div[data-testid="stDataFrame"] canvas {
+        background: var(--table-bg) !important;
     }
 
     .stButton > button {
@@ -433,9 +447,17 @@ st.markdown(
         font-weight: 650 !important;
     }
 
+    section[data-testid="stSidebar"] button * {
+        color: #ffffff !important;
+    }
+
     section[data-testid="stSidebar"] button:hover {
         background: #145083 !important;
         border-color: #145083 !important;
+        color: #ffffff !important;
+    }
+
+    section[data-testid="stSidebar"] button:hover * {
         color: #ffffff !important;
     }
 
@@ -443,6 +465,20 @@ st.markdown(
         background: #eef3f8 !important;
         color: #111827 !important;
         border: 1px solid #cfd7e2 !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stNumberInput"] button * {
+        color: #111827 !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover {
+        background: #e2eaf3 !important;
+        color: #111827 !important;
+        border-color: #b9c3cf !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover * {
+        color: #111827 !important;
     }
 
     section[data-testid="stSidebar"] [data-testid="stCheckbox"] label {
@@ -481,7 +517,7 @@ def team_logo_url(team_value):
     if team_id is None:
         return ""
 
-    return f"https://www.mlbstatic.com/team-logos/{team_id}.svg"
+    return f"https://www.mlbstatic.com/team-logos/team-cap-on-light/{team_id}.svg"
 
 
 def opponent_from_game(game, team):
@@ -802,7 +838,8 @@ def display_bvp_game_log(selected_row, season):
         game_log_df[game_log_cols],
         width="stretch",
         hide_index=True,
-        column_config=table_column_config()
+        column_config=table_column_config(),
+        row_height=42
     )
 
 
@@ -851,7 +888,8 @@ def display_pitcher_vs_team_game_log(selected_row):
         game_log_df[game_log_cols],
         width="stretch",
         hide_index=True,
-        column_config=table_column_config()
+        column_config=table_column_config(),
+        row_height=42
     )
 
 
@@ -1103,7 +1141,8 @@ with main_tab:
         schedule_display[schedule_display_cols],
         width="stretch",
         hide_index=True,
-        column_config=table_column_config()
+        column_config=table_column_config(),
+        row_height=42
     )
 
 
@@ -1195,7 +1234,8 @@ with matchup_tab:
                 column_config=table_column_config(),
                 on_select="rerun",
                 selection_mode="single-row",
-                key="bvp_table"
+                key="bvp_table",
+                row_height=42
             )
 
             selected_row = None
@@ -1287,7 +1327,8 @@ with matchup_tab:
                 display_hand[hand_cols],
                 width="stretch",
                 hide_index=True,
-                column_config=table_column_config()
+                column_config=table_column_config(),
+                row_height=42
             )
 
     with tab3:
@@ -1357,7 +1398,8 @@ with matchup_tab:
                 column_config=table_column_config(),
                 on_select="rerun",
                 selection_mode="single-row",
-                key="pitcher_k_table"
+                key="pitcher_k_table",
+                row_height=42
             )
 
             selected_pitcher_row = None
