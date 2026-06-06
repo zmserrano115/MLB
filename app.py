@@ -1,5 +1,3 @@
-# app.py
-
 from datetime import date
 from pathlib import Path
 from urllib.parse import quote
@@ -110,18 +108,15 @@ st.markdown(
     """
     <style>
     :root {
-        --bg: #f4f6f8;
+        --bg: #f3f5f7;
         --nav: #06172b;
         --panel: #ffffff;
-        --panel-2: #f8fafc;
+        --panel-soft: #f8fafc;
         --text: #111827;
         --muted: #5b6775;
         --muted-2: #7b8794;
         --line: #d8dee6;
         --line-soft: #e7ebf0;
-        --table-bg: #ffffff;
-        --table-head: #eef2f6;
-        --table-line: #d6dde6;
         --accent: #0f3b66;
     }
 
@@ -140,6 +135,7 @@ st.markdown(
         color: var(--text);
     }
 
+    /* Top header */
     header[data-testid="stHeader"] {
         background: var(--nav);
         border-bottom: 1px solid rgba(255,255,255,0.12);
@@ -150,7 +146,7 @@ st.markdown(
         content: "All Rise Analytics";
         position: fixed;
         top: 15px;
-        left: 64px;
+        left: 80px;
         color: #ffffff;
         font-size: 20px;
         font-weight: 750;
@@ -163,21 +159,31 @@ st.markdown(
         content: "MLB matchup research";
         position: fixed;
         top: 20px;
-        left: 240px;
-        color: #b8c7d8;
+        left: 300px;
+        color: #c4d0de;
         font-size: 13px;
         font-weight: 500;
         z-index: 999999;
         pointer-events: none;
     }
 
-    .hero {
+    /* Cards */
+    .hero,
+    .content-card,
+    .content-card-soft,
+    .metric-card,
+    .selected-game-box,
+    .status-box,
+    .disclaimer-box {
         background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 3px;
+        border-radius: 4px;
+        box-shadow: none;
+    }
+
+    .hero {
         padding: 26px 28px;
         margin-bottom: 20px;
-        box-shadow: none;
     }
 
     .hero-kicker {
@@ -221,18 +227,6 @@ st.markdown(
         padding: 7px 10px;
         font-size: 13px;
         font-weight: 650;
-    }
-
-    .content-card,
-    .content-card-soft,
-    .metric-card,
-    .selected-game-box,
-    .status-box,
-    .disclaimer-box {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 3px;
-        box-shadow: none;
     }
 
     .content-card {
@@ -328,6 +322,7 @@ st.markdown(
         line-height: 1.65;
     }
 
+    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2px;
         border-bottom: 1px solid var(--line);
@@ -351,42 +346,22 @@ st.markdown(
         border-bottom: 1px solid var(--panel) !important;
     }
 
-    /* Light table area for logos */
+    /* Dataframes - LIGHTER, but not broken */
     div[data-testid="stDataFrame"] {
-        border: 1px solid var(--table-line) !important;
-        border-radius: 3px !important;
+        border: 1px solid #d6dde6 !important;
+        border-radius: 4px !important;
         overflow: hidden !important;
-        background: #ffffff !important;
+        background: #fbfcfe !important;
         box-shadow: none !important;
-        color-scheme: light !important;
     }
 
-    div[data-testid="stDataFrame"] * {
-        color-scheme: light !important;
+    div[data-testid="stDataFrame"] > div {
+        background: #fbfcfe !important;
     }
 
-    div[data-testid="stDataFrame"] > div,
-    div[data-testid="stDataFrame"] [role="grid"],
-    div[data-testid="stDataFrame"] [role="row"],
-    div[data-testid="stDataFrame"] [role="columnheader"],
-    div[data-testid="stDataFrame"] [role="gridcell"] {
-        background-color: #ffffff !important;
-        color: #111827 !important;
-    }
-
-    div[data-testid="stDataFrame"] canvas {
-        background-color: #ffffff !important;
-    }
-
-    div[data-testid="stDataFrame"] div[class*="glideDataEditor"],
-    div[data-testid="stDataFrame"] div[class*="dvn"],
-    div[data-testid="stDataFrame"] div[class*="DataFrame"] {
-        background-color: #ffffff !important;
-        color: #111827 !important;
-    }
-
+    /* Buttons */
     .stButton > button {
-        border-radius: 3px;
+        border-radius: 4px;
         border: 1px solid var(--line);
         background: #eef3f8;
         color: var(--text);
@@ -400,6 +375,7 @@ st.markdown(
         color: var(--text);
     }
 
+    /* Sidebar */
     section[data-testid="stSidebar"] {
         background: #ffffff !important;
         border-right: 1px solid #cfd7e2 !important;
@@ -507,10 +483,9 @@ st.markdown(
         color: #111827 !important;
     }
 
-    /* Refined help/question mark */
+    /* Help icon: full navy circle + white clean icon */
     section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] {
         background: #0f3b66 !important;
-        color: #ffffff !important;
         border: 1px solid #0f3b66 !important;
         border-radius: 999px !important;
         width: 18px !important;
@@ -524,20 +499,16 @@ st.markdown(
     }
 
     section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] svg {
-        color: #ffffff !important;
+        width: 11px !important;
+        height: 11px !important;
+        stroke: #ffffff !important;
         fill: none !important;
-        stroke: #ffffff !important;
-        width: 13px !important;
-        height: 13px !important;
-        stroke-width: 2.25px !important;
+        stroke-width: 2.2 !important;
+        stroke-linecap: round !important;
+        stroke-linejoin: round !important;
     }
 
-    section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] * {
-        color: #ffffff !important;
-        stroke: #ffffff !important;
-    }
-
-    /* Tooltip text when hovering over info/question marks */
+    /* Tooltip popup text */
     div[data-baseweb="tooltip"],
     div[role="tooltip"],
     div[data-testid="stTooltipContent"] {
