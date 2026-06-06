@@ -351,24 +351,38 @@ st.markdown(
         border-bottom: 1px solid var(--panel) !important;
     }
 
+    /* Light table area for logos */
     div[data-testid="stDataFrame"] {
         border: 1px solid var(--table-line) !important;
         border-radius: 3px !important;
         overflow: hidden !important;
-        background: var(--table-bg) !important;
+        background: #ffffff !important;
         box-shadow: none !important;
+        color-scheme: light !important;
     }
 
-    div[data-testid="stDataFrame"] > div {
-        background: var(--table-bg) !important;
+    div[data-testid="stDataFrame"] * {
+        color-scheme: light !important;
     }
 
-    div[data-testid="stDataFrame"] [role="grid"] {
-        background: var(--table-bg) !important;
+    div[data-testid="stDataFrame"] > div,
+    div[data-testid="stDataFrame"] [role="grid"],
+    div[data-testid="stDataFrame"] [role="row"],
+    div[data-testid="stDataFrame"] [role="columnheader"],
+    div[data-testid="stDataFrame"] [role="gridcell"] {
+        background-color: #ffffff !important;
+        color: #111827 !important;
     }
 
     div[data-testid="stDataFrame"] canvas {
-        background: var(--table-bg) !important;
+        background-color: #ffffff !important;
+    }
+
+    div[data-testid="stDataFrame"] div[class*="glideDataEditor"],
+    div[data-testid="stDataFrame"] div[class*="dvn"],
+    div[data-testid="stDataFrame"] div[class*="DataFrame"] {
+        background-color: #ffffff !important;
+        color: #111827 !important;
     }
 
     .stButton > button {
@@ -489,38 +503,56 @@ st.markdown(
         stroke: #111827 !important;
     }
 
-    section[data-testid="stSidebar"] [data-testid="stCheckbox"] label {
-        background: #f8fafc !important;
-        border: 1px solid #d8dee6 !important;
-        border-radius: 6px !important;
-        padding: 8px 10px !important;
-        width: 100%;
-    }
-
-    section[data-testid="stSidebar"] [data-testid="stCheckbox"] p {
-        color: #111827 !important;
-        font-weight: 650 !important;
-    }
-
     section[data-testid="stSidebar"] [data-testid="stDateInput"] input {
         color: #111827 !important;
     }
 
+    /* Refined help/question mark */
     section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] {
         background: #0f3b66 !important;
         color: #ffffff !important;
         border: 1px solid #0f3b66 !important;
         border-radius: 999px !important;
+        width: 18px !important;
+        height: 18px !important;
+        min-width: 18px !important;
+        min-height: 18px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: none !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] svg {
+        color: #ffffff !important;
+        fill: none !important;
+        stroke: #ffffff !important;
+        width: 13px !important;
+        height: 13px !important;
+        stroke-width: 2.25px !important;
     }
 
     section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"] * {
         color: #ffffff !important;
-        fill: #ffffff !important;
         stroke: #ffffff !important;
     }
 
-    section[data-testid="stSidebar"] svg {
-        color: #ffffff !important;
+    /* Tooltip text when hovering over info/question marks */
+    div[data-baseweb="tooltip"],
+    div[role="tooltip"],
+    div[data-testid="stTooltipContent"] {
+        background: #0f172a !important;
+        color: #f8fafc !important;
+        border: 1px solid #334155 !important;
+        border-radius: 6px !important;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.25) !important;
+    }
+
+    div[data-baseweb="tooltip"] *,
+    div[role="tooltip"] *,
+    div[data-testid="stTooltipContent"] * {
+        color: #f8fafc !important;
+        fill: #f8fafc !important;
     }
     </style>
     """,
