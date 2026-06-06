@@ -2,6 +2,7 @@
 
 from datetime import date
 from pathlib import Path
+from urllib.parse import quote
 import json
 
 import pandas as pd
@@ -429,25 +430,29 @@ def opponent_from_game(game, team):
     return ""
 
 
-def grade_marker(grade):
+def grade_bar_url(grade):
     grade = str(grade).lower()
 
     if "elite" in grade or "strong" in grade or "good" in grade:
-        return "🟢"
+        color = "2ca25f"
+    elif "neutral" in grade:
+        color = "d99a16"
+    elif "avoid" in grade:
+        color = "d64545"
+    elif "small sample" in grade:
+        color = "3f7fd8"
+    elif "no history" in grade:
+        color = "9ca3af"
+    else:
+        color = "9ca3af"
 
-    if "neutral" in grade:
-        return "🟡"
+    svg = (
+        f"<svg xmlns='http://www.w3.org/2000/svg' width='6' height='32' viewBox='0 0 6 32'>"
+        f"<rect width='6' height='32' fill='#{color}'/>"
+        f"</svg>"
+    )
 
-    if "avoid" in grade:
-        return "🔴"
-
-    if "small sample" in grade:
-        return "🔵"
-
-    if "no history" in grade:
-        return "⚪"
-
-    return "⚪"
+    return "data:image/svg+xml;utf8," + quote(svg)
 
 
 def read_precomputed_csv(file_name):
@@ -553,7 +558,7 @@ def is_missing_value(value):
 
 def table_column_config():
     return {
-        "grade_marker": st.column_config.TextColumn("", width="small"),
+        "grade_bar": st.column_config.ImageColumn("", width="small"),
         "team_logo": st.column_config.ImageColumn("", width="small"),
         "opponent_logo": st.column_config.ImageColumn("", width="small"),
         "away_logo": st.column_config.ImageColumn("", width="small"),
@@ -592,9 +597,9 @@ def prepare_batter_display(df):
     df = df.copy()
 
     if "matchup_grade" in df.columns:
-        df["grade_marker"] = df["matchup_grade"].apply(grade_marker)
+        df["grade_bar"] = df["matchup_grade"].apply(grade_bar_url)
     else:
-        df["grade_marker"] = "⚪"
+        df["grade_bar"] = grade_bar_url("no history")
 
     if "team" in df.columns:
         df["team_logo"] = df["team"].apply(team_logo_url)
@@ -613,9 +618,9 @@ def prepare_pitcher_display(df):
     df = df.copy()
 
     if "k_matchup_grade" in df.columns:
-        df["grade_marker"] = df["k_matchup_grade"].apply(grade_marker)
+        df["grade_bar"] = df["k_matchup_grade"].apply(grade_bar_url)
     else:
-        df["grade_marker"] = "⚪"
+        df["grade_bar"] = grade_bar_url("no history")
 
     if "pitcher_team" in df.columns:
         df["pitcher_team_logo"] = df["pitcher_team"].apply(team_logo_url)
@@ -1043,7 +1048,7 @@ with matchup_tab:
             display_bvp = prepare_batter_display(display_bvp)
 
             bvp_cols = [
-                "grade_marker",
+                "grade_bar",
                 "team_logo",
                 "team",
                 "batter",
@@ -1139,7 +1144,7 @@ with matchup_tab:
             display_hand = prepare_batter_display(display_hand)
 
             hand_cols = [
-                "grade_marker",
+                "grade_bar",
                 "team_logo",
                 "team",
                 "batter",
@@ -1210,7 +1215,7 @@ with matchup_tab:
             display_k = prepare_pitcher_display(display_k)
 
             k_cols = [
-                "grade_marker",
+                "grade_bar",
                 "pitcher_team_logo",
                 "pitcher",
                 "pitcher_hand",
@@ -1290,11 +1295,11 @@ with info_tab:
         - Click a pitcher row to view career game logs against that opponent.
 
         **Row Markers**
-        - 🟢 favorable
-        - 🟡 neutral
-        - 🔴 avoid
-        - 🔵 small sample
-        - ⚪ no history
+        - Green bar = favorable
+        - Yellow bar = neutral
+        - Red bar = avoid
+        - Blue bar = small sample
+        - Gray bar = no history
         """
     )
 
