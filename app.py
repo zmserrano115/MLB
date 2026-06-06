@@ -131,7 +131,7 @@ st.markdown(
     .block-container {
         padding-top: 4.8rem;
         padding-bottom: 2.5rem;
-        max-width: 1320px;
+        max-width: 1500px;
     }
 
     h1, h2, h3, p, li {
@@ -635,62 +635,62 @@ def table_column_config():
     return {
         "grade_bar": st.column_config.ImageColumn("", width=18),
 
-        "team_logo": st.column_config.ImageColumn("", width=36),
-        "opponent_logo": st.column_config.ImageColumn("", width=36),
-        "away_logo": st.column_config.ImageColumn("", width=36),
-        "home_logo": st.column_config.ImageColumn("", width=36),
-        "pitcher_team_logo": st.column_config.ImageColumn("", width=36),
+        "team_logo": st.column_config.ImageColumn("", width=32),
+        "opponent_logo": st.column_config.ImageColumn("", width=32),
+        "away_logo": st.column_config.ImageColumn("", width=32),
+        "home_logo": st.column_config.ImageColumn("", width=32),
+        "pitcher_team_logo": st.column_config.ImageColumn("", width=32),
 
-        "away_team": st.column_config.TextColumn("Away Team"),
-        "home_team": st.column_config.TextColumn("Home Team"),
-        "team": st.column_config.TextColumn("Team"),
-        "opponent": st.column_config.TextColumn("Opponent"),
-        "opponent_team": st.column_config.TextColumn("Opponent"),
+        "away_team": st.column_config.TextColumn("Away Team", width=145),
+        "home_team": st.column_config.TextColumn("Home Team", width=145),
+        "team": st.column_config.TextColumn("Team", width=125),
+        "opponent": st.column_config.TextColumn("Opponent", width=125),
+        "opponent_team": st.column_config.TextColumn("Opponent", width=125),
 
-        "away_probable_pitcher": st.column_config.TextColumn("Away Pitcher"),
-        "home_probable_pitcher": st.column_config.TextColumn("Home Pitcher"),
-        "away_pitcher_hand": st.column_config.TextColumn("Away Throwing Hand"),
-        "home_pitcher_hand": st.column_config.TextColumn("Home Throwing Hand"),
+        "away_probable_pitcher": st.column_config.TextColumn("Away Pitcher", width=145),
+        "home_probable_pitcher": st.column_config.TextColumn("Home Pitcher", width=145),
+        "away_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
+        "home_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
 
-        "batter": st.column_config.TextColumn("Batter"),
-        "pitcher": st.column_config.TextColumn("Pitcher"),
-        "opposing_pitcher": st.column_config.TextColumn("Pitcher"),
-        "pitcher_hand": st.column_config.TextColumn("Throwing Hand"),
-        "opposing_pitcher_hand": st.column_config.TextColumn("Throwing Hand"),
-        "split": st.column_config.TextColumn("Split"),
-        "home_away": st.column_config.TextColumn("Home/Away"),
-        "game_date": st.column_config.TextColumn("Date"),
-        "matchup_grade": st.column_config.TextColumn("Matchup Grade"),
-        "k_matchup_grade": st.column_config.TextColumn("K Matchup Grade"),
+        "batter": st.column_config.TextColumn("Batter", width=140),
+        "pitcher": st.column_config.TextColumn("Pitcher", width=140),
+        "opposing_pitcher": st.column_config.TextColumn("Pitcher", width=140),
+        "pitcher_hand": st.column_config.TextColumn("Hand", width=60),
+        "opposing_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
+        "split": st.column_config.TextColumn("Split", width=75),
+        "home_away": st.column_config.TextColumn("H/A", width=60),
+        "game_date": st.column_config.TextColumn("Date", width=95),
+        "matchup_grade": st.column_config.TextColumn("Grade", width=115),
+        "k_matchup_grade": st.column_config.TextColumn("K Grade", width=115),
 
-        "PA": st.column_config.NumberColumn("Plate Appearances", format="%d"),
-        "AB": st.column_config.NumberColumn("At-Bats", format="%d"),
-        "H": st.column_config.NumberColumn("Hits", format="%d"),
-        "BB": st.column_config.NumberColumn("Walks", format="%d"),
-        "HBP": st.column_config.NumberColumn("Hit By Pitch", format="%d"),
-        "SO": st.column_config.NumberColumn("Strikeouts", format="%d"),
-        "HR": st.column_config.NumberColumn("Home Runs", format="%d"),
-        "RBI": st.column_config.NumberColumn("Runs Batted In", format="%d"),
-        "BF": st.column_config.NumberColumn("Batters Faced", format="%d"),
-        "R": st.column_config.NumberColumn("Runs Allowed", format="%d"),
-        "IP": st.column_config.NumberColumn("Innings Pitched", format="%.1f"),
-        "Pitch Count": st.column_config.NumberColumn("Pitch Count", format="%d"),
+        "PA": st.column_config.NumberColumn("PA", width=55, format="%d"),
+        "AB": st.column_config.NumberColumn("AB", width=55, format="%d"),
+        "H": st.column_config.NumberColumn("H", width=50, format="%d"),
+        "BB": st.column_config.NumberColumn("BB", width=55, format="%d"),
+        "HBP": st.column_config.NumberColumn("HBP", width=60, format="%d"),
+        "SO": st.column_config.NumberColumn("SO", width=55, format="%d"),
+        "HR": st.column_config.NumberColumn("HR", width=55, format="%d"),
+        "RBI": st.column_config.NumberColumn("RBI", width=60, format="%d"),
+        "BF": st.column_config.NumberColumn("BF", width=55, format="%d"),
+        "R": st.column_config.NumberColumn("R", width=50, format="%d"),
+        "IP": st.column_config.NumberColumn("IP", width=55, format="%.1f"),
+        "Pitch Count": st.column_config.NumberColumn("PC", width=60, format="%d"),
 
-        "AVG": st.column_config.NumberColumn("Average", format="%.3f"),
-        "OBP": st.column_config.NumberColumn("On-Base %", format="%.3f"),
-        "SLG": st.column_config.NumberColumn("Slugging %", format="%.3f"),
-        "OPS": st.column_config.NumberColumn("OPS", format="%.3f"),
-        "K%": st.column_config.NumberColumn("Strikeout %", format="%.2f"),
-        "BB%": st.column_config.NumberColumn("Walk %", format="%.2f"),
+        "AVG": st.column_config.NumberColumn("AVG", width=70, format="%.3f"),
+        "OBP": st.column_config.NumberColumn("OBP", width=70, format="%.3f"),
+        "SLG": st.column_config.NumberColumn("SLG", width=70, format="%.3f"),
+        "OPS": st.column_config.NumberColumn("OPS", width=70, format="%.3f"),
+        "K%": st.column_config.NumberColumn("K%", width=65, format="%.2f"),
+        "BB%": st.column_config.NumberColumn("BB%", width=65, format="%.2f"),
 
-        "Projected IP": st.column_config.NumberColumn("Projected Innings", format="%.2f"),
-        "Projected Pitch Count": st.column_config.NumberColumn("Projected Pitch Count", format="%.0f"),
-        "Projected Ks": st.column_config.NumberColumn("Projected Strikeouts", format="%.2f"),
-        "ERA": st.column_config.NumberColumn("ERA", format="%.2f"),
-        "WHIP": st.column_config.NumberColumn("WHIP", format="%.2f"),
-        "K/9": st.column_config.NumberColumn("K/9", format="%.2f"),
-        "opponent_avg_k%": st.column_config.NumberColumn("Opponent Strikeout %", format="%.2f"),
-        "k_matchup_score": st.column_config.NumberColumn("K Matchup Score", format="%.2f"),
+        "Projected IP": st.column_config.NumberColumn("Proj IP", width=80, format="%.2f"),
+        "Projected Pitch Count": st.column_config.NumberColumn("Proj PC", width=80, format="%.0f"),
+        "Projected Ks": st.column_config.NumberColumn("Proj K", width=75, format="%.2f"),
+        "ERA": st.column_config.NumberColumn("ERA", width=65, format="%.2f"),
+        "WHIP": st.column_config.NumberColumn("WHIP", width=70, format="%.2f"),
+        "K/9": st.column_config.NumberColumn("K/9", width=65, format="%.2f"),
+        "opponent_avg_k%": st.column_config.NumberColumn("Opp K%", width=80, format="%.2f"),
+        "k_matchup_score": st.column_config.NumberColumn("K Score", width=80, format="%.2f"),
     }
 
 
@@ -1146,7 +1146,7 @@ with matchup_tab:
             st.warning("No batter vs pitcher matchup data was found for this selection.")
         else:
             min_bvp_pa = st.slider(
-                "Minimum Plate Appearances vs Pitcher",
+                "Minimum PA vs Pitcher",
                 min_value=0,
                 max_value=50,
                 value=0,
@@ -1233,7 +1233,7 @@ with matchup_tab:
             st.warning("No batter vs pitcher-hand split data was found for this selection.")
         else:
             min_hand_pa = st.slider(
-                "Minimum Plate Appearances vs Throwing Hand",
+                "Minimum PA vs Throwing Hand",
                 min_value=0,
                 max_value=300,
                 value=20,
@@ -1241,7 +1241,7 @@ with matchup_tab:
             )
 
             min_hand_obp = st.slider(
-                "Minimum On-Base Percentage vs Throwing Hand",
+                "Minimum OBP vs Throwing Hand",
                 min_value=0.150,
                 max_value=0.500,
                 value=0.320,
@@ -1440,19 +1440,20 @@ with info_tab:
         | **K%** | Strikeout Percentage |
         | **BB%** | Walk Percentage |
         | **IP** | Innings Pitched |
+        | **PC** | Pitch Count |
         | **BF** | Batters Faced |
         | **R** | Runs Allowed |
         | **ERA** | Earned Run Average |
         | **WHIP** | Walks plus Hits per Inning Pitched |
         | **K/9** | Strikeouts per 9 Innings |
         | **Opp K%** | Opponent Average Strikeout Percentage |
-        | **Projected IP** | Estimated innings for today's start |
-        | **Projected Pitch Count** | Estimated pitch count for today's start |
-        | **Projected Ks** | Estimated strikeouts for today's start |
-        | **K Score** | Strikeout matchup score |
+        | **Proj IP** | Projected Innings Pitched |
+        | **Proj PC** | Projected Pitch Count |
+        | **Proj K** | Projected Strikeouts |
+        | **K Score** | Strikeout Matchup Score |
         | **RHP** | Right-Handed Pitcher |
         | **LHP** | Left-Handed Pitcher |
-        | **Home/Away** | Whether the player/team was home or away in that game |
+        | **H/A** | Home/Away |
         """
     )
 
