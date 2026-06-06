@@ -119,6 +119,64 @@ st.markdown(
         --line-soft: #e7ebf0;
         --accent: #0f3b66;
     }
+    .custom-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: -8px;
+    margin-top: 14px;
+    }
+
+.custom-label-text {
+    color: #111827;
+    font-size: 13px;
+    font-weight: 650;
+    }
+
+.custom-help-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    }
+
+.custom-help-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: #0f3b66;
+    color: #ffffff;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 20px;
+    text-align: center;
+    cursor: default;
+    user-select: none;
+    }
+
+.custom-help-tooltip {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 27px;
+    width: 240px;
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.45;
+    z-index: 999999;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.25); 
+    }
+
+.custom-help-wrap:hover .custom-help-tooltip {
+    display: block;
+    }
+    
 
     .stApp {
         background: var(--bg);
@@ -1036,12 +1094,28 @@ if schedule_df.empty:
 schedule_df = add_game_column(schedule_df)
 game_options = get_game_options(schedule_df)
 
-selected_game = st.sidebar.selectbox(
-    "Game Filter",
-    game_options,
-    index=0,
-    help="Choose a specific game to focus the matchup tables."
-)
+with st.sidebar:
+    st.markdown(
+        """
+        <div class="custom-label-row">
+            <span class="custom-label-text">Game Filter</span>
+            <span class="custom-help-wrap">
+                <span class="custom-help-dot">?</span>
+                <span class="custom-help-tooltip">
+                    Choose a specific game to focus the schedule and matchup tables.
+                </span>
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    selected_game = st.selectbox(
+        "Game Filter",
+        game_options,
+        index=0,
+        label_visibility="collapsed"
+    )
 
 filtered_schedule_df = filter_by_game(schedule_df, selected_game)
 filtered_bvp_matchups = filter_by_game(bvp_matchups, selected_game)
