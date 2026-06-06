@@ -111,7 +111,6 @@ st.markdown(
 
     :root {
         --bg: #f3f5f7;
-        --bg-top: #edf2f6;
         --nav: #06172b;
         --panel: #ffffff;
         --text: #111827;
@@ -131,7 +130,15 @@ st.markdown(
 
     .stApp {
         background:
-            linear-gradient(180deg, var(--bg-top) 0px, var(--bg) 260px, var(--bg) 100%);
+            linear-gradient(180deg, rgba(6, 23, 43, 0.035), rgba(243, 245, 247, 0) 360px),
+            repeating-linear-gradient(
+                135deg,
+                rgba(6, 23, 43, 0.018) 0px,
+                rgba(6, 23, 43, 0.018) 1px,
+                transparent 1px,
+                transparent 18px
+            ),
+            var(--bg);
         color: var(--text);
     }
 
@@ -201,15 +208,9 @@ st.markdown(
         position: absolute;
         inset: 0;
         background:
-            radial-gradient(circle at 76% 34%, rgba(255,255,255,0.08), transparent 22%),
-            linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+            linear-gradient(115deg, transparent 0%, transparent 62%, rgba(255,255,255,0.05) 62%, rgba(255,255,255,0.05) 63%, transparent 63%),
+            radial-gradient(circle at 76% 34%, rgba(255,255,255,0.08), transparent 22%);
         opacity: 1;
-        animation: heroGlow 10s ease-in-out infinite alternate;
-    }
-
-    @keyframes heroGlow {
-        from { opacity: 0.85; }
-        to { opacity: 1; }
     }
 
     .hero-content {
@@ -234,12 +235,6 @@ st.markdown(
         background: #ffffff;
         margin: 0 0 18px 0;
         opacity: 0.9;
-        animation: lineIn 900ms ease-out both;
-    }
-
-    @keyframes lineIn {
-        from { width: 0; opacity: 0; }
-        to { width: 92px; opacity: 0.9; }
     }
 
     .hero-headline {
@@ -253,35 +248,21 @@ st.markdown(
 
     .hero-baseball-wrap {
         position: absolute;
-        right: -46px;
+        right: 36px;
         top: 50%;
         transform: translateY(-50%);
-        width: 470px;
-        height: 470px;
-        z-index: 1;
+        width: 360px;
+        height: 360px;
+        z-index: 2;
         pointer-events: none;
-        animation: baseballFloat 8s ease-in-out infinite;
-    }
-
-    @keyframes baseballFloat {
-        0% { transform: translateY(-50%) rotate(-5deg); }
-        50% { transform: translateY(calc(-50% - 8px)) rotate(-2deg); }
-        100% { transform: translateY(-50%) rotate(-5deg); }
     }
 
     .hero-baseball-shadow {
         position: absolute;
         inset: 30px 10px 0 70px;
-        background: radial-gradient(circle, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0) 68%);
+        background: radial-gradient(circle, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0) 68%);
         filter: blur(24px);
-        opacity: 0.45;
-        animation: shadowPulse 8s ease-in-out infinite;
-    }
-
-    @keyframes shadowPulse {
-        0% { opacity: 0.38; transform: scale(0.98); }
-        50% { opacity: 0.50; transform: scale(1.02); }
-        100% { opacity: 0.38; transform: scale(0.98); }
+        opacity: 0.38;
     }
 
     .hero-baseball {
@@ -292,18 +273,18 @@ st.markdown(
             radial-gradient(circle at 32% 28%, #ffffff 0%, #ffffff 18%, #f9fbfd 36%, #eef2f6 64%, #dbe3ec 100%);
         border: 1px solid rgba(255,255,255,0.72);
         box-shadow:
-            inset -18px -24px 36px rgba(152, 169, 188, 0.34),
-            inset 20px 16px 28px rgba(255,255,255,0.86),
-            0 22px 38px rgba(0,0,0,0.20);
+            inset -18px -24px 36px rgba(152, 169, 188, 0.30),
+            inset 20px 16px 28px rgba(255,255,255,0.82),
+            0 18px 30px rgba(0,0,0,0.16);
     }
 
     .hero-baseball::before,
     .hero-baseball::after {
         content: "";
         position: absolute;
-        top: 52px;
-        bottom: 52px;
-        width: 120px;
+        top: 42px;
+        bottom: 42px;
+        width: 96px;
         border: 4px solid #c4444f;
         border-top-color: transparent;
         border-bottom-color: transparent;
@@ -312,26 +293,26 @@ st.markdown(
     }
 
     .hero-baseball::before {
-        left: 88px;
+        left: 62px;
         transform: rotate(7deg);
     }
 
     .hero-baseball::after {
-        right: 88px;
+        right: 62px;
         transform: rotate(-7deg);
     }
 
     .seam-stitches-left,
     .seam-stitches-right {
         position: absolute;
-        top: 76px;
-        bottom: 76px;
-        width: 34px;
+        top: 62px;
+        bottom: 62px;
+        width: 26px;
         opacity: 0.82;
     }
 
     .seam-stitches-left {
-        left: 146px;
+        left: 106px;
         transform: rotate(8deg);
         background:
             repeating-linear-gradient(
@@ -348,7 +329,7 @@ st.markdown(
     }
 
     .seam-stitches-right {
-        right: 146px;
+        right: 106px;
         transform: rotate(-8deg);
         background:
             repeating-linear-gradient(
@@ -693,39 +674,39 @@ st.markdown(
         }
 
         .hero-baseball-wrap {
-            width: 250px;
-            height: 250px;
-            right: -86px;
-            opacity: 0.55;
+            width: 220px;
+            height: 220px;
+            right: -35px;
+            opacity: 0.52;
         }
 
         .hero-baseball::before,
         .hero-baseball::after {
             top: 28px;
             bottom: 28px;
-            width: 64px;
+            width: 58px;
         }
 
         .hero-baseball::before {
-            left: 44px;
+            left: 39px;
         }
 
         .hero-baseball::after {
-            right: 44px;
+            right: 39px;
         }
 
         .seam-stitches-left {
-            left: 79px;
-            top: 43px;
-            bottom: 43px;
-            width: 18px;
+            left: 70px;
+            top: 40px;
+            bottom: 40px;
+            width: 16px;
         }
 
         .seam-stitches-right {
-            right: 79px;
-            top: 43px;
-            bottom: 43px;
-            width: 18px;
+            right: 70px;
+            top: 40px;
+            bottom: 40px;
+            width: 16px;
         }
 
         .slate-strip {
