@@ -169,7 +169,7 @@ st.markdown(
         color: #ffffff;
         font-size: 20px;
         font-weight: 800;
-        letter-spacing: -0.04em;
+        letter-spacing: -0.015em;
         z-index: 999999;
         pointer-events: none;
     }
@@ -223,7 +223,7 @@ st.markdown(
         font-size: 40px;
         line-height: 1.08;
         font-weight: 800;
-        letter-spacing: -0.045em;
+        letter-spacing: -0.015em;
         margin-bottom: 12px;
         max-width: 900px;
     }
@@ -281,7 +281,7 @@ st.markdown(
         font-size: 30px;
         font-weight: 800;
         line-height: 1.05;
-        letter-spacing: -0.04em;
+        letter-spacing: -0.01em;
     }
 
     .metric-note {
@@ -304,8 +304,16 @@ st.markdown(
         font-size: 24px;
         line-height: 1.15;
         font-weight: 800;
-        letter-spacing: -0.04em;
+        letter-spacing: -0.01em;
         margin-bottom: 8px;
+    }
+
+    .title-date {
+        color: #64748b !important;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        margin-left: 8px;
     }
 
     .section-copy {
@@ -333,7 +341,7 @@ st.markdown(
         color: var(--text);
         font-size: 19px;
         font-weight: 800;
-        letter-spacing: -0.03em;
+        letter-spacing: -0.005em;
     }
 
     .status-box,
@@ -583,7 +591,7 @@ st.markdown(
 
 def format_display_date(value):
     try:
-        return pd.to_datetime(value).strftime("%B %d, %Y").replace(" 0", " ")
+        return pd.to_datetime(value).strftime("%m/%d/%y")
     except Exception:
         return str(value)
 
@@ -1252,7 +1260,7 @@ with main_tab:
         f"""
         <div class="content-card">
             <div class="section-label">Schedule</div>
-            <div class="section-title">Today's Games — {display_game_date}</div>
+            <div class="section-title">Today's Games <span class="title-date">{display_game_date}</span></div>
             <div class="section-copy">
                 Use the game filter in the sidebar to narrow the schedule and matchup tables.
             </div>
@@ -1307,7 +1315,7 @@ with matchup_tab:
             f"""
             <div class="content-card-soft">
                 <div class="section-label">Direct History</div>
-                <div class="section-title">Hitter vs Pitcher — {display_game_date}</div>
+                <div class="section-title">Hitter vs Pitcher <span class="title-date">{display_game_date}</span></div>
                 <div class="section-copy">
                     Direct matchup history between each hitter and today's opposing probable pitcher.
                 </div>
@@ -1390,7 +1398,7 @@ with matchup_tab:
             f"""
             <div class="content-card-soft">
                 <div class="section-label">Splits</div>
-                <div class="section-title">Hitter vs Throwing Hand — {display_game_date}</div>
+                <div class="section-title">Hitter vs Throwing Hand <span class="title-date">{display_game_date}</span></div>
                 <div class="section-copy">
                     Hitter performance against the same throwing hand as today's opposing probable pitcher.
                 </div>
@@ -1460,7 +1468,7 @@ with matchup_tab:
             f"""
             <div class="content-card-soft">
                 <div class="section-label">Pitching</div>
-                <div class="section-title">Strikeout Targets — {display_game_date}</div>
+                <div class="section-title">Strikeout Targets <span class="title-date">{display_game_date}</span></div>
                 <div class="section-copy">
                     Pitcher strikeout opportunities using projected workload and opposing hitter strikeout tendencies.
                 </div>
