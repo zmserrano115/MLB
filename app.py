@@ -360,7 +360,7 @@ st.markdown(
         border: 1px solid var(--line);
         background: var(--panel);
         margin-bottom: 12px;
-        overflow: hidden;
+        overflow: visible;
     }
 
     .schedule-weather-head,
@@ -383,10 +383,16 @@ st.markdown(
     }
 
     .schedule-weather-row {
+        position: relative;
         min-height: 58px;
         border-bottom: 1px solid var(--line);
         color: var(--text);
         font-size: 13px;
+    }
+
+    .schedule-weather-row:has(.schedule-tooltip:hover),
+    .schedule-weather-row:has(.schedule-tooltip:focus-visible) {
+        z-index: 20;
     }
 
     .schedule-weather-row:last-child {
@@ -426,6 +432,7 @@ st.markdown(
     .schedule-weather-chip,
     .schedule-wind-chip {
         cursor: help;
+        position: relative;
         width: fit-content;
         border-bottom: 1px dotted #7b8794;
         font-size: 17px;
@@ -441,6 +448,26 @@ st.markdown(
 
     .weather-svg {
         flex: 0 0 auto;
+    }
+
+    .schedule-tooltip:hover::after,
+    .schedule-tooltip:focus-visible::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        z-index: 1000;
+        left: 0;
+        bottom: calc(100% + 9px);
+        width: min(300px, 70vw);
+        padding: 9px 11px;
+        border: 1px solid #c8d1dc;
+        background: #ffffff;
+        color: #263445;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.45;
+        white-space: normal;
+        box-shadow: 0 8px 24px rgba(15, 31, 48, 0.14);
+        pointer-events: none;
     }
 
     .schedule-wind-arrow {
@@ -803,18 +830,6 @@ def team_logo_url(team_value):
     return f"https://www.mlbstatic.com/team-logos/team-cap-on-light/{team_id}.svg"
 
 
-def opponent_from_game(game, team):
-    if is_missing_value(game) or is_missing_value(team) or " @ " not in str(game):
-        return ""
-
-    away_team, home_team = str(game).split(" @ ", 1)
-    if str(team) == away_team:
-        return home_team
-    if str(team) == home_team:
-        return away_team
-    return ""
-
-
 def grade_bar_url(grade):
     value = str(grade or "").lower()
     if "elite" in value or "strong" in value or "good" in value:
@@ -880,7 +895,7 @@ def weather_icon_svg(icon_name):
     icon_paths = paths.get(str(icon_name or "unknown"), paths["unknown"])
     return (
         "<svg class='weather-svg' xmlns='http://www.w3.org/2000/svg' "
-        "viewBox='0 0 24 24' width='24' height='24' fill='none' "
+        "viewBox='0 0 24 24' width='18' height='18' fill='none' "
         "stroke='#617083' stroke-width='1.7' stroke-linecap='round' "
         f"stroke-linejoin='round'>{icon_paths}</svg>"
     )
@@ -900,6 +915,19 @@ def grade_cell_style(value):
         "none": ("#687384", "#f2f4f7"),
     }
     color, background = colors[grade_class]
+    return f"color: {color}; background-color: {background}; font-weight: 700"
+
+
+def weather_edge_cell_style(value):
+    edge = str(value or "").lower()
+    if "hitter boost" in edge:
+        color, background = "#247a4d", "#edf8f2"
+    elif "pitcher boost" in edge:
+        color, background = "#b43b3b", "#fff0f0"
+    elif "neutral" in edge:
+        color, background = "#687384", "#f2f4f7"
+    else:
+        color, background = "#9a6810", "#fff8e8"
     return f"color: {color}; background-color: {background}; font-weight: 700"
 
 
@@ -956,6 +984,9 @@ def make_light_table(df):
     ]
     for column in grade_columns:
         styler = styler.map(grade_cell_style, subset=[column])
+
+    if "weather_edge" in df.columns:
+        styler = styler.map(weather_edge_cell_style, subset=["weather_edge"])
 
     return styler
 
@@ -1058,7 +1089,10 @@ def is_missing_value(value):
 def table_column_config():
     return {
         "grade_bar": st.column_config.ImageColumn("", width=18),
-        "weather_icon_url": st.column_config.ImageColumn("Wx", width=38),
+        "game_away_logo": st.column_config.ImageColumn("Game", width=34),
+        "game_at": st.column_config.TextColumn("", width=22),
+        "game_home_logo": st.column_config.ImageColumn("", width=34),
+        "weather_icon_url": st.column_config.ImageColumn("", width=28),
         "team_logo": st.column_config.ImageColumn("", width=32),
         "opponent_logo": st.column_config.ImageColumn("", width=32),
         "away_logo": st.column_config.ImageColumn("", width=32),
@@ -1092,7 +1126,7 @@ def table_column_config():
         "home_away": st.column_config.TextColumn("H/A", width=60),
         "game_date": st.column_config.TextColumn("Date", width=95),
         "matchup_grade": st.column_config.TextColumn("Grade", width=115),
-        "k_matchup_grade": st.column_config.TextColumn("K Grade", width=115),
+        "k_matchup_grade": st.column_config.TextColumn("Grade", width=115),
         "PA": st.column_config.NumberColumn("PA", width=55, format="%d"),
         "AB": st.column_config.NumberColumn("AB", width=55, format="%d"),
         "H": st.column_config.NumberColumn("H", width=50, format="%d"),
@@ -1129,7 +1163,7 @@ def table_column_config():
         "k_matchup_score": st.column_config.NumberColumn("K Score", width=80, format="%.2f"),
         "venue_name": st.column_config.TextColumn("Ballpark", width=145),
         "roof_type": st.column_config.TextColumn("Roof", width=90),
-        "weather_condition": st.column_config.TextColumn("Condition", width=115),
+        "weather_condition": st.column_config.TextColumn("Weather", width=115),
         "weather_display": st.column_config.TextColumn(
             "Temp",
             width=65,
@@ -1270,14 +1304,16 @@ def render_schedule_weather_table(df):
                     <span>{escape(roof)}</span>
                 </div>
                 <div>
-                    <span class="schedule-weather-chip" title="{weather_tooltip}">
+                    <span class="schedule-weather-chip schedule-tooltip"
+                          data-tooltip="{weather_tooltip}" tabindex="0">
                         {weather_svg}
                         <span>{escape(weather_display)}</span>
                     </span>
                     <span class="schedule-weather-edge">{escape(weather_edge)}</span>
                 </div>
                 <div>
-                    <span class="schedule-wind-chip" title="{wind_tooltip}">
+                    <span class="schedule-wind-chip schedule-tooltip"
+                          data-tooltip="{wind_tooltip}" tabindex="0">
                         <span class="schedule-wind-arrow">{escape(wind_arrow)}</span>
                         {escape(wind_speed_text)}
                     </span>
@@ -1318,21 +1354,27 @@ def matchup_grade_class(grade):
     return "none"
 
 
+def add_game_logo_columns(df):
+    result = df.copy()
+    game_parts = result.get(
+        "game",
+        pd.Series("", index=result.index),
+    ).astype(str).str.split(" @ ", n=1, expand=True)
+    result["game_away_logo"] = game_parts[0].apply(team_logo_url)
+    result["game_at"] = "@"
+    if game_parts.shape[1] > 1:
+        result["game_home_logo"] = game_parts[1].apply(team_logo_url)
+    else:
+        result["game_home_logo"] = ""
+    return result
+
+
 def prepare_batter_matchup_table(df):
-    result = df.copy().reset_index(drop=True)
+    result = add_game_logo_columns(df.copy().reset_index(drop=True))
     result["grade_bar"] = result.get(
         "matchup_grade",
         pd.Series("No History", index=result.index),
     ).apply(grade_bar_url)
-    result["team_logo"] = result.get(
-        "team",
-        pd.Series("", index=result.index),
-    ).apply(team_logo_url)
-    result["opponent_team"] = result.apply(
-        lambda row: opponent_from_game(row.get("game"), row.get("team")),
-        axis=1,
-    )
-    result["opponent_logo"] = result["opponent_team"].apply(team_logo_url)
     result["weather_icon_url"] = result.get(
         "weather_icon",
         pd.Series("unknown", index=result.index),
@@ -1341,19 +1383,11 @@ def prepare_batter_matchup_table(df):
 
 
 def prepare_pitcher_matchup_table(df):
-    result = df.copy().reset_index(drop=True)
+    result = add_game_logo_columns(df.copy().reset_index(drop=True))
     result["grade_bar"] = result.get(
         "k_matchup_grade",
         pd.Series("No History", index=result.index),
     ).apply(grade_bar_url)
-    result["pitcher_team_logo"] = result.get(
-        "pitcher_team",
-        pd.Series("", index=result.index),
-    ).apply(team_logo_url)
-    result["opponent_logo"] = result.get(
-        "opponent",
-        pd.Series("", index=result.index),
-    ).apply(team_logo_url)
     result["weather_icon_url"] = result.get(
         "weather_icon",
         pd.Series("unknown", index=result.index),
@@ -1689,12 +1723,10 @@ with matchup_tab:
 
             bvp_cols = [
                 "grade_bar",
-                "game",
-                "weather_icon_url",
-                "team_logo",
-                "team",
+                "game_away_logo",
+                "game_at",
+                "game_home_logo",
                 "batter",
-                "opponent_logo",
                 "opposing_pitcher",
                 "opposing_pitcher_hand",
                 "PA",
@@ -1711,8 +1743,7 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
-                "venue_name",
-                "roof_type",
+                "weather_icon_url",
                 "weather_condition",
                 "weather_display",
                 "humidity_pct",
@@ -1722,9 +1753,6 @@ with matchup_tab:
                 "wind_field_direction",
                 "wind_out_mph",
                 "weather_edge",
-                "hitter_weather_adjustment",
-                "history_grade",
-                "weather_adjusted_score",
                 "matchup_grade",
             ]
             bvp_cols = [column for column in bvp_cols if column in display_bvp.columns]
@@ -1786,12 +1814,10 @@ with matchup_tab:
 
             hand_cols = [
                 "grade_bar",
-                "game",
-                "weather_icon_url",
-                "team_logo",
-                "team",
+                "game_away_logo",
+                "game_at",
+                "game_home_logo",
                 "batter",
-                "opponent_logo",
                 "opposing_pitcher",
                 "opposing_pitcher_hand",
                 "split",
@@ -1809,8 +1835,7 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
-                "venue_name",
-                "roof_type",
+                "weather_icon_url",
                 "weather_condition",
                 "weather_display",
                 "humidity_pct",
@@ -1820,9 +1845,6 @@ with matchup_tab:
                 "wind_field_direction",
                 "wind_out_mph",
                 "weather_edge",
-                "hitter_weather_adjustment",
-                "history_grade",
-                "weather_adjusted_score",
                 "matchup_grade",
             ]
             hand_cols = [
@@ -1892,13 +1914,11 @@ with matchup_tab:
 
             k_cols = [
                 "grade_bar",
-                "game",
-                "weather_icon_url",
-                "pitcher_team_logo",
-                "pitcher_team",
+                "game_away_logo",
+                "game_at",
+                "game_home_logo",
                 "pitcher",
                 "pitcher_hand",
-                "opponent_logo",
                 "opponent",
                 "Season IP",
                 "GS",
@@ -1911,8 +1931,7 @@ with matchup_tab:
                 "K/9",
                 "SwStr%",
                 "opponent_avg_k%",
-                "venue_name",
-                "roof_type",
+                "weather_icon_url",
                 "weather_condition",
                 "weather_display",
                 "humidity_pct",
@@ -1922,8 +1941,6 @@ with matchup_tab:
                 "wind_field_direction",
                 "wind_out_mph",
                 "weather_edge",
-                "base_k_matchup_score",
-                "weather_k_adjustment",
                 "k_matchup_score",
                 "k_matchup_grade",
             ]
