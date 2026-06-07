@@ -1,4 +1,5 @@
 from datetime import date
+from html import escape
 import os
 from urllib.parse import quote
 
@@ -355,6 +356,105 @@ st.markdown(
         box-shadow: none;
     }
 
+    .schedule-weather-table {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        margin-bottom: 12px;
+        overflow: hidden;
+    }
+
+    .schedule-weather-head,
+    .schedule-weather-row {
+        display: grid;
+        grid-template-columns: 130px minmax(210px, 1.2fr) minmax(150px, 0.8fr) 110px 100px;
+        align-items: center;
+        column-gap: 12px;
+        padding: 10px 14px;
+    }
+
+    .schedule-weather-head {
+        background: #eef2f6;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+    }
+
+    .schedule-weather-row {
+        min-height: 58px;
+        border-bottom: 1px solid var(--line);
+        color: var(--text);
+        font-size: 13px;
+    }
+
+    .schedule-weather-row:last-child {
+        border-bottom: 0;
+    }
+
+    .schedule-game-logos,
+    .schedule-weather-chip,
+    .schedule-wind-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .schedule-game-logos img {
+        width: 30px;
+        height: 30px;
+        object-fit: contain;
+    }
+
+    .schedule-at {
+        color: var(--muted);
+        font-weight: 700;
+    }
+
+    .schedule-pitchers {
+        line-height: 1.45;
+    }
+
+    .schedule-pitchers span,
+    .schedule-venue span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+    }
+
+    .schedule-weather-chip,
+    .schedule-wind-chip {
+        cursor: help;
+        width: fit-content;
+        border-bottom: 1px dotted #7b8794;
+        font-size: 17px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .schedule-wind-arrow {
+        color: #87919c;
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .schedule-weather-edge {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .schedule-hover-note {
+        color: var(--muted-2);
+        font-size: 11px;
+        margin: -3px 0 14px 0;
+    }
+
     .stTabs [data-baseweb="tab-list"] {
         gap: 0;
         border-bottom: 1px solid var(--line);
@@ -631,6 +731,18 @@ st.markdown(
         .slate-item:nth-child(4) {
             border-bottom: 0;
         }
+
+        .schedule-weather-head,
+        .schedule-weather-row {
+            grid-template-columns: 110px 85px 78px;
+        }
+
+        .schedule-weather-head > :nth-child(2),
+        .schedule-weather-row > :nth-child(2),
+        .schedule-weather-head > :nth-child(3),
+        .schedule-weather-row > :nth-child(3) {
+            display: none;
+        }
     }
     </style>
     """,
@@ -868,8 +980,30 @@ def table_column_config():
         "k_matchup_score": st.column_config.NumberColumn("K Score", width=80, format="%.2f"),
         "venue_name": st.column_config.TextColumn("Ballpark", width=145),
         "roof_type": st.column_config.TextColumn("Roof", width=90),
-        "weather_summary": st.column_config.TextColumn("Game Weather", width=240),
-        "weather_edge": st.column_config.TextColumn("Weather Edge", width=145),
+        "weather_display": st.column_config.TextColumn(
+            "Wx",
+            width=75,
+            help=(
+                "Game-time condition and temperature. Hover the weather icon "
+                "in the schedule for the exact forecast and projection meaning."
+            ),
+        ),
+        "wind_display": st.column_config.TextColumn(
+            "Wind",
+            width=75,
+            help=(
+                "Field-relative arrow and speed in mph: up = blowing out to "
+                "center, down = blowing in, left/right = crosswind."
+            ),
+        ),
+        "weather_edge": st.column_config.TextColumn(
+            "Weather Edge",
+            width=145,
+            help=(
+                "The bounded matchup effect from field-relative wind and air "
+                "density. Retractable-roof games remain neutral."
+            ),
+        ),
         "hitter_weather_adjustment": st.column_config.NumberColumn(
             "Wx Adj",
             width=75,
@@ -889,16 +1023,100 @@ def table_column_config():
     }
 
 
-def prepare_schedule_display(df):
-    df = df.copy()
+def render_schedule_weather_table(df):
+    if df.empty:
+        st.info("No games are available for this selection.")
+        return
 
-    if "away_team" in df.columns:
-        df["away_logo"] = df["away_team"].apply(team_logo_url)
+    rows = []
+    for _, row in df.iterrows():
+        away_team = str(row.get("away_team") or "")
+        home_team = str(row.get("home_team") or "")
+        away_logo = team_logo_url(away_team)
+        home_logo = team_logo_url(home_team)
+        away_pitcher = str(row.get("away_probable_pitcher") or "TBD")
+        home_pitcher = str(row.get("home_probable_pitcher") or "TBD")
+        away_hand = str(row.get("away_pitcher_hand") or "")
+        home_hand = str(row.get("home_pitcher_hand") or "")
+        venue = str(row.get("venue_name") or "Venue TBD")
+        roof = str(row.get("roof_type") or "Roof unknown")
+        weather_display = str(row.get("weather_display") or "?")
+        wind_arrow = str(row.get("wind_arrow") or "·")
+        weather_edge = str(row.get("weather_edge") or "Neutral")
+        wind_speed = pd.to_numeric(row.get("wind_speed_mph"), errors="coerce")
+        wind_speed_text = (
+            f"{float(wind_speed):.0f} mph" if pd.notna(wind_speed) else "N/A"
+        )
+        weather_tooltip = escape(
+            str(row.get("weather_tooltip") or "Forecast unavailable."),
+            quote=True,
+        )
+        wind_tooltip = escape(
+            str(row.get("wind_tooltip") or "Wind forecast unavailable."),
+            quote=True,
+        )
 
-    if "home_team" in df.columns:
-        df["home_logo"] = df["home_team"].apply(team_logo_url)
+        away_pitcher_text = escape(away_pitcher)
+        if away_hand:
+            away_pitcher_text += f" ({escape(away_hand)})"
+        home_pitcher_text = escape(home_pitcher)
+        if home_hand:
+            home_pitcher_text += f" ({escape(home_hand)})"
 
-    return df
+        rows.append(
+            f"""
+            <div class="schedule-weather-row">
+                <div class="schedule-game-logos">
+                    <img src="{escape(away_logo, quote=True)}"
+                         alt="{escape(away_team, quote=True)}"
+                         title="{escape(away_team, quote=True)}">
+                    <span class="schedule-at">@</span>
+                    <img src="{escape(home_logo, quote=True)}"
+                         alt="{escape(home_team, quote=True)}"
+                         title="{escape(home_team, quote=True)}">
+                </div>
+                <div class="schedule-pitchers">
+                    {away_pitcher_text}
+                    <span>{home_pitcher_text}</span>
+                </div>
+                <div class="schedule-venue">
+                    {escape(venue)}
+                    <span>{escape(roof)}</span>
+                </div>
+                <div>
+                    <span class="schedule-weather-chip" title="{weather_tooltip}">
+                        {escape(weather_display)}
+                    </span>
+                    <span class="schedule-weather-edge">{escape(weather_edge)}</span>
+                </div>
+                <div>
+                    <span class="schedule-wind-chip" title="{wind_tooltip}">
+                        <span class="schedule-wind-arrow">{escape(wind_arrow)}</span>
+                        {escape(wind_speed_text)}
+                    </span>
+                </div>
+            </div>
+            """
+        )
+
+    st.markdown(
+        f"""
+        <div class="schedule-weather-table">
+            <div class="schedule-weather-head">
+                <div>Game</div>
+                <div>Probable Pitchers</div>
+                <div>Ballpark</div>
+                <div>Weather</div>
+                <div>Wind</div>
+            </div>
+            {''.join(rows)}
+        </div>
+        <div class="schedule-hover-note">
+            Hover the weather or wind values for the full forecast and matchup meaning.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def prepare_batter_display(df):
@@ -1238,28 +1456,7 @@ with main_tab:
         unsafe_allow_html=True,
     )
 
-    schedule_display = prepare_schedule_display(filtered_schedule_df)
-
-    schedule_display_cols = [
-        "away_logo",
-        "away_team",
-        "home_logo",
-        "home_team",
-        "away_probable_pitcher",
-        "away_pitcher_hand",
-        "home_probable_pitcher",
-        "home_pitcher_hand",
-        "venue_name",
-        "roof_type",
-        "weather_summary",
-        "weather_edge",
-    ]
-
-    schedule_display_cols = [
-        col for col in schedule_display_cols if col in schedule_display.columns
-    ]
-
-    show_table(schedule_display[schedule_display_cols])
+    render_schedule_weather_table(filtered_schedule_df)
 
 
 with matchup_tab:
@@ -1328,7 +1525,8 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
-                "weather_summary",
+                "weather_display",
+                "wind_display",
                 "weather_edge",
                 "hitter_weather_adjustment",
                 "weather_adjusted_score",
@@ -1421,7 +1619,8 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
-                "weather_summary",
+                "weather_display",
+                "wind_display",
                 "weather_edge",
                 "hitter_weather_adjustment",
                 "weather_adjusted_score",
@@ -1481,7 +1680,8 @@ with matchup_tab:
                 "K%",
                 "K/9",
                 "opponent_avg_k%",
-                "weather_summary",
+                "weather_display",
+                "wind_display",
                 "weather_edge",
                 "weather_k_adjustment",
                 "k_matchup_score",

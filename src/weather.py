@@ -42,6 +42,34 @@ WEATHER_CODES = {
 }
 
 
+def weather_icon(condition):
+    text = str(condition or "").lower()
+    if "thunder" in text:
+        return "⚡"
+    if "rain" in text or "drizzle" in text or "shower" in text:
+        return "☂"
+    if "snow" in text:
+        return "❄"
+    if "fog" in text:
+        return "≋"
+    if "clear" in text and "mostly" not in text:
+        return "☀"
+    if "mostly clear" in text or "partly cloudy" in text:
+        return "⛅"
+    if "overcast" in text or "cloud" in text:
+        return "☁"
+    return "?"
+
+
+def field_wind_arrow(field_direction):
+    return {
+        "Out to CF": "↑",
+        "In from CF": "↓",
+        "L to R": "→",
+        "R to L": "←",
+    }.get(field_direction, "·")
+
+
 def safe_float(value):
     try:
         if value is None or pd.isna(value):
@@ -266,6 +294,35 @@ def build_game_weather(game, forecast_data):
     summary = f"{temp_text} | {wind_text} | {condition}"
     if precipitation_probability is not None:
         summary += f" | Rain {precipitation_probability:.0f}%"
+    icon = weather_icon(condition)
+    arrow = field_wind_arrow(field_direction)
+    weather_display = icon
+    if temp_f is not None:
+        weather_display += f" {temp_f:.0f}°"
+    wind_display = arrow
+    if wind_speed is not None:
+        wind_display += f" {wind_speed:.0f}"
+
+    roof_text = str(roof_type or "Unknown roof")
+    humidity_text = (
+        f"{humidity:.0f}%" if humidity is not None else "unavailable"
+    )
+    rain_text = (
+        f"{precipitation_probability:.0f}%"
+        if precipitation_probability is not None
+        else "unavailable"
+    )
+    weather_tooltip = (
+        f"{condition}, {temp_text}. Humidity {humidity_text}; rain {rain_text}. "
+        f"Roof: {roof_text}. Projection: "
+        f"{weather_edge_label(hitter_adjustment, roof_type)} "
+        f"({hitter_adjustment:+.2f} hitter adjustment)."
+    )
+    wind_tooltip = (
+        f"{wind_text}. Arrow is relative to the field: "
+        "up = out to center, down = in from center, left/right = crosswind. "
+        "Wind blowing out generally helps carry; wind blowing in suppresses it."
+    )
 
     return {
         "weather_status": "Forecast available",
@@ -283,8 +340,14 @@ def build_game_weather(game, forecast_data):
         "wind_cross_mph": cross_component,
         "wind_field_direction": field_direction,
         "weather_condition": condition,
+        "weather_icon": icon,
+        "weather_display": weather_display,
+        "weather_tooltip": weather_tooltip,
         "weather_summary": summary,
         "weather_edge": weather_edge_label(hitter_adjustment, roof_type),
+        "wind_arrow": arrow,
+        "wind_display": wind_display,
+        "wind_tooltip": wind_tooltip,
         "hitter_weather_adjustment": hitter_adjustment,
         "pitcher_weather_adjustment": pitcher_adjustment,
     }
@@ -308,8 +371,14 @@ def enrich_schedule_with_weather(schedule_df, forecast_loader=None):
             game.update(
                 {
                     "weather_status": "Venue forecast unavailable",
+                    "weather_icon": "?",
+                    "weather_display": "?",
+                    "weather_tooltip": "Forecast unavailable.",
                     "weather_summary": "Forecast unavailable",
                     "weather_edge": "Neutral",
+                    "wind_arrow": "·",
+                    "wind_display": "·",
+                    "wind_tooltip": "Wind forecast unavailable.",
                     "hitter_weather_adjustment": 0.0,
                     "pitcher_weather_adjustment": 0.0,
                 }
@@ -331,8 +400,14 @@ def enrich_schedule_with_weather(schedule_df, forecast_loader=None):
             game.update(
                 {
                     "weather_status": f"Forecast unavailable: {error}",
+                    "weather_icon": "?",
+                    "weather_display": "?",
+                    "weather_tooltip": "Forecast unavailable.",
                     "weather_summary": "Forecast unavailable",
                     "weather_edge": "Neutral",
+                    "wind_arrow": "·",
+                    "wind_display": "·",
+                    "wind_tooltip": "Wind forecast unavailable.",
                     "hitter_weather_adjustment": 0.0,
                     "pitcher_weather_adjustment": 0.0,
                 }

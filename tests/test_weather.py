@@ -5,7 +5,9 @@ import pandas as pd
 from src.weather import (
     calculate_weather_adjustments,
     enrich_schedule_with_weather,
+    field_wind_arrow,
     project_wind_to_field,
+    weather_icon,
 )
 
 
@@ -56,6 +58,9 @@ class WeatherTests(unittest.TestCase):
         self.assertGreater(result.iloc[0]["hitter_weather_adjustment"], 3.0)
         self.assertLess(result.iloc[0]["pitcher_weather_adjustment"], 0.0)
         self.assertIn("85 F", result.iloc[0]["weather_summary"])
+        self.assertEqual(result.iloc[0]["weather_display"], "⛅ 85°")
+        self.assertEqual(result.iloc[0]["wind_display"], "↑ 10")
+        self.assertIn("up = out to center", result.iloc[0]["wind_tooltip"])
 
     def test_retractable_roof_is_projection_neutral(self):
         hitter_adjustment, pitcher_adjustment = calculate_weather_adjustments(
@@ -66,6 +71,12 @@ class WeatherTests(unittest.TestCase):
 
         self.assertEqual(hitter_adjustment, 0.0)
         self.assertEqual(pitcher_adjustment, 0.0)
+
+    def test_compact_weather_symbols_are_field_relative(self):
+        self.assertEqual(weather_icon("Thunderstorms"), "⚡")
+        self.assertEqual(weather_icon("Overcast"), "☁")
+        self.assertEqual(field_wind_arrow("Out to CF"), "↑")
+        self.assertEqual(field_wind_arrow("R to L"), "←")
 
 
 if __name__ == "__main__":

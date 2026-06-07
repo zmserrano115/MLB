@@ -16,6 +16,8 @@ from src.stat_data import (
 WEATHER_CONTEXT_COLUMNS = (
     "venue_name",
     "roof_type",
+    "weather_display",
+    "weather_tooltip",
     "weather_summary",
     "weather_edge",
     "temperature_f",
@@ -24,6 +26,8 @@ WEATHER_CONTEXT_COLUMNS = (
     "wind_speed_mph",
     "wind_direction_cardinal",
     "wind_field_direction",
+    "wind_display",
+    "wind_tooltip",
     "wind_out_mph",
     "hitter_weather_adjustment",
     "pitcher_weather_adjustment",
