@@ -1041,7 +1041,7 @@ def render_schedule_weather_table(df):
         venue = str(row.get("venue_name") or "Venue TBD")
         roof = str(row.get("roof_type") or "Roof unknown")
         weather_display = str(row.get("weather_display") or "?")
-        wind_arrow = str(row.get("wind_arrow") or "·")
+        wind_arrow = str(row.get("wind_arrow") or "\u00b7")
         weather_edge = str(row.get("weather_edge") or "Neutral")
         wind_speed = pd.to_numeric(row.get("wind_speed_mph"), errors="coerce")
         wind_speed_text = (
@@ -1099,7 +1099,7 @@ def render_schedule_weather_table(df):
             """
         )
 
-    st.markdown(
+    st.html(
         f"""
         <div class="schedule-weather-table">
             <div class="schedule-weather-head">
@@ -1114,8 +1114,7 @@ def render_schedule_weather_table(df):
         <div class="schedule-hover-note">
             Hover the weather or wind values for the full forecast and matchup meaning.
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
