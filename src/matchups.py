@@ -4,6 +4,7 @@ import pandas as pd
 
 from src.scoring import (
     find_player_row,
+    grade_k_score,
     score_hitter_matchups,
     score_pitcher_k_matchup
 )
@@ -11,6 +12,106 @@ from src.stat_data import (
     get_hitter_vs_pitcher_stats,
     get_hitter_vs_hand_stats
 )
+
+WEATHER_CONTEXT_COLUMNS = (
+    "venue_name",
+    "roof_type",
+    "weather_summary",
+    "weather_edge",
+    "temperature_f",
+    "humidity_pct",
+    "precip_probability_pct",
+    "wind_speed_mph",
+    "wind_direction_cardinal",
+    "wind_field_direction",
+    "wind_out_mph",
+    "hitter_weather_adjustment",
+    "pitcher_weather_adjustment",
+)
+
+HITTER_GRADE_SCORES = {
+    "Strong Matchup": 70.0,
+    "Good Matchup": 60.0,
+    "Neutral": 50.0,
+    "Avoid": 40.0,
+    "Small Sample": 20.0,
+    "No History": 0.0,
+}
+
+HITTER_GRADE_ORDER = (
+    "Avoid",
+    "Neutral",
+    "Good Matchup",
+    "Strong Matchup",
+)
+
+
+def game_weather_context(game):
+    return {
+        column: game.get(column)
+        for column in WEATHER_CONTEXT_COLUMNS
+    }
+
+
+def weather_adjusted_hitter_grade(history_grade, adjustment):
+    if history_grade not in HITTER_GRADE_ORDER:
+        return history_grade
+
+    adjustment = pd.to_numeric(adjustment, errors="coerce")
+    if pd.isna(adjustment):
+        return history_grade
+
+    shift = 1 if adjustment >= 2.5 else -1 if adjustment <= -2.5 else 0
+    index = HITTER_GRADE_ORDER.index(history_grade)
+    index = max(0, min(len(HITTER_GRADE_ORDER) - 1, index + shift))
+    return HITTER_GRADE_ORDER[index]
+
+
+def apply_hitter_weather_adjustment(result_df):
+    result_df = result_df.copy()
+    result_df["history_grade"] = result_df["matchup_grade"]
+    adjustment_values = (
+        result_df["hitter_weather_adjustment"]
+        if "hitter_weather_adjustment" in result_df.columns
+        else pd.Series(0.0, index=result_df.index)
+    )
+    adjustments = pd.to_numeric(
+        adjustment_values,
+        errors="coerce",
+    ).fillna(0.0)
+    base_scores = result_df["history_grade"].map(HITTER_GRADE_SCORES).fillna(0.0)
+    result_df["weather_adjusted_score"] = (
+        base_scores + adjustments
+    ).clip(0.0, 100.0)
+    result_df["matchup_grade"] = [
+        weather_adjusted_hitter_grade(grade, adjustment)
+        for grade, adjustment in zip(result_df["history_grade"], adjustments)
+    ]
+    return result_df
+
+
+def apply_pitcher_weather_adjustment(score_row, game):
+    base_score = pd.to_numeric(
+        score_row.get("k_matchup_score"),
+        errors="coerce",
+    )
+    adjustment = pd.to_numeric(
+        game.get("pitcher_weather_adjustment", 0.0),
+        errors="coerce",
+    )
+    if pd.isna(adjustment):
+        adjustment = 0.0
+
+    score_row["base_k_matchup_score"] = base_score
+    score_row["weather_k_adjustment"] = float(adjustment)
+    if not pd.isna(base_score):
+        adjusted_score = max(0.0, min(100.0, float(base_score) + adjustment))
+        score_row["k_matchup_score"] = adjusted_score
+        score_row["k_matchup_grade"] = grade_k_score(adjusted_score)
+
+    score_row.update(game_weather_context(game))
+    return score_row
+
 
 def is_valid_player_id(value):
     if value is None:
@@ -104,6 +205,7 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
             }
 
             row.update(stats)
+            row.update(game_weather_context(game))
             rows.append(row)
 
         # Away batters face home pitcher
@@ -134,6 +236,7 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
             }
 
             row.update(stats)
+            row.update(game_weather_context(game))
             rows.append(row)
 
     result_df = pd.DataFrame(rows)
@@ -171,9 +274,10 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
         "matchup_grade"
     ] = "Avoid"
 
+    result_df = apply_hitter_weather_adjustment(result_df)
     result_df = result_df.sort_values(
-        by=["PA", "OBP", "OPS"],
-        ascending=[False, False, False]
+        by=["weather_adjusted_score", "PA", "OBP", "OPS"],
+        ascending=[False, False, False, False]
     )
 
     return result_df
@@ -233,6 +337,7 @@ def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=100):
             }
 
             row.update(stats)
+            row.update(game_weather_context(game))
             rows.append(row)
 
         # Away batters vs home pitcher hand
@@ -263,6 +368,7 @@ def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=100):
             }
 
             row.update(stats)
+            row.update(game_weather_context(game))
             rows.append(row)
 
     result_df = pd.DataFrame(rows)
@@ -301,9 +407,10 @@ def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=100):
         "matchup_grade"
     ] = "Avoid"
 
+    result_df = apply_hitter_weather_adjustment(result_df)
     result_df = result_df.sort_values(
-        by=["OBP", "OPS", "PA"],
-        ascending=[False, False, False]
+        by=["weather_adjusted_score", "OBP", "OPS", "PA"],
+        ascending=[False, False, False, False]
     )
 
     return result_df
@@ -355,6 +462,7 @@ def build_pitcher_k_matchups(schedule_df, batters_df, pitchers_df, min_pa=100):
             )
 
             if score_row is not None:
+                score_row = apply_pitcher_weather_adjustment(score_row, game)
                 score_row["game"] = game_name
                 score_row["pitcher_id"] = away_pitcher_row.get("player_id")
                 score_row["pitcher"] = away_pitcher_row.get("Name")
@@ -382,6 +490,7 @@ def build_pitcher_k_matchups(schedule_df, batters_df, pitchers_df, min_pa=100):
             )
 
             if score_row is not None:
+                score_row = apply_pitcher_weather_adjustment(score_row, game)
                 score_row["game"] = game_name
                 score_row["pitcher_id"] = home_pitcher_row.get("player_id")
                 score_row["pitcher"] = home_pitcher_row.get("Name")

@@ -4,8 +4,10 @@ from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 from src.mlb_schedule import get_daily_schedule
+from src.weather import enrich_schedule_with_weather
 from src.stat_data import (
     get_batter_stats,
     get_pitcher_stats,
@@ -23,6 +25,11 @@ from src import database
 st.set_page_config(
     page_title="All Rise Analytics",
     layout="wide",
+)
+
+live_refresh_count = st_autorefresh(
+    interval=15 * 60 * 1000,
+    key="live_context_autorefresh",
 )
 
 
@@ -859,6 +866,26 @@ def table_column_config():
         "K/9": st.column_config.NumberColumn("K/9", width=65, format="%.2f"),
         "opponent_avg_k%": st.column_config.NumberColumn("Opp K%", width=80, format="%.2f"),
         "k_matchup_score": st.column_config.NumberColumn("K Score", width=80, format="%.2f"),
+        "venue_name": st.column_config.TextColumn("Ballpark", width=145),
+        "roof_type": st.column_config.TextColumn("Roof", width=90),
+        "weather_summary": st.column_config.TextColumn("Game Weather", width=240),
+        "weather_edge": st.column_config.TextColumn("Weather Edge", width=145),
+        "hitter_weather_adjustment": st.column_config.NumberColumn(
+            "Wx Adj",
+            width=75,
+            format="%+.2f",
+        ),
+        "weather_k_adjustment": st.column_config.NumberColumn(
+            "Wx K Adj",
+            width=80,
+            format="%+.2f",
+        ),
+        "weather_adjusted_score": st.column_config.NumberColumn(
+            "Wx Score",
+            width=80,
+            format="%.2f",
+        ),
+        "history_grade": st.column_config.TextColumn("History Grade", width=115),
     }
 
 
@@ -1048,12 +1075,21 @@ with st.sidebar:
         step=5,
     )
 
-    force_refresh = st.button("Refresh Baseball Data")
+    force_refresh = st.button("Refresh Live Context")
+    st.caption(
+        "Probable pitchers and weather share a 15-minute cache. "
+        "This button refreshes them immediately."
+    )
 
 
-@st.cache_data(show_spinner=True)
-def load_schedule(game_date):
+@st.cache_data(show_spinner=True, ttl=900)
+def load_schedule(game_date, refresh_count):
     return get_daily_schedule(str(game_date))
+
+
+@st.cache_data(show_spinner=True, ttl=900)
+def load_weather(schedule, refresh_count):
+    return enrich_schedule_with_weather(schedule)
 
 
 @st.cache_data(show_spinner=True)
@@ -1066,20 +1102,25 @@ def load_pitcher_stats(season, force_refresh):
     return get_pitcher_stats(season, force_refresh=force_refresh)
 
 
-schedule_df = load_schedule(selected_date)
+if force_refresh:
+    load_schedule.clear()
+    load_weather.clear()
+
+schedule_df = load_schedule(selected_date, live_refresh_count)
 
 if schedule_df.empty:
     st.warning("No MLB games found for this date.")
     st.stop()
 
+schedule_df = load_weather(schedule_df, live_refresh_count)
 batters_df = load_batter_stats(season, force_refresh)
 pitchers_df = load_pitcher_stats(season, force_refresh)
 
 cloud_status_html = """
 <div class="status-box">
-    <b>Data Mode:</b> Live schedule and probable pitchers + SQLite history<br>
-    Future slates are pulled on demand. Completed-game matchup and pitcher
-    history comes from the local database.
+    <b>Data Mode:</b> Live pitchers, stadium weather, and SQLite history<br>
+    Probable pitchers and game-time forecasts refresh every 15 minutes.
+    Completed-game matchup and pitcher history comes from the local database.
 </div>
 """
 
@@ -1208,6 +1249,10 @@ with main_tab:
         "away_pitcher_hand",
         "home_probable_pitcher",
         "home_pitcher_hand",
+        "venue_name",
+        "roof_type",
+        "weather_summary",
+        "weather_edge",
     ]
 
     schedule_display_cols = [
@@ -1283,6 +1328,10 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
+                "weather_summary",
+                "weather_edge",
+                "hitter_weather_adjustment",
+                "weather_adjusted_score",
                 "matchup_grade",
             ]
 
@@ -1372,6 +1421,10 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
+                "weather_summary",
+                "weather_edge",
+                "hitter_weather_adjustment",
+                "weather_adjusted_score",
                 "matchup_grade",
             ]
 
@@ -1428,6 +1481,9 @@ with matchup_tab:
                 "K%",
                 "K/9",
                 "opponent_avg_k%",
+                "weather_summary",
+                "weather_edge",
+                "weather_k_adjustment",
                 "k_matchup_score",
                 "k_matchup_grade",
             ]
@@ -1481,7 +1537,20 @@ with info_tab:
 
         **Strikeout Targets**
         - Uses projected innings, projected pitch count, pitcher strikeout ability,
-          and opponent hitter strikeout tendencies.
+          opponent hitter strikeout tendencies, and a small weather run-environment
+          adjustment.
+
+        **Weather Projection**
+        - Uses the scheduled venue's MLB coordinates, elevation, field azimuth,
+          roof type, and game start time.
+        - Wind is projected relative to the center-field bearing, so the model
+          distinguishes wind blowing out, in, or across the field.
+        - Outdoor hitter rankings include wind and air-density adjustments.
+        - Retractable-roof games show the forecast but remain neutral until roof
+          status is known.
+        - Weather adjustments are bounded matchup heuristics, not calibrated
+          batted-ball or sportsbook projections.
+        - Forecast source: [Open-Meteo](https://open-meteo.com/).
 
         **Row Markers**
         - Green bar = favorable
@@ -1524,6 +1593,9 @@ with info_tab:
         | **Proj PC** | Projected Pitch Count |
         | **Proj K** | Projected Strikeouts |
         | **K Score** | Strikeout Matchup Score |
+        | **Wx Adj** | Weather adjustment applied to hitter matchup ranking |
+        | **Wx Score** | Weather-adjusted matchup ranking score |
+        | **Wx K Adj** | Small weather run-environment adjustment to K score |
         | **RHP** | Right-Handed Pitcher |
         | **LHP** | Left-Handed Pitcher |
         | **H/A** | Home/Away |

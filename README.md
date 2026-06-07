@@ -6,11 +6,30 @@ This Streamlit app uses:
 - The Chadwick Register to map Retrosheet player IDs to MLBAM IDs.
 - MLB StatsAPI for live schedules, probable pitchers, current rosters/stats,
   and completed current-season games.
+- Open-Meteo for game-time stadium weather forecasts.
 - SQLite for career BvP summaries, BvP game logs, pitcher game logs, and
   pitcher season summaries.
 
 Raw play-by-play is streamed from each Retrosheet ZIP, aggregated, and then
 discarded. SQLite does not contain a raw plate-appearance table.
+
+## Live Weather Context
+
+The live slate uses the scheduled MLB venue's coordinates, elevation, center-
+field azimuth, roof type, and first-pitch time. Forecast wind is projected
+relative to the field so matchup tables can distinguish wind blowing out, in,
+or across the diamond.
+
+Outdoor hitter rankings include a capped wind and air-density adjustment.
+Pitcher strikeout scores receive only a small inverse run-environment
+adjustment because wind does not directly change strikeout skill. Retractable-
+roof games display the forecast but remain projection-neutral while roof
+status is unknown. These are bounded matchup heuristics rather than calibrated
+batted-ball or sportsbook projections.
+
+Probable pitchers and forecasts use a 15-minute Streamlit cache and can be
+refreshed immediately with the **Refresh Live Context** button. The nightly
+database job remains limited to completed-game history.
 
 ## Install
 
@@ -94,3 +113,4 @@ Historical game information was obtained free of charge from and is
 copyrighted by [Retrosheet](https://www.retrosheet.org/).
 Player ID cross-references come from the
 [Chadwick Register](https://github.com/chadwickbureau/register).
+Forecast data comes from [Open-Meteo](https://open-meteo.com/).

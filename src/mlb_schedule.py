@@ -49,7 +49,7 @@ def get_daily_schedule(game_date):
     params = {
         "sportId": 1,
         "date": game_date,
-        "hydrate": "probablePitcher(note),team"
+        "hydrate": "probablePitcher(note),team,venue(location,fieldInfo)",
     }
 
     response = requests.get(SCHEDULE_URL, params=params, timeout=20)
@@ -74,9 +74,14 @@ def get_daily_schedule(game_date):
 
             away_pitcher_id = away_pitcher.get("id")
             home_pitcher_id = home_pitcher.get("id")
+            venue = game.get("venue", {})
+            location = venue.get("location", {})
+            coordinates = location.get("defaultCoordinates", {})
+            field_info = venue.get("fieldInfo", {})
 
             rows.append({
                 "game_date": game_date,
+                "game_time_utc": game.get("gameDate"),
                 "game_pk": game.get("gamePk"),
 
                 "away_team": away_team,
@@ -92,6 +97,15 @@ def get_daily_schedule(game_date):
                 "home_probable_pitcher": home_pitcher.get("fullName"),
                 "home_probable_pitcher_id": home_pitcher_id,
                 "home_pitcher_hand": None,
+
+                "venue_id": venue.get("id"),
+                "venue_name": venue.get("name"),
+                "venue_city": location.get("city"),
+                "venue_latitude": coordinates.get("latitude"),
+                "venue_longitude": coordinates.get("longitude"),
+                "field_azimuth": location.get("azimuthAngle"),
+                "venue_elevation_ft": location.get("elevation"),
+                "roof_type": field_info.get("roofType"),
             })
 
     pitcher_hands = get_pitcher_hands(

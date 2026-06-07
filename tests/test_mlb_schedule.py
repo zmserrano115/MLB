@@ -15,6 +15,21 @@ class ScheduleTests(unittest.TestCase):
                     "games": [
                         {
                             "gamePk": 1,
+                            "gameDate": "2026-06-01T23:10:00Z",
+                            "venue": {
+                                "id": 99,
+                                "name": "Test Park",
+                                "location": {
+                                    "city": "Denver",
+                                    "defaultCoordinates": {
+                                        "latitude": 39.756,
+                                        "longitude": -104.994,
+                                    },
+                                    "azimuthAngle": 20.0,
+                                    "elevation": 5200,
+                                },
+                                "fieldInfo": {"roofType": "Open"},
+                            },
                             "teams": {
                                 "away": {
                                     "team": {"id": 10, "name": "Away"},
@@ -51,6 +66,10 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(mock_get.call_count, 2)
         self.assertEqual(schedule.iloc[0]["away_pitcher_hand"], "R")
         self.assertEqual(schedule.iloc[0]["home_pitcher_hand"], "L")
+        self.assertEqual(schedule.iloc[0]["venue_name"], "Test Park")
+        self.assertEqual(schedule.iloc[0]["venue_latitude"], 39.756)
+        self.assertEqual(schedule.iloc[0]["field_azimuth"], 20.0)
+        self.assertEqual(schedule.iloc[0]["roof_type"], "Open")
 
 
 if __name__ == "__main__":
