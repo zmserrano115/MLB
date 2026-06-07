@@ -852,7 +852,7 @@ def grade_bar_url(grade):
     return "data:image/svg+xml;utf8," + quote(svg)
 
 
-def weather_icon_svg(icon_name):
+def weather_icon_svg(icon_name, size=18):
     paths = {
         "clear": (
             "<circle cx='12' cy='12' r='4'/>"
@@ -890,19 +890,25 @@ def weather_icon_svg(icon_name):
             "A6 6 0 0 0 6.1 3.4 4.5 4.5 0 0 0 5 13Z'/>"
             "<path d='M4 17h16M6 21h12'/>"
         ),
-        "unknown": "<circle cx='12' cy='12' r='9'/><path d='M9.8 9a2.3 2.3 0 1 1 3.3 2.1c-.8.4-1.1.9-1.1 1.9M12 17h.01'/>",
+        "unknown": (
+            "<circle cx='12' cy='12' r='9'/>"
+            "<path d='M9.8 9a2.3 2.3 0 1 1 3.3 2.1"
+            "c-.8.4-1.1.9-1.1 1.9M12 17h.01'/>"
+        ),
     }
+
     icon_paths = paths.get(str(icon_name or "unknown"), paths["unknown"])
+
     return (
         "<svg class='weather-svg' xmlns='http://www.w3.org/2000/svg' "
-        "viewBox='0 0 24 24' width='18' height='18' fill='none' "
+        f"viewBox='0 0 24 24' width='{size}' height='{size}' fill='none' "
         "stroke='#617083' stroke-width='1.7' stroke-linecap='round' "
         f"stroke-linejoin='round'>{icon_paths}</svg>"
     )
 
 
-def weather_icon_data_url(icon_name):
-    return "data:image/svg+xml;utf8," + quote(weather_icon_svg(icon_name))
+def weather_icon_data_url(icon_name, size=18):
+    return "data:image/svg+xml;utf8," + quote(weather_icon_svg(icon_name, size=size))
 
 
 def grade_cell_style(value):
@@ -1092,7 +1098,7 @@ def table_column_config():
         "game_away_logo": st.column_config.ImageColumn("Game", width=34),
         "game_at": st.column_config.TextColumn("", width=22),
         "game_home_logo": st.column_config.ImageColumn("", width=34),
-        "weather_icon_url": st.column_config.ImageColumn("", width=28),
+        "weather_icon_url": st.column_config.ImageColumn("", width=24),
         "team_logo": st.column_config.ImageColumn("", width=32),
         "opponent_logo": st.column_config.ImageColumn("", width=32),
         "away_logo": st.column_config.ImageColumn("", width=32),
@@ -1259,8 +1265,8 @@ def render_schedule_weather_table(df):
         venue = str(row.get("venue_name") or "Venue TBD")
         roof = str(row.get("roof_type") or "Roof unknown")
         weather_icon_name = str(row.get("weather_icon") or "unknown")
-        weather_svg = weather_icon_svg(weather_icon_name)
-        weather_display = str(row.get("weather_display") or "?")
+        weather_svg = weather_icon_svg(weather_icon_name, size=22)  
+        weather_display = str(row.get("weather_display") or "?")      
         wind_arrow = str(row.get("wind_arrow") or "\u00b7")
         weather_edge = str(row.get("weather_edge") or "Neutral")
         wind_speed = pd.to_numeric(row.get("wind_speed_mph"), errors="coerce")
@@ -1376,9 +1382,9 @@ def prepare_batter_matchup_table(df):
         pd.Series("No History", index=result.index),
     ).apply(grade_bar_url)
     result["weather_icon_url"] = result.get(
-        "weather_icon",
-        pd.Series("unknown", index=result.index),
-    ).apply(weather_icon_data_url)
+    "weather_icon",
+    pd.Series("unknown", index=result.index),
+    ).apply(lambda icon: weather_icon_data_url(icon, size=22))
     return result
 
 
