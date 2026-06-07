@@ -93,15 +93,22 @@ jobs:
           GAME_DATE="${{ github.event.inputs.game_date }}"
           LOOKBACK_DAYS="${{ github.event.inputs.lookback_days }}"
           REPROCESS="${{ github.event.inputs.reprocess_existing }}"
+          EVENT_NAME="${{ github.event_name }}"
 
           if [ -z "$GAME_DATE" ]; then
             GAME_DATE=$(TZ="America/Denver" date -d "yesterday" +"%Y-%m-%d")
           fi
-          if [ -z "$LOOKBACK_DAYS" ]; then
-            LOOKBACK_DAYS="3"
+
+          ARGS=(--date "$GAME_DATE")
+          if [ "$EVENT_NAME" = "push" ] && [ -z "$LOOKBACK_DAYS" ]; then
+            ARGS+=(--season-to-date)
+          else
+            if [ -z "$LOOKBACK_DAYS" ]; then
+              LOOKBACK_DAYS="3"
+            fi
+            ARGS+=(--lookback-days "$LOOKBACK_DAYS")
           fi
 
-          ARGS=(--date "$GAME_DATE" --lookback-days "$LOOKBACK_DAYS")
           if [ "$REPROCESS" = "true" ]; then
             ARGS+=(--reprocess-existing)
           fi

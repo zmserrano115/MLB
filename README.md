@@ -46,10 +46,13 @@ precomputed matchup files:
 ```powershell
 python refresh_nightly.py
 python refresh_nightly.py --date 2026-06-06 --lookback-days 3
+python refresh_nightly.py --date 2026-06-06 --season-to-date
 ```
 
 The lookback catches games whose final status arrived late. Existing games are
-idempotently skipped unless `--reprocess-existing` is supplied.
+idempotently skipped unless `--reprocess-existing` is supplied. Repository
+pushes run the season-to-date mode so a new deployment cannot miss earlier
+current-season games; scheduled nightly runs use the three-day lookback.
 
 ## Cloud Database
 

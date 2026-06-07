@@ -17,6 +17,14 @@ def refresh_dates(end_date, lookback_days):
         current += timedelta(days=1)
 
 
+def season_to_date_lookback_days(end_date):
+    end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    season_start = date(end.year, 3, 1)
+    if end < season_start:
+        season_start = date(end.year, 1, 1)
+    return (end - season_start).days + 1
+
+
 def run_nightly_refresh(
     end_date,
     lookback_days=3,
@@ -90,6 +98,11 @@ def main():
         default=3,
         help="Number of dates ending at --date to recheck for late finals.",
     )
+    parser.add_argument(
+        "--season-to-date",
+        action="store_true",
+        help="Check every date from March 1 through --date.",
+    )
     parser.add_argument("--game-type", default="R")
     parser.add_argument("--reprocess-existing", action="store_true")
     parser.add_argument("--db", help="Optional SQLite path.")
@@ -99,9 +112,13 @@ def main():
         database.DB_PATH = Path(args.db).expanduser().resolve()
 
     try:
+        lookback_days = args.lookback_days
+        if args.season_to_date:
+            lookback_days = season_to_date_lookback_days(args.date)
+
         run_nightly_refresh(
             end_date=args.date,
-            lookback_days=args.lookback_days,
+            lookback_days=lookback_days,
             game_type=args.game_type,
             reprocess_existing=args.reprocess_existing,
         )
