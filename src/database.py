@@ -25,6 +25,13 @@ def now_text():
 
 def bootstrap_database():
     """Download a published SQLite file when running in a clean cloud image."""
+    if os.environ.get("MLB_DB_SKIP_BOOTSTRAP", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return
+
     if DB_PATH.exists():
         return
 
@@ -42,7 +49,7 @@ def bootstrap_database():
         database_url,
         headers={"User-Agent": "all-rise-analytics/1.0"},
     )
-    attempts = 40 if automatic_url else 1
+    attempts = 80 if automatic_url else 1
     for attempt in range(attempts):
         try:
             with urllib.request.urlopen(request, timeout=600) as response:

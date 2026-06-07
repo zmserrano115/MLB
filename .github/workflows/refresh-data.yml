@@ -73,6 +73,7 @@ jobs:
         if: ${{ github.event.inputs.test_only != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          MLB_DB_SKIP_BOOTSTRAP: "1"
         run: |
           mkdir -p data
           if gh release view mlb-data >/dev/null 2>&1; then

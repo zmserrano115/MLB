@@ -3,6 +3,7 @@ from collections import defaultdict
 import csv
 import hashlib
 import io
+import os
 from pathlib import Path
 import tempfile
 import time
@@ -497,6 +498,9 @@ def main():
     parser.add_argument("--sleep-seconds", type=float, default=0.25)
     args = parser.parse_args()
 
+    # This command creates the release database, so it must not try to
+    # bootstrap from that release before it exists.
+    os.environ["MLB_DB_SKIP_BOOTSTRAP"] = "1"
     if args.db:
         database.DB_PATH = Path(args.db).expanduser().resolve()
 
