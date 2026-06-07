@@ -58,7 +58,8 @@ class WeatherTests(unittest.TestCase):
         self.assertGreater(result.iloc[0]["hitter_weather_adjustment"], 3.0)
         self.assertLess(result.iloc[0]["pitcher_weather_adjustment"], 0.0)
         self.assertIn("85 F", result.iloc[0]["weather_summary"])
-        self.assertEqual(result.iloc[0]["weather_display"], "⛅ 85°")
+        self.assertEqual(result.iloc[0]["weather_icon"], "partly-cloudy")
+        self.assertEqual(result.iloc[0]["weather_display"], "85°")
         self.assertEqual(result.iloc[0]["wind_display"], "↑ 10")
         self.assertIn("up = out to center", result.iloc[0]["wind_tooltip"])
 
@@ -73,8 +74,8 @@ class WeatherTests(unittest.TestCase):
         self.assertEqual(pitcher_adjustment, 0.0)
 
     def test_compact_weather_symbols_are_field_relative(self):
-        self.assertEqual(weather_icon("Thunderstorms"), "⚡")
-        self.assertEqual(weather_icon("Overcast"), "☁")
+        self.assertEqual(weather_icon("Thunderstorms"), "storm")
+        self.assertEqual(weather_icon("Overcast"), "cloudy")
         self.assertEqual(field_wind_arrow("Out to CF"), "↑")
         self.assertEqual(field_wind_arrow("R to L"), "←")
 

@@ -16,6 +16,8 @@ from src.stat_data import (
 WEATHER_CONTEXT_COLUMNS = (
     "venue_name",
     "roof_type",
+    "weather_icon",
+    "weather_condition",
     "weather_display",
     "weather_tooltip",
     "weather_summary",

@@ -1,6 +1,7 @@
 from datetime import date
 from html import escape
 import os
+from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
@@ -432,6 +433,16 @@ st.markdown(
         white-space: nowrap;
     }
 
+    .schedule-weather-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .weather-svg {
+        flex: 0 0 auto;
+    }
+
     .schedule-wind-arrow {
         color: #87919c;
         font-size: 24px;
@@ -454,113 +465,17 @@ st.markdown(
         margin: -3px 0 14px 0;
     }
 
-    .matchup-list-head {
-        display: grid;
-        grid-template-columns: 40px 1.55fr 1.45fr 0.55fr 1.35fr 1fr 1fr;
-        gap: 12px;
-        padding: 0 14px 7px 14px;
-        color: var(--muted-2);
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
-    }
-
-    div[class*="st-key-bvp_card_"],
-    div[class*="st-key-hand_card_"],
-    div[class*="st-key-k_card_"] {
+    div[class*="st-key-bvp_table"] [data-testid="stDataFrame"],
+    div[class*="st-key-hand_table"] [data-testid="stDataFrame"],
+    div[class*="st-key-pitcher_k_table"] [data-testid="stDataFrame"] {
+        border: 1px solid var(--line);
         background: #ffffff;
-        border-color: var(--line) !important;
-        border-radius: 0 !important;
-        padding: 8px 12px !important;
-        margin-bottom: 6px;
     }
 
-    div[class*="st-key-bvp_name_"] button,
-    div[class*="st-key-hand_name_"] button,
-    div[class*="st-key-k_name_"] button {
-        color: var(--accent) !important;
-        font-size: 14px !important;
-        font-weight: 700 !important;
-        line-height: 1.2 !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-        text-align: left !important;
-        justify-content: flex-start !important;
-    }
-
-    div[class*="st-key-bvp_name_"] button:hover,
-    div[class*="st-key-hand_name_"] button:hover,
-    div[class*="st-key-k_name_"] button:hover {
-        color: #1f5f96 !important;
-        text-decoration: underline;
-    }
-
-    .matchup-primary {
-        color: var(--text);
-        font-size: 13px;
-        font-weight: 600;
-        line-height: 1.35;
-    }
-
-    .matchup-secondary {
+    .research-table-note {
         color: var(--muted);
         font-size: 11px;
-        line-height: 1.4;
-        margin-top: 2px;
-    }
-
-    .matchup-stat {
-        color: var(--text);
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1.4;
-    }
-
-    .matchup-weather {
-        cursor: help;
-        color: var(--text);
-        font-size: 13px;
-        font-weight: 600;
-        line-height: 1.35;
-        border-bottom: 1px dotted var(--muted-2);
-        width: fit-content;
-    }
-
-    .matchup-grade {
-        display: inline-block;
-        padding: 4px 8px;
-        border: 1px solid currentColor;
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        white-space: nowrap;
-    }
-
-    .matchup-grade.good {
-        color: #247a4d;
-        background: #edf8f2;
-    }
-
-    .matchup-grade.neutral {
-        color: #9a6810;
-        background: #fff8e8;
-    }
-
-    .matchup-grade.avoid {
-        color: #b43b3b;
-        background: #fff0f0;
-    }
-
-    .matchup-grade.sample {
-        color: #3f6fa8;
-        background: #eef5ff;
-    }
-
-    .matchup-grade.none {
-        color: #687384;
-        background: #f2f4f7;
+        margin: -3px 0 8px 0;
     }
 
     .matchup-log-shell {
@@ -858,15 +773,6 @@ st.markdown(
             display: none;
         }
 
-        .matchup-list-head {
-            display: none;
-        }
-
-        div[class*="st-key-bvp_card_"] [data-testid="stHorizontalBlock"],
-        div[class*="st-key-hand_card_"] [data-testid="stHorizontalBlock"],
-        div[class*="st-key-k_card_"] [data-testid="stHorizontalBlock"] {
-            flex-wrap: wrap;
-        }
     }
     </style>
     """,
@@ -897,8 +803,108 @@ def team_logo_url(team_value):
     return f"https://www.mlbstatic.com/team-logos/team-cap-on-light/{team_id}.svg"
 
 
-def make_light_table(df):
+def opponent_from_game(game, team):
+    if is_missing_value(game) or is_missing_value(team) or " @ " not in str(game):
+        return ""
+
+    away_team, home_team = str(game).split(" @ ", 1)
+    if str(team) == away_team:
+        return home_team
+    if str(team) == home_team:
+        return away_team
+    return ""
+
+
+def grade_bar_url(grade):
+    value = str(grade or "").lower()
+    if "elite" in value or "strong" in value or "good" in value:
+        color = "2ca25f"
+    elif "neutral" in value:
+        color = "d99a16"
+    elif "avoid" in value:
+        color = "d64545"
+    elif "sample" in value:
+        color = "3f7fd8"
+    else:
+        color = "9ca3af"
+
+    svg = (
+        "<svg xmlns='http://www.w3.org/2000/svg' width='8' height='34' "
+        "viewBox='0 0 8 34'>"
+        f"<rect width='8' height='34' rx='2' fill='#{color}'/>"
+        "</svg>"
+    )
+    return "data:image/svg+xml;utf8," + quote(svg)
+
+
+def weather_icon_svg(icon_name):
+    paths = {
+        "clear": (
+            "<circle cx='12' cy='12' r='4'/>"
+            "<path d='M12 2v2M12 20v2M4.93 4.93l1.42 1.42"
+            "M17.66 17.66l1.41 1.41M2 12h2M20 12h2"
+            "M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41'/>"
+        ),
+        "partly-cloudy": (
+            "<path d='M8.5 5.5A4 4 0 0 1 16 7.5'/>"
+            "<path d='M5 9H4a3 3 0 0 0 0 6h13a4 4 0 0 0 0-8"
+            " 5.5 5.5 0 0 0-10.6 2'/>"
+        ),
+        "cloudy": (
+            "<path d='M5 18h12a4 4 0 0 0 .4-7.98"
+            "A6 6 0 0 0 6.1 8.4 4.5 4.5 0 0 0 5 18Z'/>"
+        ),
+        "rain": (
+            "<path d='M5 15h12a4 4 0 0 0 .4-7.98"
+            "A6 6 0 0 0 6.1 5.4 4.5 4.5 0 0 0 5 15Z'/>"
+            "<path d='M8 18l-1 3M13 18l-1 3M18 18l-1 3'/>"
+        ),
+        "storm": (
+            "<path d='M5 14h12a4 4 0 0 0 .4-7.98"
+            "A6 6 0 0 0 6.1 4.4 4.5 4.5 0 0 0 5 14Z'/>"
+            "<path d='m13 15-3 5h3l-1 3 4-6h-3l1-2'/>"
+        ),
+        "snow": (
+            "<path d='M5 14h12a4 4 0 0 0 .4-7.98"
+            "A6 6 0 0 0 6.1 4.4 4.5 4.5 0 0 0 5 14Z'/>"
+            "<path d='M8 18v4M6.3 19l3.4 2M9.7 19l-3.4 2"
+            "M16 18v4M14.3 19l3.4 2M17.7 19l-3.4 2'/>"
+        ),
+        "fog": (
+            "<path d='M5 13h12a4 4 0 0 0 .4-7.98"
+            "A6 6 0 0 0 6.1 3.4 4.5 4.5 0 0 0 5 13Z'/>"
+            "<path d='M4 17h16M6 21h12'/>"
+        ),
+        "unknown": "<circle cx='12' cy='12' r='9'/><path d='M9.8 9a2.3 2.3 0 1 1 3.3 2.1c-.8.4-1.1.9-1.1 1.9M12 17h.01'/>",
+    }
+    icon_paths = paths.get(str(icon_name or "unknown"), paths["unknown"])
     return (
+        "<svg class='weather-svg' xmlns='http://www.w3.org/2000/svg' "
+        "viewBox='0 0 24 24' width='24' height='24' fill='none' "
+        "stroke='#617083' stroke-width='1.7' stroke-linecap='round' "
+        f"stroke-linejoin='round'>{icon_paths}</svg>"
+    )
+
+
+def weather_icon_data_url(icon_name):
+    return "data:image/svg+xml;utf8," + quote(weather_icon_svg(icon_name))
+
+
+def grade_cell_style(value):
+    grade_class = matchup_grade_class(value)
+    colors = {
+        "good": ("#247a4d", "#edf8f2"),
+        "neutral": ("#9a6810", "#fff8e8"),
+        "avoid": ("#b43b3b", "#fff0f0"),
+        "sample": ("#3f6fa8", "#eef5ff"),
+        "none": ("#687384", "#f2f4f7"),
+    }
+    color, background = colors[grade_class]
+    return f"color: {color}; background-color: {background}; font-weight: 700"
+
+
+def make_light_table(df):
+    styler = (
         df.style
         .set_properties(
             **{
@@ -930,24 +936,70 @@ def make_light_table(df):
         )
     )
 
+    name_columns = [
+        column for column in ("batter", "pitcher") if column in df.columns
+    ]
+    if name_columns:
+        styler = styler.set_properties(
+            subset=name_columns,
+            **{
+                "color": "#245f96",
+                "font-weight": "700",
+                "text-decoration": "underline",
+            },
+        )
 
-def show_table(df, key=None, selectable=False):
+    grade_columns = [
+        column
+        for column in ("matchup_grade", "k_matchup_grade", "history_grade")
+        if column in df.columns
+    ]
+    for column in grade_columns:
+        styler = styler.map(grade_cell_style, subset=[column])
+
+    return styler
+
+
+def show_table(df, key=None, selectable_column=None):
     table_data = make_light_table(df)
+    table_height = min(44 * (len(df) + 1) + 8, 820)
 
     kwargs = {
         "data": table_data,
         "width": "stretch",
+        "height": max(table_height, 180),
         "hide_index": True,
         "column_config": table_column_config(),
         "row_height": 42,
     }
 
-    if selectable:
+    if selectable_column:
         kwargs["on_select"] = "rerun"
-        kwargs["selection_mode"] = "single-row"
+        kwargs["selection_mode"] = "single-cell"
         kwargs["key"] = key
 
     return st.dataframe(**kwargs)
+
+
+def selected_name_row(event, display_df, name_column):
+    try:
+        selected_cells = event.selection.cells
+    except Exception:
+        return None
+
+    if not selected_cells:
+        return None
+
+    row_position, column_name = selected_cells[0]
+    if column_name != name_column or row_position >= len(display_df):
+        return None
+    return display_df.iloc[int(row_position)]
+
+
+def apply_matchup_row_limit(df, row_setting):
+    if row_setting == "All matchups":
+        return df.copy()
+    return df.head(int(row_setting)).copy()
 
 
 def add_game_column(df):
@@ -1006,22 +1058,33 @@ def is_missing_value(value):
 def table_column_config():
     return {
         "grade_bar": st.column_config.ImageColumn("", width=18),
+        "weather_icon_url": st.column_config.ImageColumn("Wx", width=38),
         "team_logo": st.column_config.ImageColumn("", width=32),
         "opponent_logo": st.column_config.ImageColumn("", width=32),
         "away_logo": st.column_config.ImageColumn("", width=32),
         "home_logo": st.column_config.ImageColumn("", width=32),
         "pitcher_team_logo": st.column_config.ImageColumn("", width=32),
+        "game": st.column_config.TextColumn("Game", width=190),
         "away_team": st.column_config.TextColumn("Away Team", width=145),
         "home_team": st.column_config.TextColumn("Home Team", width=145),
         "team": st.column_config.TextColumn("Team", width=125),
+        "pitcher_team": st.column_config.TextColumn("Team", width=125),
         "opponent": st.column_config.TextColumn("Opponent", width=125),
         "opponent_team": st.column_config.TextColumn("Opponent", width=125),
         "away_probable_pitcher": st.column_config.TextColumn("Away Pitcher", width=145),
         "home_probable_pitcher": st.column_config.TextColumn("Home Pitcher", width=145),
         "away_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
         "home_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
-        "batter": st.column_config.TextColumn("Batter", width=140),
-        "pitcher": st.column_config.TextColumn("Pitcher", width=140),
+        "batter": st.column_config.TextColumn(
+            "Batter",
+            width=150,
+            help="Click a batter name cell to open the career game log.",
+        ),
+        "pitcher": st.column_config.TextColumn(
+            "Pitcher",
+            width=150,
+            help="Click a pitcher name cell to open the opponent game log.",
+        ),
         "opposing_pitcher": st.column_config.TextColumn("Pitcher", width=140),
         "pitcher_hand": st.column_config.TextColumn("Hand", width=60),
         "opposing_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
@@ -1051,20 +1114,62 @@ def table_column_config():
         "Projected IP": st.column_config.NumberColumn("Proj IP", width=80, format="%.2f"),
         "Projected Pitch Count": st.column_config.NumberColumn("Proj PC", width=80, format="%.0f"),
         "Projected Ks": st.column_config.NumberColumn("Proj K", width=75, format="%.2f"),
+        "Season IP": st.column_config.NumberColumn("Season IP", width=85, format="%.1f"),
+        "GS": st.column_config.NumberColumn("GS", width=55, format="%d"),
         "ERA": st.column_config.NumberColumn("ERA", width=65, format="%.2f"),
         "WHIP": st.column_config.NumberColumn("WHIP", width=70, format="%.2f"),
         "K/9": st.column_config.NumberColumn("K/9", width=65, format="%.2f"),
+        "SwStr%": st.column_config.NumberColumn("SwStr%", width=75, format="%.2f"),
         "opponent_avg_k%": st.column_config.NumberColumn("Opp K%", width=80, format="%.2f"),
+        "base_k_matchup_score": st.column_config.NumberColumn(
+            "Base K Score",
+            width=95,
+            format="%.2f",
+        ),
         "k_matchup_score": st.column_config.NumberColumn("K Score", width=80, format="%.2f"),
         "venue_name": st.column_config.TextColumn("Ballpark", width=145),
         "roof_type": st.column_config.TextColumn("Roof", width=90),
+        "weather_condition": st.column_config.TextColumn("Condition", width=115),
         "weather_display": st.column_config.TextColumn(
-            "Wx",
-            width=75,
+            "Temp",
+            width=65,
             help=(
-                "Game-time condition and temperature. Hover the weather icon "
-                "in the schedule for the exact forecast and projection meaning."
+                "Projected game-time temperature. Hover the weather icon in "
+                "the schedule for the full forecast."
             ),
+        ),
+        "temperature_f": st.column_config.NumberColumn(
+            "Temp F",
+            width=70,
+            format="%.0f",
+        ),
+        "humidity_pct": st.column_config.NumberColumn(
+            "Humidity",
+            width=80,
+            format="%.0f%%",
+        ),
+        "precip_probability_pct": st.column_config.NumberColumn(
+            "Rain",
+            width=65,
+            format="%.0f%%",
+        ),
+        "wind_speed_mph": st.column_config.NumberColumn(
+            "Wind mph",
+            width=85,
+            format="%.0f",
+        ),
+        "wind_direction_cardinal": st.column_config.TextColumn(
+            "Wind Dir",
+            width=75,
+        ),
+        "wind_field_direction": st.column_config.TextColumn(
+            "Field Wind",
+            width=95,
+        ),
+        "wind_out_mph": st.column_config.NumberColumn(
+            "Out mph",
+            width=75,
+            format="%+.1f",
         ),
         "wind_display": st.column_config.TextColumn(
             "Wind",
@@ -1098,6 +1203,7 @@ def table_column_config():
             format="%.2f",
         ),
         "history_grade": st.column_config.TextColumn("History Grade", width=115),
+        "ER": st.column_config.NumberColumn("ER", width=50, format="%d"),
     }
 
 
@@ -1118,6 +1224,8 @@ def render_schedule_weather_table(df):
         home_hand = str(row.get("home_pitcher_hand") or "")
         venue = str(row.get("venue_name") or "Venue TBD")
         roof = str(row.get("roof_type") or "Roof unknown")
+        weather_icon_name = str(row.get("weather_icon") or "unknown")
+        weather_svg = weather_icon_svg(weather_icon_name)
         weather_display = str(row.get("weather_display") or "?")
         wind_arrow = str(row.get("wind_arrow") or "\u00b7")
         weather_edge = str(row.get("weather_edge") or "Neutral")
@@ -1163,7 +1271,8 @@ def render_schedule_weather_table(df):
                 </div>
                 <div>
                     <span class="schedule-weather-chip" title="{weather_tooltip}">
-                        {escape(weather_display)}
+                        {weather_svg}
+                        <span>{escape(weather_display)}</span>
                     </span>
                     <span class="schedule-weather-edge">{escape(weather_edge)}</span>
                 </div>
@@ -1196,13 +1305,6 @@ def render_schedule_weather_table(df):
     )
 
 
-def format_matchup_number(value, digits=1, suffix=""):
-    number = pd.to_numeric(value, errors="coerce")
-    if pd.isna(number):
-        return "-"
-    return f"{float(number):.{digits}f}{suffix}"
-
-
 def matchup_grade_class(grade):
     value = str(grade or "").lower()
     if "strong" in value or "good" in value or "elite" in value:
@@ -1216,210 +1318,50 @@ def matchup_grade_class(grade):
     return "none"
 
 
-def render_matchup_weather(row):
-    weather_display = escape(str(row.get("weather_display") or "?"))
-    wind_display = escape(str(row.get("wind_display") or "\u00b7"))
-    edge = escape(str(row.get("weather_edge") or "Neutral"))
-    tooltip = escape(
-        (
-            f"{row.get('weather_tooltip') or 'Forecast unavailable.'} "
-            f"{row.get('wind_tooltip') or 'Wind forecast unavailable.'}"
-        ),
-        quote=True,
+def prepare_batter_matchup_table(df):
+    result = df.copy().reset_index(drop=True)
+    result["grade_bar"] = result.get(
+        "matchup_grade",
+        pd.Series("No History", index=result.index),
+    ).apply(grade_bar_url)
+    result["team_logo"] = result.get(
+        "team",
+        pd.Series("", index=result.index),
+    ).apply(team_logo_url)
+    result["opponent_team"] = result.apply(
+        lambda row: opponent_from_game(row.get("game"), row.get("team")),
+        axis=1,
     )
-    return (
-        f'<div class="matchup-weather" title="{tooltip}">'
-        f"{weather_display} &nbsp; {wind_display}</div>"
-        f'<div class="matchup-secondary">{edge}</div>'
-    )
+    result["opponent_logo"] = result["opponent_team"].apply(team_logo_url)
+    result["weather_icon_url"] = result.get(
+        "weather_icon",
+        pd.Series("unknown", index=result.index),
+    ).apply(weather_icon_data_url)
+    return result
 
 
-def render_grade(grade, score=None):
-    grade_text = str(grade or "No History")
-    score_text = ""
-    score_value = pd.to_numeric(score, errors="coerce")
-    if pd.notna(score_value):
-        score_text = f'<div class="matchup-secondary">{float(score_value):.1f}</div>'
-    return (
-        f'<span class="matchup-grade {matchup_grade_class(grade_text)}">'
-        f"{escape(grade_text)}</span>{score_text}"
-    )
+def prepare_pitcher_matchup_table(df):
+    result = df.copy().reset_index(drop=True)
+    result["grade_bar"] = result.get(
+        "k_matchup_grade",
+        pd.Series("No History", index=result.index),
+    ).apply(grade_bar_url)
+    result["pitcher_team_logo"] = result.get(
+        "pitcher_team",
+        pd.Series("", index=result.index),
+    ).apply(team_logo_url)
+    result["opponent_logo"] = result.get(
+        "opponent",
+        pd.Series("", index=result.index),
+    ).apply(team_logo_url)
+    result["weather_icon_url"] = result.get(
+        "weather_icon",
+        pd.Series("unknown", index=result.index),
+    ).apply(weather_icon_data_url)
+    return result
 
 
-def clear_stale_matchup_selection(selection_key, current_df):
-    selected = st.session_state.get(selection_key)
-    if not selected:
-        return
-
-    identity_columns = [
-        column
-        for column in (
-            "game",
-            "batter_id",
-            "opposing_pitcher_id",
-            "pitcher_id",
-            "opponent",
-        )
-        if column in current_df.columns
-    ]
-    if not identity_columns:
-        st.session_state.pop(selection_key, None)
-        return
-
-    selected_identity = tuple(str(selected.get(column)) for column in identity_columns)
-    current_identities = {
-        tuple(str(row.get(column)) for column in identity_columns)
-        for _, row in current_df.iterrows()
-    }
-    if selected_identity not in current_identities:
-        st.session_state.pop(selection_key, None)
-
-
-def render_batter_matchup_cards(
-    df,
-    selection_key,
-    key_prefix,
-    split_view=False,
-):
-    clear_stale_matchup_selection(selection_key, df)
-    st.html(
-        """
-        <div class="matchup-list-head">
-            <div></div>
-            <div>Batter</div>
-            <div>Matchup</div>
-            <div>PA</div>
-            <div>Production</div>
-            <div>Weather</div>
-            <div>Grade</div>
-        </div>
-        """
-    )
-
-    for position, (_, row) in enumerate(df.iterrows()):
-        batter_id = row.get("batter_id")
-        pitcher_id = row.get("opposing_pitcher_id")
-        unique_id = f"{batter_id}_{pitcher_id}_{position}"
-        team = str(row.get("team") or "")
-        logo = team_logo_url(team)
-        pitcher = str(row.get("opposing_pitcher") or "Pitcher TBD")
-        hand = str(row.get("opposing_pitcher_hand") or "")
-        matchup_text = pitcher + (f" ({hand})" if hand else "")
-        split_text = str(row.get("split") or "") if split_view else ""
-
-        with st.container(border=True, key=f"{key_prefix}_card_{unique_id}"):
-            columns = st.columns(
-                [0.42, 1.55, 1.45, 0.55, 1.35, 1.0, 1.0],
-                vertical_alignment="center",
-            )
-            if logo:
-                columns[0].image(logo, width=32)
-            if columns[1].button(
-                str(row.get("batter") or "Unknown batter"),
-                key=f"{key_prefix}_name_{unique_id}",
-                type="tertiary",
-            ):
-                st.session_state[selection_key] = row.to_dict()
-            columns[1].html(
-                f'<div class="matchup-secondary">{escape(team)}</div>'
-            )
-            columns[2].html(
-                f'<div class="matchup-primary">{escape(matchup_text)}</div>'
-                f'<div class="matchup-secondary">{escape(split_text)}</div>'
-            )
-            columns[3].html(
-                f'<div class="matchup-stat">{format_matchup_number(row.get("PA"), 0)}</div>'
-            )
-            columns[4].html(
-                '<div class="matchup-stat">'
-                f'AVG {format_matchup_number(row.get("AVG"), 3)}'
-                '</div><div class="matchup-secondary">'
-                f'OBP {format_matchup_number(row.get("OBP"), 3)} &nbsp; '
-                f'OPS {format_matchup_number(row.get("OPS"), 3)}'
-                "</div>"
-            )
-            columns[5].html(render_matchup_weather(row))
-            columns[6].html(
-                render_grade(
-                    row.get("matchup_grade"),
-                    row.get("weather_adjusted_score"),
-                )
-            )
-
-    return st.session_state.get(selection_key)
-
-
-def render_pitcher_matchup_cards(df, selection_key, key_prefix):
-    clear_stale_matchup_selection(selection_key, df)
-    st.html(
-        """
-        <div class="matchup-list-head">
-            <div></div>
-            <div>Pitcher</div>
-            <div>Opponent</div>
-            <div>Proj K</div>
-            <div>Pitching</div>
-            <div>Weather</div>
-            <div>Grade</div>
-        </div>
-        """
-    )
-
-    for position, (_, row) in enumerate(df.iterrows()):
-        pitcher_id = row.get("pitcher_id")
-        unique_id = f"{pitcher_id}_{position}"
-        team = str(row.get("pitcher_team") or "")
-        logo = team_logo_url(team)
-        opponent = str(row.get("opponent") or "")
-        opponent_logo = team_logo_url(opponent)
-
-        with st.container(border=True, key=f"{key_prefix}_card_{unique_id}"):
-            columns = st.columns(
-                [0.42, 1.55, 1.45, 0.65, 1.25, 1.0, 1.0],
-                vertical_alignment="center",
-            )
-            if logo:
-                columns[0].image(logo, width=32)
-            if columns[1].button(
-                str(row.get("pitcher") or "Unknown pitcher"),
-                key=f"{key_prefix}_name_{unique_id}",
-                type="tertiary",
-            ):
-                st.session_state[selection_key] = row.to_dict()
-            columns[1].html(
-                f'<div class="matchup-secondary">{escape(team)}</div>'
-            )
-            opponent_html = f'<div class="matchup-primary">{escape(opponent)}</div>'
-            if opponent_logo:
-                opponent_html += '<div class="matchup-secondary">Opponent</div>'
-            columns[2].html(opponent_html)
-            columns[3].html(
-                '<div class="matchup-stat">'
-                f'{format_matchup_number(row.get("Projected Ks"), 1)}'
-                '</div><div class="matchup-secondary">'
-                f'{format_matchup_number(row.get("Projected IP"), 1)} IP'
-                "</div>"
-            )
-            columns[4].html(
-                '<div class="matchup-stat">'
-                f'K/9 {format_matchup_number(row.get("K/9"), 1)}'
-                '</div><div class="matchup-secondary">'
-                f'ERA {format_matchup_number(row.get("ERA"), 2)} &nbsp; '
-                f'K% {format_matchup_number(row.get("K%"), 1, "%")}'
-                "</div>"
-            )
-            columns[5].html(render_matchup_weather(row))
-            columns[6].html(
-                render_grade(
-                    row.get("k_matchup_grade"),
-                    row.get("k_matchup_score"),
-                )
-            )
-
-    return st.session_state.get(selection_key)
-
-
-def display_bvp_game_log(selected_row, season):
+def display_bvp_game_log(selected_row):
     batter_name = selected_row.get("batter")
     pitcher_name = selected_row.get("opposing_pitcher")
     batter_id = selected_row.get("batter_id")
@@ -1435,7 +1377,6 @@ def display_bvp_game_log(selected_row, season):
         game_log_df = get_batter_vs_pitcher_game_log(
             int(batter_id),
             int(pitcher_id),
-            int(season),
         )
 
     if game_log_df.empty:
@@ -1547,14 +1488,6 @@ with st.sidebar:
         step=10,
     )
 
-    top_n = st.number_input(
-        "Rows to Show",
-        min_value=5,
-        max_value=100,
-        value=25,
-        step=5,
-    )
-
     force_refresh = st.button("Refresh Live Context")
 
 
@@ -1633,12 +1566,18 @@ if schedule_df.empty:
 schedule_df = add_game_column(schedule_df)
 game_options = get_game_options(schedule_df)
 
-game_filter_col, _ = st.columns([2.2, 3.8])
+game_filter_col, row_filter_col, _ = st.columns([2.2, 1.5, 2.3])
 with game_filter_col:
     selected_game = st.selectbox(
         "Game",
         game_options,
         index=0,
+    )
+with row_filter_col:
+    matchup_rows = st.selectbox(
+        "Rows per chart",
+        [10, 20, 30, 50, "All matchups"],
+        index=2,
     )
 
 
@@ -1744,16 +1683,67 @@ with matchup_tab:
                 filtered_bvp_matchups["PA"] >= min_bvp_pa
             ].copy()
 
-            display_bvp = display_bvp.head(int(top_n))
-            selected_row = render_batter_matchup_cards(
-                display_bvp,
-                selection_key="selected_bvp_matchup",
-                key_prefix="bvp",
+            available_bvp_rows = len(display_bvp)
+            display_bvp = apply_matchup_row_limit(display_bvp, matchup_rows)
+            display_bvp = prepare_batter_matchup_table(display_bvp)
+
+            bvp_cols = [
+                "grade_bar",
+                "game",
+                "weather_icon_url",
+                "team_logo",
+                "team",
+                "batter",
+                "opponent_logo",
+                "opposing_pitcher",
+                "opposing_pitcher_hand",
+                "PA",
+                "AB",
+                "H",
+                "BB",
+                "HBP",
+                "SO",
+                "HR",
+                "RBI",
+                "AVG",
+                "OBP",
+                "SLG",
+                "OPS",
+                "K%",
+                "BB%",
+                "venue_name",
+                "roof_type",
+                "weather_condition",
+                "weather_display",
+                "humidity_pct",
+                "precip_probability_pct",
+                "wind_speed_mph",
+                "wind_direction_cardinal",
+                "wind_field_direction",
+                "wind_out_mph",
+                "weather_edge",
+                "hitter_weather_adjustment",
+                "history_grade",
+                "weather_adjusted_score",
+                "matchup_grade",
+            ]
+            bvp_cols = [column for column in bvp_cols if column in display_bvp.columns]
+
+            st.html(
+                f'<div class="research-table-note">Showing {len(display_bvp):,} '
+                f'of {available_bvp_rows:,} matchups. Click a batter name cell '
+                "to open the career game log.</div>"
             )
+            bvp_event = show_table(
+                display_bvp[bvp_cols],
+                key=f"bvp_table_{selected_game}_{matchup_rows}_{min_bvp_pa}",
+                selectable_column="batter",
+            )
+            selected_row = selected_name_row(bvp_event, display_bvp, "batter")
 
             if selected_row is not None:
                 st.html('<div class="matchup-log-shell"></div>')
-                display_bvp_game_log(selected_row, season)
+                display_bvp_game_log(selected_row)
 
     with tab2:
         st.markdown(
@@ -1790,17 +1780,77 @@ with matchup_tab:
                 & (filtered_hand_matchups["OBP"] >= min_hand_obp)
             ].copy()
 
-            display_hand = display_hand.head(int(top_n))
-            selected_hand_row = render_batter_matchup_cards(
+            available_hand_rows = len(display_hand)
+            display_hand = apply_matchup_row_limit(display_hand, matchup_rows)
+            display_hand = prepare_batter_matchup_table(display_hand)
+
+            hand_cols = [
+                "grade_bar",
+                "game",
+                "weather_icon_url",
+                "team_logo",
+                "team",
+                "batter",
+                "opponent_logo",
+                "opposing_pitcher",
+                "opposing_pitcher_hand",
+                "split",
+                "PA",
+                "AB",
+                "H",
+                "BB",
+                "HBP",
+                "SO",
+                "HR",
+                "RBI",
+                "AVG",
+                "OBP",
+                "SLG",
+                "OPS",
+                "K%",
+                "BB%",
+                "venue_name",
+                "roof_type",
+                "weather_condition",
+                "weather_display",
+                "humidity_pct",
+                "precip_probability_pct",
+                "wind_speed_mph",
+                "wind_direction_cardinal",
+                "wind_field_direction",
+                "wind_out_mph",
+                "weather_edge",
+                "hitter_weather_adjustment",
+                "history_grade",
+                "weather_adjusted_score",
+                "matchup_grade",
+            ]
+            hand_cols = [
+                column for column in hand_cols if column in display_hand.columns
+            ]
+
+            st.html(
+                f'<div class="research-table-note">Showing {len(display_hand):,} '
+                f'of {available_hand_rows:,} matchups. Click a batter name cell '
+                "to open the game log against today's probable pitcher.</div>"
+            )
+            hand_event = show_table(
+                display_hand[hand_cols],
+                key=(
+                    f"hand_table_{selected_game}_{matchup_rows}_"
+                    f"{min_hand_pa}_{min_hand_obp}"
+                ),
+                selectable_column="batter",
+            )
+            selected_hand_row = selected_name_row(
+                hand_event,
                 display_hand,
-                selection_key="selected_hand_matchup",
-                key_prefix="hand",
-                split_view=True,
+                "batter",
             )
 
             if selected_hand_row is not None:
                 st.html('<div class="matchup-log-shell"></div>')
-                display_bvp_game_log(selected_hand_row, season)
+                display_bvp_game_log(selected_hand_row)
 
     with tab3:
         st.markdown(
@@ -1833,11 +1883,66 @@ with matchup_tab:
                     "Run the GitHub Action refresh, then reboot the Streamlit app."
                 )
 
-            display_k = filtered_pitcher_k_matchups.head(int(top_n)).copy()
-            selected_pitcher_row = render_pitcher_matchup_cards(
+            available_pitcher_rows = len(filtered_pitcher_k_matchups)
+            display_k = apply_matchup_row_limit(
+                filtered_pitcher_k_matchups,
+                matchup_rows,
+            )
+            display_k = prepare_pitcher_matchup_table(display_k)
+
+            k_cols = [
+                "grade_bar",
+                "game",
+                "weather_icon_url",
+                "pitcher_team_logo",
+                "pitcher_team",
+                "pitcher",
+                "pitcher_hand",
+                "opponent_logo",
+                "opponent",
+                "Season IP",
+                "GS",
+                "Projected IP",
+                "Projected Pitch Count",
+                "Projected Ks",
+                "ERA",
+                "WHIP",
+                "K%",
+                "K/9",
+                "SwStr%",
+                "opponent_avg_k%",
+                "venue_name",
+                "roof_type",
+                "weather_condition",
+                "weather_display",
+                "humidity_pct",
+                "precip_probability_pct",
+                "wind_speed_mph",
+                "wind_direction_cardinal",
+                "wind_field_direction",
+                "wind_out_mph",
+                "weather_edge",
+                "base_k_matchup_score",
+                "weather_k_adjustment",
+                "k_matchup_score",
+                "k_matchup_grade",
+            ]
+            k_cols = [column for column in k_cols if column in display_k.columns]
+
+            st.html(
+                f'<div class="research-table-note">Showing {len(display_k):,} '
+                f'of {available_pitcher_rows:,} matchups. Click a pitcher name '
+                "cell to open the career opponent game log.</div>"
+            )
+            k_event = show_table(
+                display_k[k_cols],
+                key=f"pitcher_k_table_{selected_game}_{matchup_rows}",
+                selectable_column="pitcher",
+            )
+            selected_pitcher_row = selected_name_row(
+                k_event,
                 display_k,
-                selection_key="selected_pitcher_matchup",
-                key_prefix="k",
+                "pitcher",
             )
 
             if selected_pitcher_row is not None:

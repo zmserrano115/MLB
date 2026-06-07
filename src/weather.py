@@ -45,20 +45,20 @@ WEATHER_CODES = {
 def weather_icon(condition):
     text = str(condition or "").lower()
     if "thunder" in text:
-        return "⚡"
+        return "storm"
     if "rain" in text or "drizzle" in text or "shower" in text:
-        return "☂"
+        return "rain"
     if "snow" in text:
-        return "❄"
+        return "snow"
     if "fog" in text:
-        return "≋"
+        return "fog"
     if "clear" in text and "mostly" not in text:
-        return "☀"
+        return "clear"
     if "mostly clear" in text or "partly cloudy" in text:
-        return "⛅"
+        return "partly-cloudy"
     if "overcast" in text or "cloud" in text:
-        return "☁"
-    return "?"
+        return "cloudy"
+    return "unknown"
 
 
 def field_wind_arrow(field_direction):
@@ -296,9 +296,9 @@ def build_game_weather(game, forecast_data):
         summary += f" | Rain {precipitation_probability:.0f}%"
     icon = weather_icon(condition)
     arrow = field_wind_arrow(field_direction)
-    weather_display = icon
+    weather_display = condition
     if temp_f is not None:
-        weather_display += f" {temp_f:.0f}°"
+        weather_display = f"{temp_f:.0f}°"
     wind_display = arrow
     if wind_speed is not None:
         wind_display += f" {wind_speed:.0f}"
@@ -371,8 +371,8 @@ def enrich_schedule_with_weather(schedule_df, forecast_loader=None):
             game.update(
                 {
                     "weather_status": "Venue forecast unavailable",
-                    "weather_icon": "?",
-                    "weather_display": "?",
+                    "weather_icon": "unknown",
+                    "weather_display": "N/A",
                     "weather_tooltip": "Forecast unavailable.",
                     "weather_summary": "Forecast unavailable",
                     "weather_edge": "Neutral",
@@ -400,8 +400,8 @@ def enrich_schedule_with_weather(schedule_df, forecast_loader=None):
             game.update(
                 {
                     "weather_status": f"Forecast unavailable: {error}",
-                    "weather_icon": "?",
-                    "weather_display": "?",
+                    "weather_icon": "unknown",
+                    "weather_display": "N/A",
                     "weather_tooltip": "Forecast unavailable.",
                     "weather_summary": "Forecast unavailable",
                     "weather_edge": "Neutral",
