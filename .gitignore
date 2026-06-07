@@ -18,21 +18,22 @@ Thumbs.db
 # VS Code settings
 .vscode/
 
-# Local logs
+# Local logs and obsolete CSV/cache outputs
 data/nightly_refresh_log.txt
-
-# Local season stats cache
 data/batters_*.csv
 data/pitchers_*.csv
+data/matchup_cache.json
+data/precomputed/
 
-# PyBaseball cache
+# Historical import scratch files
+data/retrosheet/
+data/*csvs.zip
+
+# SQLite transient files
+data/mlb.db
+data/*.db-wal
+data/*.db-shm
+
+# Legacy PyBaseball cache
 pybaseball/
 .cache/
-
-# Keep precomputed cloud files
-!data/precomputed/
-!data/precomputed/*.csv
-!data/precomputed/*.json
-
-# Keep cloud matchup cache because it stores preloaded game logs
-!data/matchup_cache.json

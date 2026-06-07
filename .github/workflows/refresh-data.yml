@@ -1,57 +1,47 @@
-name: Refresh MLB matchup data
+name: Refresh completed MLB games
 
 on:
-  schedule:
-    # 1:30 PM Mountain Time - refresh today's slate
-    - cron: "30 13 * * *"
-      timezone: "America/Denver"
+  push:
+    branches:
+      - main
 
-    # 11:30 PM Mountain Time - refresh tomorrow's slate
-    - cron: "30 23 * * *"
+  schedule:
+    - cron: "30 3 * * *"
       timezone: "America/Denver"
 
   workflow_dispatch:
     inputs:
       game_date:
-        description: "Optional game date in YYYY-MM-DD format. Leave blank to use today's date."
+        description: "Last date to check (YYYY-MM-DD). Blank means yesterday."
         required: false
         type: string
-
-      build_game_logs:
-        description: "Build game logs?"
+      lookback_days:
+        description: "Number of dates to recheck"
         required: true
-        default: "true"
-        type: choice
-        options:
-          - "true"
-          - "false"
-
-      max_game_logs:
-        description: "Maximum game logs to build"
-        required: true
-        default: "100"
+        default: "3"
         type: string
-
-      minimum_pa:
-        description: "Minimum PA"
-        required: true
-        default: "100"
-        type: string
-
-      test_only:
-        description: "Test workflow only without refreshing data?"
+      reprocess_existing:
+        description: "Replace games already present in SQLite?"
         required: true
         default: "false"
         type: choice
         options:
-          - "true"
           - "false"
+          - "true"
+      test_only:
+        description: "Run syntax/tests without calling StatsAPI?"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: write
 
 concurrency:
-  group: refresh-mlb-data
+  group: refresh-mlb-database
   cancel-in-progress: false
 
 jobs:
@@ -63,110 +53,69 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Test workflow without refresh
-        if: ${{ github.event.inputs.test_only == 'true' }}
-        shell: bash
+      - name: Run tests
         run: |
-          echo "Testing Python syntax and refresh script arguments..."
-          python -m py_compile refresh_nightly.py src/stat_data.py src/matchups.py src/mlb_schedule.py src/scoring.py app.py
-          python refresh_nightly.py --help
-          echo "Workflow test passed. Skipping full refresh."
+          python -m compileall -q app.py refresh_database.py refresh_nightly.py backfill_database.py src tests
+          python -m unittest discover -s tests -v
 
-      - name: Choose refresh date
+      - name: Download or build SQLite database
+        if: ${{ github.event.inputs.test_only != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data
+          if gh release view mlb-data >/dev/null 2>&1; then
+            gh release download mlb-data --pattern mlb.db --dir data
+          else
+            python backfill_database.py \
+              --start-season 2005 \
+              --end-season 2025 \
+              --db data/mlb.db \
+              --sleep-seconds 0
+          fi
+
+      - name: Refresh final games
         if: ${{ github.event.inputs.test_only != 'true' }}
         shell: bash
         run: |
-          MANUAL_GAME_DATE="${{ github.event.inputs.game_date }}"
+          GAME_DATE="${{ github.event.inputs.game_date }}"
+          LOOKBACK_DAYS="${{ github.event.inputs.lookback_days }}"
+          REPROCESS="${{ github.event.inputs.reprocess_existing }}"
 
-          if [ -n "$MANUAL_GAME_DATE" ]; then
-            GAME_DATE="$MANUAL_GAME_DATE"
-            REFRESH_TYPE="manual custom date"
-
-          elif [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" = "30 23 * * *" ]; then
-            GAME_DATE=$(TZ="America/Denver" date -d "tomorrow" +"%Y-%m-%d")
-            REFRESH_TYPE="scheduled 11:30 PM tomorrow slate"
-
-          else
-            GAME_DATE=$(TZ="America/Denver" date +"%Y-%m-%d")
-            REFRESH_TYPE="scheduled/manual today slate"
+          if [ -z "$GAME_DATE" ]; then
+            GAME_DATE=$(TZ="America/Denver" date -d "yesterday" +"%Y-%m-%d")
+          fi
+          if [ -z "$LOOKBACK_DAYS" ]; then
+            LOOKBACK_DAYS="3"
           fi
 
-          echo "GAME_DATE=$GAME_DATE" >> "$GITHUB_ENV"
-          echo "REFRESH_TYPE=$REFRESH_TYPE" >> "$GITHUB_ENV"
+          ARGS=(--date "$GAME_DATE" --lookback-days "$LOOKBACK_DAYS")
+          if [ "$REPROCESS" = "true" ]; then
+            ARGS+=(--reprocess-existing)
+          fi
 
-          echo "Selected game date: $GAME_DATE"
-          echo "Refresh type: $REFRESH_TYPE"
+          python refresh_nightly.py "${ARGS[@]}"
 
-      - name: Refresh MLB data
+      - name: Publish refreshed SQLite database
         if: ${{ github.event.inputs.test_only != 'true' }}
-        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          BUILD_GAME_LOGS="${{ github.event.inputs.build_game_logs }}"
-          MAX_GAME_LOGS="${{ github.event.inputs.max_game_logs }}"
-          MINIMUM_PA="${{ github.event.inputs.minimum_pa }}"
-
-          if [ -z "$BUILD_GAME_LOGS" ]; then
-            BUILD_GAME_LOGS="true"
-          fi
-
-          if [ -z "$MAX_GAME_LOGS" ]; then
-            MAX_GAME_LOGS="100"
-          fi
-
-          if [ -z "$MINIMUM_PA" ]; then
-            MINIMUM_PA="100"
-          fi
-
-          echo "Running refresh for game date: $GAME_DATE"
-          echo "Build game logs: $BUILD_GAME_LOGS"
-          echo "Max game logs: $MAX_GAME_LOGS"
-          echo "Minimum PA: $MINIMUM_PA"
-
-          if [ "$BUILD_GAME_LOGS" = "true" ]; then
-            python refresh_nightly.py \
-              --date "$GAME_DATE" \
-              --min-pa "$MINIMUM_PA" \
-              --build-game-logs \
-              --max-game-logs "$MAX_GAME_LOGS"
+          if gh release view mlb-data >/dev/null 2>&1; then
+            gh release upload mlb-data data/mlb.db --clobber
           else
-            python refresh_nightly.py \
-              --date "$GAME_DATE" \
-              --min-pa "$MINIMUM_PA" \
-              --max-game-logs "$MAX_GAME_LOGS"
-          fi
-
-      - name: Commit refreshed data and cache
-        if: ${{ github.event.inputs.test_only != 'true' }}
-        shell: bash
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Pull latest remote before committing. Autostash prevents unstaged-change rebase errors.
-          git pull --rebase --autostash origin main
-
-          # Remove Python cache files so they do not get committed or block the action.
-          find . -type d -name "__pycache__" -prune -exec rm -rf {} +
-          find . -name "*.pyc" -delete
-
-          # Stage only refreshed data files.
-          git add data
-
-          if git diff --cached --quiet; then
-            echo "No refreshed data changes to commit."
-          else
-            git commit -m "Refresh MLB matchup data for $GAME_DATE"
-            git push origin main
+            gh release create mlb-data data/mlb.db \
+              --title "MLB SQLite data" \
+              --notes "Retrosheet 2005-2025 history plus completed current-season StatsAPI updates."
           fi

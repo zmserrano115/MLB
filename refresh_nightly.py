@@ -1,326 +1,126 @@
-# refresh_nightly.py
-
-from datetime import date, datetime
-from pathlib import Path
 import argparse
+from collections import defaultdict
+from datetime import date, datetime, timedelta
+from pathlib import Path
 import traceback
-import json
 
-from src.mlb_schedule import get_daily_schedule
-from src.stat_data import (
-    get_batter_stats,
-    get_pitcher_stats,
-    clear_matchup_cache,
-    get_batter_vs_pitcher_game_log
-)
-from src.matchups import (
-    build_batter_vs_pitcher_matchups,
-    build_batter_vs_hand_matchups,
-    build_pitcher_k_matchups
-)
+from refresh_database import refresh_completed_games
+from src import database
 
 
-DATA_DIR = Path("data")
-DATA_DIR.mkdir(exist_ok=True)
-
-PRECOMPUTED_DIR = DATA_DIR / "precomputed"
-PRECOMPUTED_DIR.mkdir(exist_ok=True)
-
-LOG_FILE = DATA_DIR / "nightly_refresh_log.txt"
-
-
-def write_log(message):
-    """
-    Writes progress messages to the terminal and to a log file.
-    """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    full_message = f"[{timestamp}] {message}"
-
-    print(full_message)
-
-    with open(LOG_FILE, "a", encoding="utf-8") as file:
-        file.write(full_message + "\n")
-
-
-def save_dataframe(df, file_name):
-    """
-    Saves a dataframe to data/precomputed.
-    """
-    file_path = PRECOMPUTED_DIR / file_name
-
-    if df is None or df.empty:
-        file_path.write_text("", encoding="utf-8")
-        return
-
-    df.to_csv(file_path, index=False)
-
-
-def save_metadata(
-    game_date,
-    season,
-    min_pa,
-    schedule_rows,
-    bvp_rows,
-    hand_rows,
-    k_rows,
-    game_logs_built
-):
-    """
-    Saves refresh information so the app/user can see when data was last updated.
-    """
-    metadata = {
-        "last_refreshed": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "game_date": game_date,
-        "season": season,
-        "minimum_pa": min_pa,
-        "schedule_rows": schedule_rows,
-        "batter_vs_pitcher_rows": bvp_rows,
-        "batter_vs_hand_rows": hand_rows,
-        "pitcher_k_rows": k_rows,
-        "game_logs_preloaded": game_logs_built
-    }
-
-    metadata_path = PRECOMPUTED_DIR / "latest_metadata.json"
-
-    with open(metadata_path, "w", encoding="utf-8") as file:
-        json.dump(metadata, file, indent=4)
-
-
-def build_precomputed_game_logs(bvp_matchups, season, max_game_logs):
-    """
-    Preloads career game logs for Batter vs Pitcher matchups with history.
-
-    This makes the Streamlit Cloud app faster because clicked game logs
-    can load from data/matchup_cache.json instead of pulling live.
-    """
-    if bvp_matchups is None or bvp_matchups.empty:
-        write_log("No BvP matchups available for game-log preloading.")
-        return 0
-
-    required_cols = [
-        "batter",
-        "batter_id",
-        "opposing_pitcher",
-        "opposing_pitcher_id",
-        "PA"
-    ]
-
-    missing_cols = [
-        col for col in required_cols if col not in bvp_matchups.columns
-    ]
-
-    if missing_cols:
-        write_log(f"Skipping game-log preload. Missing columns: {missing_cols}")
-        return 0
-
-    matchups_with_history = bvp_matchups[
-        bvp_matchups["PA"] > 0
-    ].copy()
-
-    if matchups_with_history.empty:
-        write_log("No BvP rows with PA > 0. No game logs to preload.")
-        return 0
-
-    matchups_with_history = matchups_with_history.sort_values(
-        "PA",
-        ascending=False
-    )
-
-    matchups_to_build = matchups_with_history.head(max_game_logs)
-
-    write_log(
-        f"Preloading {len(matchups_to_build)} career BvP game logs "
-        f"out of {len(matchups_with_history)} matchups with history."
-    )
-
-    built_count = 0
-
-    for _, row in matchups_to_build.iterrows():
-        batter = row.get("batter")
-        pitcher = row.get("opposing_pitcher")
-        batter_id = row.get("batter_id")
-        pitcher_id = row.get("opposing_pitcher_id")
-
-        if batter_id is None or pitcher_id is None:
-            continue
-
-        write_log(f"Preloading game log: {batter} vs {pitcher}")
-
-        game_log_df = get_batter_vs_pitcher_game_log(
-            batter_id=int(batter_id),
-            pitcher_id=int(pitcher_id),
-            season=season
-        )
-
-        if game_log_df is not None and not game_log_df.empty:
-            built_count += 1
-
-    write_log(f"Career game logs successfully preloaded: {built_count}")
-
-    return built_count
+def refresh_dates(end_date, lookback_days):
+    end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    start = end - timedelta(days=max(lookback_days, 1) - 1)
+    current = start
+    while current <= end:
+        yield current.strftime("%Y-%m-%d")
+        current += timedelta(days=1)
 
 
 def run_nightly_refresh(
-    game_date,
-    season,
-    min_pa=100,
-    build_game_logs=True,
-    max_game_logs=50
+    end_date,
+    lookback_days=3,
+    game_type="R",
+    reprocess_existing=False,
 ):
-    """
-    Refreshes MLB matchup data.
+    """Update only final-game BvP history and pitcher logs."""
+    database.init_database()
+    totals = defaultdict(int)
+    dates = list(refresh_dates(end_date, lookback_days))
 
-    This script is meant to run locally or through GitHub Actions.
-    """
+    print("========================================")
+    print("Starting nightly completed-game refresh")
+    print(f"Dates: {dates[0]} through {dates[-1]}")
+    print("========================================")
 
-    write_log("========================================")
-    write_log("Starting nightly MLB data refresh")
-    write_log(f"Game date: {game_date}")
-    write_log(f"Season: {season}")
-    write_log(f"Minimum PA: {min_pa}")
-    write_log(f"Build game logs: {build_game_logs}")
-    write_log(f"Max game logs: {max_game_logs}")
-
-    write_log("Pulling daily schedule...")
-    schedule_df = get_daily_schedule(game_date)
-
-    if schedule_df.empty:
-        write_log("No games found for this date. Saving metadata and stopping.")
-
-        save_metadata(
-            game_date=game_date,
-            season=season,
-            min_pa=min_pa,
-            schedule_rows=0,
-            bvp_rows=0,
-            hand_rows=0,
-            k_rows=0,
-            game_logs_built=0
+    for refresh_date in dates:
+        result = refresh_completed_games(
+            refresh_date=refresh_date,
+            game_type=game_type,
+            reprocess_existing=reprocess_existing,
+            rebuild_after=False,
+            write_refresh_log=False,
         )
+        for key, value in result.items():
+            totals[key] += value
 
-        return
+    print("Rebuilding aggregate matchup and pitcher season summaries...")
+    database.rebuild_all_summary_stats()
 
-    write_log(f"Games found: {len(schedule_df)}")
-
-    write_log("Refreshing batter season stats...")
-    batters_df = get_batter_stats(season, force_refresh=True)
-    write_log(f"Batter rows loaded: {len(batters_df)}")
-
-    write_log("Refreshing pitcher season stats...")
-    pitchers_df = get_pitcher_stats(season, force_refresh=True)
-    write_log(f"Pitcher rows loaded: {len(pitchers_df)}")
-
-    write_log("Clearing old matchup cache...")
-    clear_matchup_cache()
-
-    write_log("Building batter vs opposing pitcher matchups...")
-    bvp_matchups = build_batter_vs_pitcher_matchups(
-        schedule_df=schedule_df,
-        batters_df=batters_df,
-        season=season,
-        min_pa=min_pa
+    status = "success" if totals["errors"] == 0 else "completed_with_errors"
+    message = (
+        f"Dates checked: {len(dates)}. "
+        f"Games checked: {totals['games_checked']}. "
+        f"Games processed: {totals['games_processed']}. "
+        f"Plate appearances loaded: {totals['plate_appearances_loaded']}. "
+        f"Pitcher logs loaded: {totals['pitcher_logs_loaded']}. "
+        f"Errors: {totals['errors']}."
     )
-    write_log(f"Batter vs pitcher rows built: {len(bvp_matchups)}")
-
-    write_log("Building batter vs pitcher-hand matchups...")
-    hand_matchups = build_batter_vs_hand_matchups(
-        schedule_df=schedule_df,
-        batters_df=batters_df,
-        season=season,
-        min_pa=min_pa
-    )
-    write_log(f"Batter vs hand rows built: {len(hand_matchups)}")
-
-    write_log("Building pitcher strikeout matchups...")
-    pitcher_k_matchups = build_pitcher_k_matchups(
-        schedule_df=schedule_df,
-        batters_df=batters_df,
-        pitchers_df=pitchers_df,
-        min_pa=min_pa
-    )
-    write_log(f"Pitcher K matchup rows built: {len(pitcher_k_matchups)}")
-
-    game_logs_built = 0
-
-    if build_game_logs:
-        game_logs_built = build_precomputed_game_logs(
-            bvp_matchups=bvp_matchups,
-            season=season,
-            max_game_logs=max_game_logs
-        )
-
-    write_log("Saving precomputed data files...")
-    save_dataframe(schedule_df, "latest_schedule.csv")
-    save_dataframe(bvp_matchups, "latest_batter_vs_pitcher.csv")
-    save_dataframe(hand_matchups, "latest_batter_vs_hand.csv")
-    save_dataframe(pitcher_k_matchups, "latest_pitcher_k_matchups.csv")
-
-    save_metadata(
-        game_date=game_date,
-        season=season,
-        min_pa=min_pa,
-        schedule_rows=len(schedule_df),
-        bvp_rows=len(bvp_matchups),
-        hand_rows=len(hand_matchups),
-        k_rows=len(pitcher_k_matchups),
-        game_logs_built=game_logs_built
+    database.log_refresh(
+        refresh_type="nightly_completed_games",
+        refresh_date=f"{dates[0]}_to_{dates[-1]}",
+        games_checked=totals["games_checked"],
+        games_processed=totals["games_processed"],
+        plate_appearances_loaded=totals["plate_appearances_loaded"],
+        pitcher_logs_loaded=totals["pitcher_logs_loaded"],
+        status=status,
+        message=message,
     )
 
-    write_log("Nightly refresh completed successfully")
-    write_log("========================================")
+    print(message)
+    database.print_database_counts()
+    return dict(totals)
 
 
 def main():
-    parser = argparse.ArgumentParser()
-
+    parser = argparse.ArgumentParser(
+        description=(
+            "Refresh final MLB games from StatsAPI. This job does not build "
+            "future schedules or precomputed matchup CSV files."
+        )
+    )
     parser.add_argument(
         "--date",
-        default=date.today().strftime("%Y-%m-%d"),
-        help="Game date to refresh, format YYYY-MM-DD"
+        default=(date.today() - timedelta(days=1)).strftime("%Y-%m-%d"),
+        help="Last completed-game date to check. Defaults to yesterday.",
     )
-
     parser.add_argument(
-        "--season",
-        default=date.today().year,
+        "--lookback-days",
         type=int,
-        help="MLB season year"
+        default=3,
+        help="Number of dates ending at --date to recheck for late finals.",
     )
-
-    parser.add_argument(
-        "--min-pa",
-        default=100,
-        type=int,
-        help="Minimum season plate appearances to include hitters"
-    )
-
-    parser.add_argument(
-        "--build-game-logs",
-        action="store_true",
-        help="Preload career BvP game logs into data/matchup_cache.json"
-    )
-
-    parser.add_argument(
-        "--max-game-logs",
-        default=50,
-        type=int,
-        help="Maximum number of career BvP game logs to preload"
-    )
-
+    parser.add_argument("--game-type", default="R")
+    parser.add_argument("--reprocess-existing", action="store_true")
+    parser.add_argument("--db", help="Optional SQLite path.")
     args = parser.parse_args()
+
+    if args.db:
+        database.DB_PATH = Path(args.db).expanduser().resolve()
 
     try:
         run_nightly_refresh(
-            game_date=args.date,
-            season=args.season,
-            min_pa=args.min_pa,
-            build_game_logs=args.build_game_logs,
-            max_game_logs=args.max_game_logs
+            end_date=args.date,
+            lookback_days=args.lookback_days,
+            game_type=args.game_type,
+            reprocess_existing=args.reprocess_existing,
         )
-
     except Exception as error:
-        write_log("ERROR during nightly refresh")
-        write_log(str(error))
-        write_log(traceback.format_exc())
+        try:
+            database.log_refresh(
+                refresh_type="nightly_completed_games",
+                refresh_date=args.date,
+                games_checked=0,
+                games_processed=0,
+                plate_appearances_loaded=0,
+                pitcher_logs_loaded=0,
+                status="error",
+                message=str(error),
+            )
+        except Exception:
+            pass
+        print("ERROR during nightly completed-game refresh")
+        traceback.print_exc()
         raise
 
 

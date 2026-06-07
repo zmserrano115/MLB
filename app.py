@@ -1,11 +1,9 @@
 from datetime import date
-from pathlib import Path
+import os
 from urllib.parse import quote
-import json
 
 import pandas as pd
 import streamlit as st
-from pandas.errors import EmptyDataError
 
 from src.mlb_schedule import get_daily_schedule
 from src.stat_data import (
@@ -19,15 +17,13 @@ from src.matchups import (
     build_batter_vs_hand_matchups,
     build_pitcher_k_matchups,
 )
+from src import database
 
 
 st.set_page_config(
     page_title="All Rise Analytics",
     layout="wide",
 )
-
-
-PRECOMPUTED_DIR = Path("data") / "precomputed"
 
 
 TEAM_ID_BY_NAME = {
@@ -757,54 +753,6 @@ def show_table(df, key=None, selectable=False):
     return st.dataframe(**kwargs)
 
 
-def read_precomputed_csv(file_name):
-    file_path = PRECOMPUTED_DIR / file_name
-
-    if not file_path.exists():
-        return pd.DataFrame()
-
-    try:
-        return pd.read_csv(file_path)
-    except EmptyDataError:
-        return pd.DataFrame()
-    except Exception:
-        return pd.DataFrame()
-
-
-def read_precomputed_metadata():
-    file_path = PRECOMPUTED_DIR / "latest_metadata.json"
-
-    if not file_path.exists():
-        return {}
-
-    try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            return json.load(file)
-    except Exception:
-        return {}
-
-
-def precomputed_files_available():
-    required_files = [
-        PRECOMPUTED_DIR / "latest_schedule.csv",
-        PRECOMPUTED_DIR / "latest_batter_vs_pitcher.csv",
-        PRECOMPUTED_DIR / "latest_batter_vs_hand.csv",
-        PRECOMPUTED_DIR / "latest_pitcher_k_matchups.csv",
-    ]
-
-    return all(file.exists() for file in required_files)
-
-
-def load_precomputed_data():
-    schedule_df = read_precomputed_csv("latest_schedule.csv")
-    bvp_matchups = read_precomputed_csv("latest_batter_vs_pitcher.csv")
-    hand_matchups = read_precomputed_csv("latest_batter_vs_hand.csv")
-    pitcher_k_matchups = read_precomputed_csv("latest_pitcher_k_matchups.csv")
-    metadata = read_precomputed_metadata()
-
-    return schedule_df, bvp_matchups, hand_matchups, pitcher_k_matchups, metadata
-
-
 def add_game_column(df):
     if df.empty:
         return df
@@ -1066,8 +1014,12 @@ def display_pitcher_vs_team_game_log(selected_row):
 
 
 current_year = date.today().year
-has_precomputed = precomputed_files_available()
-use_precomputed = has_precomputed
+try:
+    if "MLB_DB_URL" in st.secrets:
+        os.environ.setdefault("MLB_DB_URL", st.secrets["MLB_DB_URL"])
+except Exception:
+    pass
+database.init_database()
 
 
 with st.sidebar:
@@ -1114,62 +1066,46 @@ def load_pitcher_stats(season, force_refresh):
     return get_pitcher_stats(season, force_refresh=force_refresh)
 
 
-cloud_status_html = ""
+schedule_df = load_schedule(selected_date)
 
-if use_precomputed and has_precomputed:
-    schedule_df, bvp_matchups, hand_matchups, pitcher_k_matchups, metadata = load_precomputed_data()
-    season = int(metadata.get("season", season))
+if schedule_df.empty:
+    st.warning("No MLB games found for this date.")
+    st.stop()
 
-    cloud_status_html = f"""
-    <div class="status-box">
-        <b>Data Mode:</b> Cloud precomputed data<br>
-        <b>Last refreshed:</b> {metadata.get("last_refreshed", "Unknown")}<br>
-        <b>Game date:</b> {metadata.get("game_date", "Unknown")} |
-        <b>Season:</b> {metadata.get("season", "Unknown")} |
-        <b>Minimum PA:</b> {metadata.get("minimum_pa", "Unknown")}
-    </div>
-    """
+batters_df = load_batter_stats(season, force_refresh)
+pitchers_df = load_pitcher_stats(season, force_refresh)
 
-else:
-    schedule_df = load_schedule(selected_date)
+cloud_status_html = """
+<div class="status-box">
+    <b>Data Mode:</b> Live schedule and probable pitchers + SQLite history<br>
+    Future slates are pulled on demand. Completed-game matchup and pitcher
+    history comes from the local database.
+</div>
+"""
 
-    if schedule_df.empty:
-        st.warning("No MLB games found for this date.")
-        st.stop()
+with st.spinner("Building batter vs pitcher matchups..."):
+    bvp_matchups = build_batter_vs_pitcher_matchups(
+        schedule_df=schedule_df,
+        batters_df=batters_df,
+        season=season,
+        min_pa=min_pa,
+    )
 
-    batters_df = load_batter_stats(season, force_refresh)
-    pitchers_df = load_pitcher_stats(season, force_refresh)
+with st.spinner("Building batter vs pitcher hand matchups..."):
+    hand_matchups = build_batter_vs_hand_matchups(
+        schedule_df=schedule_df,
+        batters_df=batters_df,
+        season=season,
+        min_pa=min_pa,
+    )
 
-    cloud_status_html = """
-    <div class="status-box">
-        <b>Data Mode:</b> Live data build<br>
-        Live mode may take longer because the app is not using precomputed cloud files.
-    </div>
-    """
-
-    with st.spinner("Building batter vs pitcher matchups..."):
-        bvp_matchups = build_batter_vs_pitcher_matchups(
-            schedule_df=schedule_df,
-            batters_df=batters_df,
-            season=season,
-            min_pa=min_pa,
-        )
-
-    with st.spinner("Building batter vs pitcher hand matchups..."):
-        hand_matchups = build_batter_vs_hand_matchups(
-            schedule_df=schedule_df,
-            batters_df=batters_df,
-            season=season,
-            min_pa=min_pa,
-        )
-
-    with st.spinner("Building pitcher strikeout matchups..."):
-        pitcher_k_matchups = build_pitcher_k_matchups(
-            schedule_df=schedule_df,
-            batters_df=batters_df,
-            pitchers_df=pitchers_df,
-            min_pa=min_pa,
-        )
+with st.spinner("Building pitcher strikeout matchups..."):
+    pitcher_k_matchups = build_pitcher_k_matchups(
+        schedule_df=schedule_df,
+        batters_df=batters_df,
+        pitchers_df=pitchers_df,
+        min_pa=min_pa,
+    )
 
 
 if schedule_df.empty:
@@ -1211,10 +1147,7 @@ filtered_hand_matchups = filter_by_game(hand_matchups, selected_game)
 filtered_pitcher_k_matchups = filter_by_game(pitcher_k_matchups, selected_game)
 
 
-if use_precomputed and has_precomputed:
-    display_game_date = format_display_date(metadata.get("game_date", selected_date))
-else:
-    display_game_date = format_display_date(selected_date)
+display_game_date = format_display_date(selected_date)
 
 
 main_tab, matchup_tab, info_tab = st.tabs(

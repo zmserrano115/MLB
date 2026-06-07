@@ -1,4 +1,5 @@
 import argparse
+from collections import defaultdict
 from datetime import date, timedelta
 import traceback
 
@@ -6,10 +7,11 @@ import requests
 
 from src.database import (
     init_database,
-    upsert_game,
-    insert_plate_appearance,
-    rebuild_batter_pitcher_stats,
+    is_game_processed,
+    save_completed_game,
+    rebuild_all_summary_stats,
     log_refresh,
+    print_database_counts,
 )
 
 
@@ -17,11 +19,91 @@ MLB_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule"
 MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
 
 
-def get_schedule_for_date(game_date):
+PA_EVENT_TYPES = {
+    "single",
+    "double",
+    "triple",
+    "home_run",
+    "walk",
+    "intent_walk",
+    "hit_by_pitch",
+    "strikeout",
+    "strikeout_double_play",
+    "field_out",
+    "force_out",
+    "grounded_into_double_play",
+    "double_play",
+    "triple_play",
+    "fielders_choice",
+    "fielders_choice_out",
+    "field_error",
+    "sac_fly",
+    "sac_bunt",
+    "sac_fly_double_play",
+    "sac_bunt_double_play",
+    "catcher_interf",
+    "other_out",
+}
+
+NON_AB_EVENT_TYPES = {
+    "walk",
+    "intent_walk",
+    "hit_by_pitch",
+    "sac_fly",
+    "sac_bunt",
+    "sac_fly_double_play",
+    "sac_bunt_double_play",
+    "catcher_interf",
+}
+
+HIT_EVENT_TYPES = {
+    "single",
+    "double",
+    "triple",
+    "home_run",
+}
+
+
+def safe_int(value, default=0):
+    try:
+        if value is None or value == "":
+            return default
+        return int(value)
+    except Exception:
+        return default
+
+
+def ip_to_outs(ip_value):
+    if ip_value is None:
+        return 0
+
+    text = str(ip_value).strip()
+
+    if text == "":
+        return 0
+
+    if "." not in text:
+        return safe_int(text) * 3
+
+    innings, outs = text.split(".", 1)
+
+    return safe_int(innings) * 3 + safe_int(outs)
+
+
+def outs_to_baseball_ip(outs):
+    if outs is None:
+        return 0.0
+
+    outs = int(outs)
+    return (outs // 3) + (outs % 3) / 10.0
+
+
+def get_schedule_for_date(game_date, game_type="R"):
     params = {
         "sportId": 1,
         "date": game_date,
         "hydrate": "probablePitcher",
+        "gameType": game_type,
     }
 
     response = requests.get(MLB_SCHEDULE_URL, params=params, timeout=30)
@@ -82,26 +164,52 @@ def get_game_feed(game_pk):
     return response.json()
 
 
-def get_team_name_from_feed(feed, team_type):
-    try:
-        return feed["gameData"]["teams"][team_type]["name"]
-    except Exception:
-        return None
+def get_total_bases(event_type):
+    if event_type == "single":
+        return 1
+
+    if event_type == "double":
+        return 2
+
+    if event_type == "triple":
+        return 3
+
+    if event_type == "home_run":
+        return 4
+
+    return 0
 
 
-def parse_plate_appearances(feed, game):
+def parse_game_to_batter_pitcher_logs(feed, game):
     all_plays = feed.get("liveData", {}).get("plays", {}).get("allPlays", [])
 
     away_team = game.get("away_team")
     home_team = game.get("home_team")
 
-    plate_appearances = []
+    grouped_logs = defaultdict(
+        lambda: {
+            "PA": 0,
+            "AB": 0,
+            "H": 0,
+            "doubles": 0,
+            "triples": 0,
+            "BB": 0,
+            "HBP": 0,
+            "SO": 0,
+            "HR": 0,
+            "RBI": 0,
+            "SF": 0,
+            "TB": 0,
+        }
+    )
 
-    for play_index, play in enumerate(all_plays):
+    players = {}
+    plate_appearances_loaded = 0
+
+    for play in all_plays:
         matchup = play.get("matchup", {})
         result = play.get("result", {})
         about = play.get("about", {})
-        count = play.get("count", {})
 
         batter = matchup.get("batter", {})
         pitcher = matchup.get("pitcher", {})
@@ -113,10 +221,16 @@ def parse_plate_appearances(feed, game):
             continue
 
         event_type = result.get("eventType")
-        event_name = result.get("event")
-        description = result.get("description")
 
-        inning = about.get("inning")
+        if event_type not in PA_EVENT_TYPES:
+            continue
+
+        batter_name = batter.get("fullName")
+        pitcher_name = pitcher.get("fullName")
+
+        players[batter_id] = batter_name
+        players[pitcher_id] = pitcher_name
+
         half_inning = about.get("halfInning")
 
         if half_inning == "top":
@@ -126,102 +240,282 @@ def parse_plate_appearances(feed, game):
             batting_team = home_team
             pitching_team = away_team
 
-        rbi = int(result.get("rbi", 0) or 0)
+        key = (
+            int(game.get("game_pk")),
+            int(batter_id),
+            int(pitcher_id),
+            batting_team,
+            pitching_team,
+        )
 
-        is_bb = 1 if event_type in ["walk", "intent_walk"] else 0
-        is_hbp = 1 if event_type == "hit_by_pitch" else 0
-        is_so = 1 if event_type in ["strikeout", "strikeout_double_play"] else 0
-        is_hr = 1 if event_type == "home_run" else 0
+        log = grouped_logs[key]
 
-        hit_events = [
-            "single",
-            "double",
-            "triple",
-            "home_run",
-        ]
+        log["PA"] += 1
+        log["RBI"] += safe_int(result.get("rbi"), 0)
 
-        is_hit = 1 if event_type in hit_events else 0
+        if event_type not in NON_AB_EVENT_TYPES:
+            log["AB"] += 1
 
-        non_ab_events = [
-            "walk",
-            "intent_walk",
-            "hit_by_pitch",
-            "sac_bunt",
-            "sac_fly",
-            "catcher_interf",
-            "sac_fly_double_play",
-            "sac_bunt_double_play",
-        ]
+        if event_type in HIT_EVENT_TYPES:
+            log["H"] += 1
 
-        is_ab = 0 if event_type in non_ab_events else 1
+        if event_type == "double":
+            log["doubles"] += 1
 
-        pa_key = f"{game.get('game_pk')}_{play_index}_{batter_id}_{pitcher_id}"
+        if event_type == "triple":
+            log["triples"] += 1
 
-        plate_appearances.append(
+        if event_type in ["walk", "intent_walk"]:
+            log["BB"] += 1
+
+        if event_type == "hit_by_pitch":
+            log["HBP"] += 1
+
+        if event_type in ["strikeout", "strikeout_double_play"]:
+            log["SO"] += 1
+
+        if event_type == "home_run":
+            log["HR"] += 1
+
+        if event_type in ["sac_fly", "sac_fly_double_play"]:
+            log["SF"] += 1
+
+        log["TB"] += get_total_bases(event_type)
+
+        plate_appearances_loaded += 1
+
+    game_logs = []
+
+    for key, values in grouped_logs.items():
+        game_pk, batter_id, pitcher_id, batting_team, pitching_team = key
+
+        game_logs.append(
             {
-                "pa_key": pa_key,
-                "game_pk": game.get("game_pk"),
+                "game_pk": game_pk,
                 "game_date": game.get("game_date"),
                 "season": game.get("season"),
-                "inning": inning,
-                "half_inning": half_inning,
                 "batter_id": batter_id,
-                "batter_name": batter.get("fullName"),
                 "pitcher_id": pitcher_id,
-                "pitcher_name": pitcher.get("fullName"),
                 "batting_team": batting_team,
                 "pitching_team": pitching_team,
-                "event_type": event_name or event_type,
-                "description": description,
-                "is_ab": is_ab,
-                "is_hit": is_hit,
-                "is_bb": is_bb,
-                "is_hbp": is_hbp,
-                "is_so": is_so,
-                "is_hr": is_hr,
-                "rbi": rbi,
+                **values,
             }
         )
 
-    return plate_appearances
+    return players, game_logs, plate_appearances_loaded
 
 
-def refresh_completed_games(refresh_date):
-    init_database()
+def parse_pitcher_game_logs(feed, game):
+    boxscore = feed.get("liveData", {}).get("boxscore", {}).get("teams", {})
 
-    games = get_schedule_for_date(refresh_date)
+    pitcher_logs = []
+    players = {}
 
-    games_checked = 0
-    plate_appearances_added = 0
+    for side in ["away", "home"]:
+        team_box = boxscore.get(side, {})
+        team_name = game.get("away_team") if side == "away" else game.get("home_team")
+        opponent_name = game.get("home_team") if side == "away" else game.get("away_team")
 
-    for game in games:
-        upsert_game(game)
-        games_checked += 1
+        pitcher_ids = team_box.get("pitchers", []) or []
+        player_dict = team_box.get("players", {}) or {}
 
-        if not is_completed_game(game):
-            continue
+        starter_id = pitcher_ids[0] if pitcher_ids else None
 
-        feed = get_game_feed(game["game_pk"])
-        plate_appearances = parse_plate_appearances(feed, game)
+        for pitcher_id in pitcher_ids:
+            player = player_dict.get(f"ID{pitcher_id}", {})
 
-        for pa in plate_appearances:
-            plate_appearances_added += insert_plate_appearance(pa)
+            if not player:
+                continue
 
-    rebuild_batter_pitcher_stats()
+            person = player.get("person", {})
+            pitcher_name = person.get("fullName")
 
-    log_refresh(
-        refresh_type="completed_games",
-        refresh_date=refresh_date,
-        games_checked=games_checked,
-        plate_appearances_added=plate_appearances_added,
-        status="success",
-        message="Database refresh completed.",
+            stats = player.get("stats", {}).get("pitching", {}) or {}
+
+            if not stats:
+                continue
+
+            ip_outs = ip_to_outs(stats.get("inningsPitched"))
+
+            players[pitcher_id] = pitcher_name
+
+            pitcher_logs.append(
+                {
+                    "game_pk": game.get("game_pk"),
+                    "game_date": game.get("game_date"),
+                    "season": game.get("season"),
+                    "pitcher_id": int(pitcher_id),
+                    "pitcher_name": pitcher_name,
+                    "team": team_name,
+                    "opponent": opponent_name,
+                    "is_starter": 1 if pitcher_id == starter_id else 0,
+                    "IP_outs": ip_outs,
+                    "IP": outs_to_baseball_ip(ip_outs),
+                    "pitch_count": safe_int(stats.get("numberOfPitches"), 0),
+                    "BF": safe_int(stats.get("battersFaced"), 0),
+                    "H": safe_int(stats.get("hits"), 0),
+                    "BB": safe_int(stats.get("baseOnBalls"), 0),
+                    "HBP": safe_int(stats.get("hitBatsmen"), 0),
+                    "SO": safe_int(stats.get("strikeOuts"), 0),
+                    "HR": safe_int(stats.get("homeRuns"), 0),
+                    "R": safe_int(stats.get("runs"), 0),
+                    "ER": safe_int(stats.get("earnedRuns"), 0),
+                }
+            )
+
+    return players, pitcher_logs
+
+
+def process_completed_game(game, reprocess_existing=False, rebuild_after=False):
+    game_pk = game.get("game_pk")
+
+    if game_pk is None:
+        return {
+            "processed": False,
+            "plate_appearances_loaded": 0,
+            "pitcher_logs_loaded": 0,
+            "message": "Missing gamePk.",
+        }
+
+    if not is_completed_game(game):
+        return {
+            "processed": False,
+            "plate_appearances_loaded": 0,
+            "pitcher_logs_loaded": 0,
+            "message": "Game is not final.",
+        }
+
+    if is_game_processed(game_pk) and not reprocess_existing:
+        return {
+            "processed": False,
+            "plate_appearances_loaded": 0,
+            "pitcher_logs_loaded": 0,
+            "message": "Game already processed.",
+        }
+
+    feed = get_game_feed(game_pk)
+
+    bvp_players, bvp_game_logs, plate_appearances_loaded = parse_game_to_batter_pitcher_logs(feed, game)
+    pitcher_players, pitcher_logs = parse_pitcher_game_logs(feed, game)
+
+    all_players = {}
+    all_players.update(bvp_players)
+    all_players.update(pitcher_players)
+
+    save_completed_game(
+        game=game,
+        players=all_players,
+        batter_pitcher_logs=bvp_game_logs,
+        pitcher_logs=pitcher_logs,
+        plate_appearances_loaded=plate_appearances_loaded,
+        reprocess_existing=reprocess_existing,
     )
 
-    print("Database refresh completed.")
+    if rebuild_after:
+        rebuild_all_summary_stats()
+
+    return {
+        "processed": True,
+        "plate_appearances_loaded": plate_appearances_loaded,
+        "pitcher_logs_loaded": len(pitcher_logs),
+        "message": "Game processed.",
+    }
+
+
+def refresh_completed_games(
+    refresh_date,
+    game_type="R",
+    reprocess_existing=False,
+    rebuild_after=True,
+    write_refresh_log=True,
+):
+    init_database()
+
+    games = get_schedule_for_date(refresh_date, game_type=game_type)
+
+    games_checked = 0
+    games_processed = 0
+    plate_appearances_loaded = 0
+    pitcher_logs_loaded = 0
+    errors = 0
+
+    print("========================================")
+    print("Starting aggregate MLB database refresh")
     print(f"Refresh date: {refresh_date}")
-    print(f"Games checked: {games_checked}")
-    print(f"Plate appearances added: {plate_appearances_added}")
+    print(f"Game type: {game_type}")
+    print("========================================")
+
+    for game in games:
+        games_checked += 1
+
+        try:
+            result = process_completed_game(
+                game,
+                reprocess_existing=reprocess_existing,
+                rebuild_after=False,
+            )
+
+            matchup = f"{game.get('away_team')} @ {game.get('home_team')}"
+
+            if result["processed"]:
+                games_processed += 1
+                plate_appearances_loaded += result["plate_appearances_loaded"]
+                pitcher_logs_loaded += result["pitcher_logs_loaded"]
+
+                print(
+                    f"Processed: {matchup} | "
+                    f"PA loaded: {result['plate_appearances_loaded']} | "
+                    f"Pitcher logs: {result['pitcher_logs_loaded']}"
+                )
+            else:
+                print(f"Skipped: {matchup} | {result['message']}")
+
+        except Exception as error:
+            errors += 1
+            print(f"ERROR processing game {game.get('game_pk')}: {error}")
+            traceback.print_exc()
+
+    if rebuild_after:
+        print("Rebuilding summary stats...")
+        rebuild_all_summary_stats()
+
+    status = "success" if errors == 0 else "completed_with_errors"
+
+    message = (
+        f"Games checked: {games_checked}. "
+        f"Games processed: {games_processed}. "
+        f"Plate appearances loaded: {plate_appearances_loaded}. "
+        f"Pitcher logs loaded: {pitcher_logs_loaded}. "
+        f"Errors: {errors}."
+    )
+
+    if write_refresh_log:
+        log_refresh(
+            refresh_type="daily_completed_games",
+            refresh_date=refresh_date,
+            games_checked=games_checked,
+            games_processed=games_processed,
+            plate_appearances_loaded=plate_appearances_loaded,
+            pitcher_logs_loaded=pitcher_logs_loaded,
+            status=status,
+            message=message,
+        )
+
+    print("========================================")
+    print("Refresh finished")
+    print(message)
+    print("========================================")
+
+    if rebuild_after:
+        print_database_counts()
+
+    return {
+        "games_checked": games_checked,
+        "games_processed": games_processed,
+        "plate_appearances_loaded": plate_appearances_loaded,
+        "pitcher_logs_loaded": pitcher_logs_loaded,
+        "errors": errors,
+    }
 
 
 def main():
@@ -233,6 +527,18 @@ def main():
         help="Date to refresh in YYYY-MM-DD format. Defaults to yesterday.",
     )
 
+    parser.add_argument(
+        "--game-type",
+        default="R",
+        help="MLB game type. R = regular season.",
+    )
+
+    parser.add_argument(
+        "--reprocess-existing",
+        action="store_true",
+        help="Reprocess games even if they were already loaded.",
+    )
+
     args = parser.parse_args()
 
     if args.date:
@@ -241,18 +547,24 @@ def main():
         refresh_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     try:
-        refresh_completed_games(refresh_date)
+        refresh_completed_games(
+            refresh_date=refresh_date,
+            game_type=args.game_type,
+            reprocess_existing=args.reprocess_existing,
+        )
     except Exception as error:
         log_refresh(
-            refresh_type="completed_games",
+            refresh_type="daily_completed_games",
             refresh_date=refresh_date,
             games_checked=0,
-            plate_appearances_added=0,
+            games_processed=0,
+            plate_appearances_loaded=0,
+            pitcher_logs_loaded=0,
             status="error",
             message=str(error),
         )
 
-        print("ERROR during database refresh")
+        print("ERROR during aggregate database refresh")
         print(str(error))
         traceback.print_exc()
         raise
