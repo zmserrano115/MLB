@@ -1,7 +1,6 @@
 from datetime import date
 from html import escape
 import os
-from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
@@ -455,6 +454,121 @@ st.markdown(
         margin: -3px 0 14px 0;
     }
 
+    .matchup-list-head {
+        display: grid;
+        grid-template-columns: 40px 1.55fr 1.45fr 0.55fr 1.35fr 1fr 1fr;
+        gap: 12px;
+        padding: 0 14px 7px 14px;
+        color: var(--muted-2);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+    }
+
+    div[class*="st-key-bvp_card_"],
+    div[class*="st-key-hand_card_"],
+    div[class*="st-key-k_card_"] {
+        background: #ffffff;
+        border-color: var(--line) !important;
+        border-radius: 0 !important;
+        padding: 8px 12px !important;
+        margin-bottom: 6px;
+    }
+
+    div[class*="st-key-bvp_name_"] button,
+    div[class*="st-key-hand_name_"] button,
+    div[class*="st-key-k_name_"] button {
+        color: var(--accent) !important;
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        line-height: 1.2 !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
+    }
+
+    div[class*="st-key-bvp_name_"] button:hover,
+    div[class*="st-key-hand_name_"] button:hover,
+    div[class*="st-key-k_name_"] button:hover {
+        color: #1f5f96 !important;
+        text-decoration: underline;
+    }
+
+    .matchup-primary {
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.35;
+    }
+
+    .matchup-secondary {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.4;
+        margin-top: 2px;
+    }
+
+    .matchup-stat {
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.4;
+    }
+
+    .matchup-weather {
+        cursor: help;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.35;
+        border-bottom: 1px dotted var(--muted-2);
+        width: fit-content;
+    }
+
+    .matchup-grade {
+        display: inline-block;
+        padding: 4px 8px;
+        border: 1px solid currentColor;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .matchup-grade.good {
+        color: #247a4d;
+        background: #edf8f2;
+    }
+
+    .matchup-grade.neutral {
+        color: #9a6810;
+        background: #fff8e8;
+    }
+
+    .matchup-grade.avoid {
+        color: #b43b3b;
+        background: #fff0f0;
+    }
+
+    .matchup-grade.sample {
+        color: #3f6fa8;
+        background: #eef5ff;
+    }
+
+    .matchup-grade.none {
+        color: #687384;
+        background: #f2f4f7;
+    }
+
+    .matchup-log-shell {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+    }
+
     .stTabs [data-baseweb="tab-list"] {
         gap: 0;
         border-bottom: 1px solid var(--line);
@@ -743,6 +857,16 @@ st.markdown(
         .schedule-weather-row > :nth-child(3) {
             display: none;
         }
+
+        .matchup-list-head {
+            display: none;
+        }
+
+        div[class*="st-key-bvp_card_"] [data-testid="stHorizontalBlock"],
+        div[class*="st-key-hand_card_"] [data-testid="stHorizontalBlock"],
+        div[class*="st-key-k_card_"] [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap;
+        }
     }
     </style>
     """,
@@ -771,52 +895,6 @@ def team_logo_url(team_value):
         return ""
 
     return f"https://www.mlbstatic.com/team-logos/team-cap-on-light/{team_id}.svg"
-
-
-def opponent_from_game(game, team):
-    if pd.isna(game) or pd.isna(team):
-        return ""
-
-    game = str(game)
-    team = str(team)
-
-    if " @ " not in game:
-        return ""
-
-    away_team, home_team = game.split(" @ ", 1)
-
-    if team == away_team:
-        return home_team
-
-    if team == home_team:
-        return away_team
-
-    return ""
-
-
-def grade_bar_url(grade):
-    grade = str(grade).lower()
-
-    if "elite" in grade or "strong" in grade or "good" in grade:
-        color = "2ca25f"
-    elif "neutral" in grade:
-        color = "d99a16"
-    elif "avoid" in grade:
-        color = "d64545"
-    elif "small sample" in grade:
-        color = "3f7fd8"
-    elif "no history" in grade:
-        color = "9ca3af"
-    else:
-        color = "9ca3af"
-
-    svg = (
-        f"<svg xmlns='http://www.w3.org/2000/svg' width='8' height='34' viewBox='0 0 8 34'>"
-        f"<rect x='0' y='0' width='8' height='34' fill='#{color}'/>"
-        f"</svg>"
-    )
-
-    return "data:image/svg+xml;utf8," + quote(svg)
 
 
 def make_light_table(df):
@@ -1118,42 +1196,227 @@ def render_schedule_weather_table(df):
     )
 
 
-def prepare_batter_display(df):
-    df = df.copy()
+def format_matchup_number(value, digits=1, suffix=""):
+    number = pd.to_numeric(value, errors="coerce")
+    if pd.isna(number):
+        return "-"
+    return f"{float(number):.{digits}f}{suffix}"
 
-    if "matchup_grade" in df.columns:
-        df["grade_bar"] = df["matchup_grade"].apply(grade_bar_url)
-    else:
-        df["grade_bar"] = grade_bar_url("no history")
 
-    if "team" in df.columns:
-        df["team_logo"] = df["team"].apply(team_logo_url)
+def matchup_grade_class(grade):
+    value = str(grade or "").lower()
+    if "strong" in value or "good" in value or "elite" in value:
+        return "good"
+    if "neutral" in value:
+        return "neutral"
+    if "avoid" in value:
+        return "avoid"
+    if "sample" in value:
+        return "sample"
+    return "none"
 
-    if "game" in df.columns and "team" in df.columns:
-        df["opponent_team"] = df.apply(
-            lambda row: opponent_from_game(row.get("game"), row.get("team")),
-            axis=1,
+
+def render_matchup_weather(row):
+    weather_display = escape(str(row.get("weather_display") or "?"))
+    wind_display = escape(str(row.get("wind_display") or "\u00b7"))
+    edge = escape(str(row.get("weather_edge") or "Neutral"))
+    tooltip = escape(
+        (
+            f"{row.get('weather_tooltip') or 'Forecast unavailable.'} "
+            f"{row.get('wind_tooltip') or 'Wind forecast unavailable.'}"
+        ),
+        quote=True,
+    )
+    return (
+        f'<div class="matchup-weather" title="{tooltip}">'
+        f"{weather_display} &nbsp; {wind_display}</div>"
+        f'<div class="matchup-secondary">{edge}</div>'
+    )
+
+
+def render_grade(grade, score=None):
+    grade_text = str(grade or "No History")
+    score_text = ""
+    score_value = pd.to_numeric(score, errors="coerce")
+    if pd.notna(score_value):
+        score_text = f'<div class="matchup-secondary">{float(score_value):.1f}</div>'
+    return (
+        f'<span class="matchup-grade {matchup_grade_class(grade_text)}">'
+        f"{escape(grade_text)}</span>{score_text}"
+    )
+
+
+def clear_stale_matchup_selection(selection_key, current_df):
+    selected = st.session_state.get(selection_key)
+    if not selected:
+        return
+
+    identity_columns = [
+        column
+        for column in (
+            "game",
+            "batter_id",
+            "opposing_pitcher_id",
+            "pitcher_id",
+            "opponent",
         )
-        df["opponent_logo"] = df["opponent_team"].apply(team_logo_url)
+        if column in current_df.columns
+    ]
+    if not identity_columns:
+        st.session_state.pop(selection_key, None)
+        return
 
-    return df
+    selected_identity = tuple(str(selected.get(column)) for column in identity_columns)
+    current_identities = {
+        tuple(str(row.get(column)) for column in identity_columns)
+        for _, row in current_df.iterrows()
+    }
+    if selected_identity not in current_identities:
+        st.session_state.pop(selection_key, None)
 
 
-def prepare_pitcher_display(df):
-    df = df.copy()
+def render_batter_matchup_cards(
+    df,
+    selection_key,
+    key_prefix,
+    split_view=False,
+):
+    clear_stale_matchup_selection(selection_key, df)
+    st.html(
+        """
+        <div class="matchup-list-head">
+            <div></div>
+            <div>Batter</div>
+            <div>Matchup</div>
+            <div>PA</div>
+            <div>Production</div>
+            <div>Weather</div>
+            <div>Grade</div>
+        </div>
+        """
+    )
 
-    if "k_matchup_grade" in df.columns:
-        df["grade_bar"] = df["k_matchup_grade"].apply(grade_bar_url)
-    else:
-        df["grade_bar"] = grade_bar_url("no history")
+    for position, (_, row) in enumerate(df.iterrows()):
+        batter_id = row.get("batter_id")
+        pitcher_id = row.get("opposing_pitcher_id")
+        unique_id = f"{batter_id}_{pitcher_id}_{position}"
+        team = str(row.get("team") or "")
+        logo = team_logo_url(team)
+        pitcher = str(row.get("opposing_pitcher") or "Pitcher TBD")
+        hand = str(row.get("opposing_pitcher_hand") or "")
+        matchup_text = pitcher + (f" ({hand})" if hand else "")
+        split_text = str(row.get("split") or "") if split_view else ""
 
-    if "pitcher_team" in df.columns:
-        df["pitcher_team_logo"] = df["pitcher_team"].apply(team_logo_url)
+        with st.container(border=True, key=f"{key_prefix}_card_{unique_id}"):
+            columns = st.columns(
+                [0.42, 1.55, 1.45, 0.55, 1.35, 1.0, 1.0],
+                vertical_alignment="center",
+            )
+            if logo:
+                columns[0].image(logo, width=32)
+            if columns[1].button(
+                str(row.get("batter") or "Unknown batter"),
+                key=f"{key_prefix}_name_{unique_id}",
+                type="tertiary",
+            ):
+                st.session_state[selection_key] = row.to_dict()
+            columns[1].html(
+                f'<div class="matchup-secondary">{escape(team)}</div>'
+            )
+            columns[2].html(
+                f'<div class="matchup-primary">{escape(matchup_text)}</div>'
+                f'<div class="matchup-secondary">{escape(split_text)}</div>'
+            )
+            columns[3].html(
+                f'<div class="matchup-stat">{format_matchup_number(row.get("PA"), 0)}</div>'
+            )
+            columns[4].html(
+                '<div class="matchup-stat">'
+                f'AVG {format_matchup_number(row.get("AVG"), 3)}'
+                '</div><div class="matchup-secondary">'
+                f'OBP {format_matchup_number(row.get("OBP"), 3)} &nbsp; '
+                f'OPS {format_matchup_number(row.get("OPS"), 3)}'
+                "</div>"
+            )
+            columns[5].html(render_matchup_weather(row))
+            columns[6].html(
+                render_grade(
+                    row.get("matchup_grade"),
+                    row.get("weather_adjusted_score"),
+                )
+            )
 
-    if "opponent" in df.columns:
-        df["opponent_logo"] = df["opponent"].apply(team_logo_url)
+    return st.session_state.get(selection_key)
 
-    return df
+
+def render_pitcher_matchup_cards(df, selection_key, key_prefix):
+    clear_stale_matchup_selection(selection_key, df)
+    st.html(
+        """
+        <div class="matchup-list-head">
+            <div></div>
+            <div>Pitcher</div>
+            <div>Opponent</div>
+            <div>Proj K</div>
+            <div>Pitching</div>
+            <div>Weather</div>
+            <div>Grade</div>
+        </div>
+        """
+    )
+
+    for position, (_, row) in enumerate(df.iterrows()):
+        pitcher_id = row.get("pitcher_id")
+        unique_id = f"{pitcher_id}_{position}"
+        team = str(row.get("pitcher_team") or "")
+        logo = team_logo_url(team)
+        opponent = str(row.get("opponent") or "")
+        opponent_logo = team_logo_url(opponent)
+
+        with st.container(border=True, key=f"{key_prefix}_card_{unique_id}"):
+            columns = st.columns(
+                [0.42, 1.55, 1.45, 0.65, 1.25, 1.0, 1.0],
+                vertical_alignment="center",
+            )
+            if logo:
+                columns[0].image(logo, width=32)
+            if columns[1].button(
+                str(row.get("pitcher") or "Unknown pitcher"),
+                key=f"{key_prefix}_name_{unique_id}",
+                type="tertiary",
+            ):
+                st.session_state[selection_key] = row.to_dict()
+            columns[1].html(
+                f'<div class="matchup-secondary">{escape(team)}</div>'
+            )
+            opponent_html = f'<div class="matchup-primary">{escape(opponent)}</div>'
+            if opponent_logo:
+                opponent_html += '<div class="matchup-secondary">Opponent</div>'
+            columns[2].html(opponent_html)
+            columns[3].html(
+                '<div class="matchup-stat">'
+                f'{format_matchup_number(row.get("Projected Ks"), 1)}'
+                '</div><div class="matchup-secondary">'
+                f'{format_matchup_number(row.get("Projected IP"), 1)} IP'
+                "</div>"
+            )
+            columns[4].html(
+                '<div class="matchup-stat">'
+                f'K/9 {format_matchup_number(row.get("K/9"), 1)}'
+                '</div><div class="matchup-secondary">'
+                f'ERA {format_matchup_number(row.get("ERA"), 2)} &nbsp; '
+                f'K% {format_matchup_number(row.get("K%"), 1, "%")}'
+                "</div>"
+            )
+            columns[5].html(render_matchup_weather(row))
+            columns[6].html(
+                render_grade(
+                    row.get("k_matchup_grade"),
+                    row.get("k_matchup_score"),
+                )
+            )
+
+    return st.session_state.get(selection_key)
 
 
 def display_bvp_game_log(selected_row, season):
@@ -1293,10 +1556,6 @@ with st.sidebar:
     )
 
     force_refresh = st.button("Refresh Live Context")
-    st.caption(
-        "Probable pitchers and weather share a 15-minute cache. "
-        "This button refreshes them immediately."
-    )
 
 
 @st.cache_data(show_spinner=True, ttl=900)
@@ -1374,28 +1633,12 @@ if schedule_df.empty:
 schedule_df = add_game_column(schedule_df)
 game_options = get_game_options(schedule_df)
 
-
-with st.sidebar:
-    st.markdown(
-        """
-        <div class="custom-label-row">
-            <span class="custom-label-text">Game Filter</span>
-            <span class="custom-help-wrap">
-                <span class="custom-help-dot">?</span>
-                <span class="custom-help-tooltip">
-                    Choose a specific game to focus the schedule and matchup tables.
-                </span>
-            </span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
+game_filter_col, _ = st.columns([2.2, 3.8])
+with game_filter_col:
     selected_game = st.selectbox(
-        "Game Filter",
+        "Game",
         game_options,
         index=0,
-        label_visibility="collapsed",
     )
 
 
@@ -1488,76 +1731,29 @@ with matchup_tab:
         if filtered_bvp_matchups.empty:
             st.warning("No batter vs pitcher matchup data was found for this selection.")
         else:
-            min_bvp_pa = st.slider(
-                "Minimum PA vs Pitcher",
-                min_value=0,
-                max_value=50,
-                value=0,
-                step=1,
-            )
+            with st.popover("Filters"):
+                min_bvp_pa = st.slider(
+                    "Minimum PA vs Pitcher",
+                    min_value=0,
+                    max_value=50,
+                    value=0,
+                    step=1,
+                )
 
             display_bvp = filtered_bvp_matchups[
                 filtered_bvp_matchups["PA"] >= min_bvp_pa
             ].copy()
 
             display_bvp = display_bvp.head(int(top_n))
-            display_bvp = prepare_batter_display(display_bvp)
-
-            bvp_cols = [
-                "grade_bar",
-                "team_logo",
-                "team",
-                "batter",
-                "opponent_logo",
-                "opposing_pitcher",
-                "opposing_pitcher_hand",
-                "PA",
-                "AB",
-                "H",
-                "BB",
-                "SO",
-                "HR",
-                "RBI",
-                "AVG",
-                "OBP",
-                "SLG",
-                "OPS",
-                "K%",
-                "BB%",
-                "weather_display",
-                "wind_display",
-                "weather_edge",
-                "hitter_weather_adjustment",
-                "weather_adjusted_score",
-                "matchup_grade",
-            ]
-
-            bvp_cols = [col for col in bvp_cols if col in display_bvp.columns]
-
-            st.caption("Click one row below to view its career matchup game log.")
-
-            bvp_event = show_table(
-                display_bvp[bvp_cols],
-                key="bvp_table",
-                selectable=True,
+            selected_row = render_batter_matchup_cards(
+                display_bvp,
+                selection_key="selected_bvp_matchup",
+                key_prefix="bvp",
             )
 
-            selected_row = None
-
-            try:
-                selected_rows = bvp_event.selection.rows
-
-                if selected_rows:
-                    selected_row = display_bvp.iloc[selected_rows[0]]
-            except Exception:
-                selected_row = None
-
-            st.divider()
-
             if selected_row is not None:
+                st.html('<div class="matchup-log-shell"></div>')
                 display_bvp_game_log(selected_row, season)
-            else:
-                st.info("Select a batter-vs-pitcher row above to view the game log.")
 
     with tab2:
         st.markdown(
@@ -1572,21 +1768,22 @@ with matchup_tab:
         if filtered_hand_matchups.empty:
             st.warning("No batter vs pitcher-hand split data was found for this selection.")
         else:
-            min_hand_pa = st.slider(
-                "Minimum PA vs Throwing Hand",
-                min_value=0,
-                max_value=300,
-                value=20,
-                step=5,
-            )
+            with st.popover("Filters"):
+                min_hand_pa = st.slider(
+                    "Minimum PA vs Throwing Hand",
+                    min_value=0,
+                    max_value=300,
+                    value=20,
+                    step=5,
+                )
 
-            min_hand_obp = st.slider(
-                "Minimum OBP vs Throwing Hand",
-                min_value=0.150,
-                max_value=0.500,
-                value=0.320,
-                step=0.005,
-            )
+                min_hand_obp = st.slider(
+                    "Minimum OBP vs Throwing Hand",
+                    min_value=0.150,
+                    max_value=0.500,
+                    value=0.320,
+                    step=0.005,
+                )
 
             display_hand = filtered_hand_matchups[
                 (filtered_hand_matchups["PA"] >= min_hand_pa)
@@ -1594,41 +1791,16 @@ with matchup_tab:
             ].copy()
 
             display_hand = display_hand.head(int(top_n))
-            display_hand = prepare_batter_display(display_hand)
+            selected_hand_row = render_batter_matchup_cards(
+                display_hand,
+                selection_key="selected_hand_matchup",
+                key_prefix="hand",
+                split_view=True,
+            )
 
-            hand_cols = [
-                "grade_bar",
-                "team_logo",
-                "team",
-                "batter",
-                "opponent_logo",
-                "opposing_pitcher",
-                "opposing_pitcher_hand",
-                "split",
-                "PA",
-                "AB",
-                "H",
-                "BB",
-                "SO",
-                "HR",
-                "RBI",
-                "AVG",
-                "OBP",
-                "SLG",
-                "OPS",
-                "K%",
-                "BB%",
-                "weather_display",
-                "wind_display",
-                "weather_edge",
-                "hitter_weather_adjustment",
-                "weather_adjusted_score",
-                "matchup_grade",
-            ]
-
-            hand_cols = [col for col in hand_cols if col in display_hand.columns]
-
-            show_table(display_hand[hand_cols])
+            if selected_hand_row is not None:
+                st.html('<div class="matchup-log-shell"></div>')
+                display_bvp_game_log(selected_hand_row, season)
 
     with tab3:
         st.markdown(
@@ -1662,57 +1834,15 @@ with matchup_tab:
                 )
 
             display_k = filtered_pitcher_k_matchups.head(int(top_n)).copy()
-            display_k = prepare_pitcher_display(display_k)
-
-            k_cols = [
-                "grade_bar",
-                "pitcher_team_logo",
-                "pitcher",
-                "pitcher_hand",
-                "opponent_logo",
-                "opponent",
-                "Projected IP",
-                "Projected Pitch Count",
-                "Projected Ks",
-                "ERA",
-                "WHIP",
-                "K%",
-                "K/9",
-                "opponent_avg_k%",
-                "weather_display",
-                "wind_display",
-                "weather_edge",
-                "weather_k_adjustment",
-                "k_matchup_score",
-                "k_matchup_grade",
-            ]
-
-            k_cols = [col for col in k_cols if col in display_k.columns]
-
-            st.caption("Click one pitcher row below to view his career game log against that opponent.")
-
-            k_event = show_table(
-                display_k[k_cols],
-                key="pitcher_k_table",
-                selectable=True,
+            selected_pitcher_row = render_pitcher_matchup_cards(
+                display_k,
+                selection_key="selected_pitcher_matchup",
+                key_prefix="k",
             )
 
-            selected_pitcher_row = None
-
-            try:
-                selected_rows = k_event.selection.rows
-
-                if selected_rows:
-                    selected_pitcher_row = display_k.iloc[selected_rows[0]]
-            except Exception:
-                selected_pitcher_row = None
-
-            st.divider()
-
             if selected_pitcher_row is not None:
+                st.html('<div class="matchup-log-shell"></div>')
                 display_pitcher_vs_team_game_log(selected_pitcher_row)
-            else:
-                st.info("Select a pitcher row above to view his career game log against that opponent.")
 
 
 with info_tab:
@@ -1739,24 +1869,16 @@ with info_tab:
           opponent hitter strikeout tendencies, and a small weather run-environment
           adjustment.
 
-        **Weather Projection**
-        - Uses the scheduled venue's MLB coordinates, elevation, field azimuth,
-          roof type, and game start time.
-        - Wind is projected relative to the center-field bearing, so the model
-          distinguishes wind blowing out, in, or across the field.
-        - Outdoor hitter rankings include wind and air-density adjustments.
-        - Retractable-roof games show the forecast but remain neutral until roof
-          status is known.
-        - Weather adjustments are bounded matchup heuristics, not calibrated
-          batted-ball or sportsbook projections.
-        - Forecast source: [Open-Meteo](https://open-meteo.com/).
+        **Weather**
+        - Game-time conditions and field-relative wind are included in matchup
+          rankings. Hover a weather or wind value for details.
 
-        **Row Markers**
-        - Green bar = favorable
-        - Yellow bar = neutral
-        - Red bar = avoid
-        - Blue bar = small sample
-        - Gray bar = no history
+        **Grade Colors**
+        - Green = favorable
+        - Yellow = neutral
+        - Red = avoid
+        - Blue = small sample
+        - Gray = no history
         """
     )
 
@@ -1792,9 +1914,6 @@ with info_tab:
         | **Proj PC** | Projected Pitch Count |
         | **Proj K** | Projected Strikeouts |
         | **K Score** | Strikeout Matchup Score |
-        | **Wx Adj** | Weather adjustment applied to hitter matchup ranking |
-        | **Wx Score** | Weather-adjusted matchup ranking score |
-        | **Wx K Adj** | Small weather run-environment adjustment to K score |
         | **RHP** | Right-Handed Pitcher |
         | **LHP** | Left-Handed Pitcher |
         | **H/A** | Home/Away |
