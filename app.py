@@ -8,10 +8,7 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 from src.mlb_schedule import get_daily_schedule
-from src.weather import (
-    enrich_schedule_with_weather,
-    preserve_previous_weather,
-)
+from src.weather import enrich_schedule_with_weather
 from src.stat_data import (
     get_batter_stats,
     get_pitcher_stats,
@@ -1922,6 +1919,55 @@ def load_schedule(game_date, refresh_count):
 @st.cache_data(show_spinner=True, ttl=900)
 def load_weather(schedule, refresh_count, cache_version):
     return enrich_schedule_with_weather(schedule)
+
+
+def preserve_previous_weather(current_df, previous_df):
+    if (
+        current_df is None
+        or current_df.empty
+        or previous_df is None
+        or previous_df.empty
+        or "game_pk" not in current_df.columns
+        or "game_pk" not in previous_df.columns
+    ):
+        return current_df
+
+    result = current_df.copy()
+    previous_by_game = previous_df.drop_duplicates("game_pk").set_index("game_pk")
+    weather_columns = [
+        column
+        for column in previous_df.columns
+        if column.startswith(("weather_", "wind_"))
+        or column
+        in {
+            "forecast_time_utc",
+            "temperature_f",
+            "humidity_pct",
+            "precip_probability_pct",
+            "surface_pressure_hpa",
+            "air_density_kg_m3",
+            "hitter_weather_adjustment",
+            "pitcher_weather_adjustment",
+        }
+    ]
+
+    for index, row in result.iterrows():
+        if row.get("weather_status") == "Forecast available":
+            continue
+
+        game_pk = row.get("game_pk")
+        if game_pk not in previous_by_game.index:
+            continue
+
+        previous = previous_by_game.loc[game_pk]
+        if previous.get("weather_status") != "Forecast available":
+            continue
+
+        for column in weather_columns:
+            result.at[index, column] = previous.get(column)
+        result.at[index, "weather_source"] = "Last successful forecast"
+
+    return result
 
 
 @st.cache_data(show_spinner=True)
