@@ -1,7 +1,7 @@
 from datetime import date
 from html import escape
 import os
-from urllib.parse import quote
+from urllib.parse import urlencode
 
 import pandas as pd
 import streamlit as st
@@ -492,19 +492,167 @@ st.markdown(
         margin: -3px 0 14px 0;
     }
 
-    div[class*="st-key-bvp_table"] [data-testid="stDataFrame"],
-    div[class*="st-key-hand_table"] [data-testid="stDataFrame"],
-    div[class*="st-key-pitcher_k_table"] [data-testid="stDataFrame"] {
-        border: 1px solid var(--line);
-        background: #ffffff;
-        overscroll-behavior-x: contain;
-        touch-action: pan-x pan-y;
-    }
-
     .research-table-note {
         color: var(--muted);
         font-size: 11px;
         margin: -3px 0 8px 0;
+    }
+
+    .research-table-shell {
+        max-height: 540px;
+        overflow: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        border: 1px solid var(--line);
+        background: #ffffff;
+        scrollbar-gutter: stable;
+    }
+
+    .research-table {
+        width: max-content;
+        min-width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        color: var(--text);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .research-table th,
+    .research-table td {
+        height: 36px;
+        padding: 0 10px;
+        border: 0;
+        border-bottom: 1px solid #edf0f4;
+        background: #ffffff;
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .research-table th {
+        position: sticky;
+        top: 0;
+        z-index: 8;
+        height: 38px;
+        background: #eef2f6;
+        color: #647184;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+
+    .research-table tbody tr:hover td {
+        background: #f7fafc;
+    }
+
+    .research-table .align-left {
+        text-align: left;
+    }
+
+    .research-table .sticky-game {
+        position: sticky;
+        left: 0;
+        z-index: 5;
+        width: 92px;
+        min-width: 92px;
+        text-align: center;
+        box-shadow: 1px 0 0 #dfe5ec;
+    }
+
+    .research-table .sticky-player {
+        position: sticky;
+        left: 92px;
+        z-index: 5;
+        width: 150px;
+        min-width: 150px;
+        text-align: left;
+        box-shadow: 1px 0 0 #dfe5ec;
+    }
+
+    .research-table th.sticky-game,
+    .research-table th.sticky-player {
+        z-index: 10;
+        background: #e8edf3;
+    }
+
+    .research-game {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+    }
+
+    .research-game img {
+        width: 24px;
+        height: 24px;
+        object-fit: contain;
+    }
+
+    .research-at {
+        color: var(--muted-2);
+        font-size: 10px;
+        font-weight: 700;
+    }
+
+    .research-player-link {
+        color: #245f96;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .research-player-link:hover {
+        color: #123f69;
+        text-decoration: underline;
+    }
+
+    .research-weather {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 86px;
+    }
+
+    .research-weather .weather-svg {
+        width: 17px;
+        height: 17px;
+    }
+
+    .research-grade,
+    .research-edge {
+        display: inline-block;
+        padding: 3px 7px;
+        border-radius: 2px;
+        font-size: 10px;
+        font-weight: 700;
+    }
+
+    .research-grade.good,
+    .research-edge.hitter {
+        color: #247a4d;
+        background: #edf8f2;
+    }
+
+    .research-grade.neutral,
+    .research-edge.neutral {
+        color: #687384;
+        background: #f2f4f7;
+    }
+
+    .research-grade.avoid,
+    .research-edge.pitcher {
+        color: #b43b3b;
+        background: #fff0f0;
+    }
+
+    .research-grade.sample {
+        color: #3f6fa8;
+        background: #eef5ff;
+    }
+
+    .research-grade.none {
+        color: #687384;
+        background: #f2f4f7;
     }
 
     .matchup-log-shell {
@@ -802,15 +950,38 @@ st.markdown(
             display: none;
         }
 
-        div[class*="st-key-bvp_table"] [data-testid="stDataFrame"],
-        div[class*="st-key-hand_table"] [data-testid="stDataFrame"],
-        div[class*="st-key-pitcher_k_table"] [data-testid="stDataFrame"] {
-            max-height: 540px;
-        }
-
         .research-table-note {
             line-height: 1.45;
             margin-bottom: 6px;
+        }
+
+        .research-table-shell {
+            max-height: 500px;
+        }
+
+        .research-table {
+            font-size: 11px;
+        }
+
+        .research-table th,
+        .research-table td {
+            padding: 0 8px;
+        }
+
+        .research-table .sticky-game {
+            width: 82px;
+            min-width: 82px;
+        }
+
+        .research-table .sticky-player {
+            left: 82px;
+            width: 132px;
+            min-width: 132px;
+        }
+
+        .research-game img {
+            width: 21px;
+            height: 21px;
         }
 
     }
@@ -841,28 +1012,6 @@ def team_logo_url(team_value):
         return ""
 
     return f"https://www.mlbstatic.com/team-logos/team-cap-on-light/{team_id}.svg"
-
-
-def grade_bar_url(grade):
-    value = str(grade or "").lower()
-    if "elite" in value or "strong" in value or "good" in value:
-        color = "2ca25f"
-    elif "neutral" in value:
-        color = "d99a16"
-    elif "avoid" in value:
-        color = "d64545"
-    elif "sample" in value:
-        color = "3f7fd8"
-    else:
-        color = "9ca3af"
-
-    svg = (
-        "<svg xmlns='http://www.w3.org/2000/svg' width='8' height='34' "
-        "viewBox='0 0 8 34'>"
-        f"<rect width='8' height='34' rx='2' fill='#{color}'/>"
-        "</svg>"
-    )
-    return "data:image/svg+xml;utf8," + quote(svg)
 
 
 def weather_icon_svg(icon_name, size=18, padding=0):
@@ -919,12 +1068,6 @@ def weather_icon_svg(icon_name, size=18, padding=0):
         f"width='{size}' height='{size}' fill='none' "
         "stroke='#617083' stroke-width='1.7' stroke-linecap='round' "
         f"stroke-linejoin='round'>{icon_paths}</svg>"
-    )
-
-
-def weather_icon_data_url(icon_name, size=18, padding=0):
-    return "data:image/svg+xml;utf8," + quote(
-        weather_icon_svg(icon_name, size=size, padding=padding)
     )
 
 
@@ -1035,21 +1178,6 @@ def show_table(df, key=None, selectable_column=None):
         kwargs["key"] = key
 
     return st.dataframe(**kwargs)
-
-
-def selected_name_row(event, display_df, name_column):
-    try:
-        selected_cells = event.selection.cells
-    except Exception:
-        return None
-
-    if not selected_cells:
-        return None
-
-    row_position, column_name = selected_cells[0]
-    if column_name != name_column or row_position >= len(display_df):
-        return None
-    return display_df.iloc[int(row_position)]
 
 
 def apply_matchup_row_limit(df, row_setting):
@@ -1394,45 +1522,263 @@ def matchup_grade_class(grade):
     return "none"
 
 
-def add_game_logo_columns(df):
-    result = df.copy()
-    game_parts = result.get(
-        "game",
-        pd.Series("", index=result.index),
-    ).astype(str).str.split(" @ ", n=1, expand=True)
-    result["game_away_logo"] = game_parts[0].apply(team_logo_url)
-    result["game_at"] = "@"
-    if game_parts.shape[1] > 1:
-        result["game_home_logo"] = game_parts[1].apply(team_logo_url)
+RESEARCH_COLUMN_LABELS = {
+    "opposing_pitcher": "Pitcher",
+    "opposing_pitcher_hand": "Hand",
+    "pitcher_hand": "Hand",
+    "Season IP": "Season IP",
+    "Projected IP": "Proj IP",
+    "Projected Pitch Count": "Proj PC",
+    "Projected Ks": "Proj K",
+    "opponent_avg_k%": "Opp K%",
+    "weather_condition": "Weather",
+    "weather_display": "Temp",
+    "humidity_pct": "Humidity",
+    "precip_probability_pct": "Rain",
+    "wind_speed_mph": "Wind mph",
+    "wind_direction_cardinal": "Wind Dir",
+    "wind_field_direction": "Field Wind",
+    "wind_out_mph": "Out mph",
+    "weather_edge": "Weather Edge",
+    "matchup_grade": "Grade",
+    "k_matchup_score": "K Score",
+    "k_matchup_grade": "Grade",
+}
+
+RESEARCH_COLUMN_WIDTHS = {
+    "opposing_pitcher": 130,
+    "opposing_pitcher_hand": 54,
+    "pitcher_hand": 54,
+    "opponent": 110,
+    "split": 70,
+    "weather_condition": 105,
+    "weather_display": 58,
+    "humidity_pct": 68,
+    "precip_probability_pct": 58,
+    "wind_speed_mph": 70,
+    "wind_direction_cardinal": 66,
+    "wind_field_direction": 82,
+    "wind_out_mph": 66,
+    "weather_edge": 130,
+    "matchup_grade": 108,
+    "k_matchup_grade": 108,
+}
+
+INTEGER_RESEARCH_COLUMNS = {
+    "PA",
+    "AB",
+    "H",
+    "BB",
+    "HBP",
+    "SO",
+    "HR",
+    "RBI",
+    "GS",
+    "BF",
+    "R",
+    "ER",
+    "Projected Pitch Count",
+}
+THREE_DECIMAL_RESEARCH_COLUMNS = {"AVG", "OBP", "SLG", "OPS"}
+TWO_DECIMAL_RESEARCH_COLUMNS = {
+    "K%",
+    "BB%",
+    "ERA",
+    "WHIP",
+    "K/9",
+    "SwStr%",
+    "opponent_avg_k%",
+    "Projected IP",
+    "Projected Ks",
+    "k_matchup_score",
+}
+ONE_DECIMAL_RESEARCH_COLUMNS = {"Season IP"}
+PERCENT_RESEARCH_COLUMNS = {"humidity_pct", "precip_probability_pct"}
+
+
+def research_cell_value(column, value):
+    if is_missing_value(value):
+        return "-"
+
+    number = pd.to_numeric(value, errors="coerce")
+    if column in INTEGER_RESEARCH_COLUMNS and pd.notna(number):
+        return f"{float(number):.0f}"
+    if column in THREE_DECIMAL_RESEARCH_COLUMNS and pd.notna(number):
+        return f"{float(number):.3f}"
+    if column in TWO_DECIMAL_RESEARCH_COLUMNS and pd.notna(number):
+        return f"{float(number):.2f}"
+    if column in ONE_DECIMAL_RESEARCH_COLUMNS and pd.notna(number):
+        return f"{float(number):.1f}"
+    if column in PERCENT_RESEARCH_COLUMNS and pd.notna(number):
+        return f"{float(number):.0f}%"
+    if column == "wind_speed_mph" and pd.notna(number):
+        return f"{float(number):.0f}"
+    if column == "wind_out_mph" and pd.notna(number):
+        return f"{float(number):+.1f}"
+    return str(value)
+
+
+def research_game_html(game):
+    game_text = str(game or "")
+    if " @ " in game_text:
+        away_team, home_team = game_text.split(" @ ", 1)
     else:
-        result["game_home_logo"] = ""
-    return result
+        away_team, home_team = game_text, ""
+    away_logo = team_logo_url(away_team)
+    home_logo = team_logo_url(home_team)
+    return (
+        '<span class="research-game">'
+        f'<img src="{escape(away_logo, quote=True)}" '
+        f'alt="{escape(away_team, quote=True)}" title="{escape(away_team, quote=True)}">'
+        '<span class="research-at">@</span>'
+        f'<img src="{escape(home_logo, quote=True)}" '
+        f'alt="{escape(home_team, quote=True)}" title="{escape(home_team, quote=True)}">'
+        "</span>"
+    )
 
 
-def prepare_batter_matchup_table(df):
-    result = add_game_logo_columns(df.copy().reset_index(drop=True))
-    result["grade_bar"] = result.get(
-        "matchup_grade",
-        pd.Series("No History", index=result.index),
-    ).apply(grade_bar_url)
-    result["weather_icon_url"] = result.get(
-        "weather_icon",
-        pd.Series("unknown", index=result.index),
-    ).apply(lambda icon: weather_icon_data_url(icon, size=14, padding=8))
-    return result
+def research_log_url(row, log_type):
+    if log_type == "pitcher":
+        params = {
+            "log_type": "pitcher",
+            "pitcher_id": row.get("pitcher_id"),
+            "pitcher": row.get("pitcher"),
+            "opponent": row.get("opponent"),
+        }
+    else:
+        params = {
+            "log_type": "bvp",
+            "batter_id": row.get("batter_id"),
+            "pitcher_id": row.get("opposing_pitcher_id"),
+            "batter": row.get("batter"),
+            "pitcher": row.get("opposing_pitcher"),
+        }
+    clean_params = {}
+    for key, value in params.items():
+        if is_missing_value(value):
+            continue
+        if key.endswith("_id"):
+            numeric_value = pd.to_numeric(value, errors="coerce")
+            if pd.notna(numeric_value):
+                value = int(numeric_value)
+        clean_params[key] = value
+    return "?" + urlencode(clean_params) + "#matchup-log"
 
 
-def prepare_pitcher_matchup_table(df):
-    result = add_game_logo_columns(df.copy().reset_index(drop=True))
-    result["grade_bar"] = result.get(
-        "k_matchup_grade",
-        pd.Series("No History", index=result.index),
-    ).apply(grade_bar_url)
-    result["weather_icon_url"] = result.get(
-        "weather_icon",
-        pd.Series("unknown", index=result.index),
-    ).apply(lambda icon: weather_icon_data_url(icon, size=14, padding=8))
-    return result
+def research_edge_class(value):
+    edge = str(value or "").lower()
+    if "hitter boost" in edge:
+        return "hitter"
+    if "pitcher boost" in edge:
+        return "pitcher"
+    return "neutral"
+
+
+def render_research_table(df, columns, player_column, log_type, table_key):
+    header_cells = [
+        '<th class="sticky-game"></th>',
+        f'<th class="sticky-player">{escape(player_column.title())}</th>',
+    ]
+    data_columns = [
+        column
+        for column in columns
+        if column not in {"game", player_column}
+    ]
+    for column in data_columns:
+        label = RESEARCH_COLUMN_LABELS.get(column, column)
+        width = RESEARCH_COLUMN_WIDTHS.get(column, 62)
+        align_class = " align-left" if column in {
+            "opposing_pitcher",
+            "opponent",
+            "split",
+            "weather_condition",
+            "wind_direction_cardinal",
+            "wind_field_direction",
+            "weather_edge",
+            "matchup_grade",
+            "k_matchup_grade",
+        } else ""
+        header_cells.append(
+            f'<th class="{align_class.strip()}" '
+            f'style="min-width:{width}px">{escape(label)}</th>'
+        )
+
+    body_rows = []
+    for _, row in df.iterrows():
+        player_name = str(row.get(player_column) or "Unknown")
+        player_url = research_log_url(row, log_type)
+        cells = [
+            f'<td class="sticky-game">{research_game_html(row.get("game"))}</td>',
+            '<td class="sticky-player">'
+            f'<a class="research-player-link" href="{escape(player_url, quote=True)}">'
+            f"{escape(player_name)}</a></td>",
+        ]
+        for column in data_columns:
+            value = row.get(column)
+            align_class = "align-left" if column in {
+                "opposing_pitcher",
+                "opponent",
+                "split",
+                "weather_condition",
+                "wind_direction_cardinal",
+                "wind_field_direction",
+                "weather_edge",
+                "matchup_grade",
+                "k_matchup_grade",
+            } else ""
+            if column == "weather_condition":
+                icon = weather_icon_svg(row.get("weather_icon"), size=17)
+                content = (
+                    '<span class="research-weather">'
+                    f"{icon}<span>{escape(research_cell_value(column, value))}</span>"
+                    "</span>"
+                )
+            elif column == "weather_edge":
+                content = (
+                    f'<span class="research-edge {research_edge_class(value)}">'
+                    f"{escape(research_cell_value(column, value))}</span>"
+                )
+            elif column in {"matchup_grade", "k_matchup_grade"}:
+                grade_class = matchup_grade_class(value)
+                content = (
+                    f'<span class="research-grade {grade_class}">'
+                    f"{escape(research_cell_value(column, value))}</span>"
+                )
+            else:
+                content = escape(research_cell_value(column, value))
+            cells.append(f'<td class="{align_class}">{content}</td>')
+        body_rows.append("<tr>" + "".join(cells) + "</tr>")
+
+    st.html(
+        f"""
+        <div class="research-table-shell" id="{escape(table_key, quote=True)}">
+            <table class="research-table">
+                <thead><tr>{''.join(header_cells)}</tr></thead>
+                <tbody>{''.join(body_rows)}</tbody>
+            </table>
+        </div>
+        """
+    )
+
+
+def selected_log_from_query():
+    log_type = st.query_params.get("log_type")
+    if log_type == "bvp":
+        return {
+            "log_type": "bvp",
+            "batter_id": st.query_params.get("batter_id"),
+            "opposing_pitcher_id": st.query_params.get("pitcher_id"),
+            "batter": st.query_params.get("batter"),
+            "opposing_pitcher": st.query_params.get("pitcher"),
+        }
+    if log_type == "pitcher":
+        return {
+            "log_type": "pitcher",
+            "pitcher_id": st.query_params.get("pitcher_id"),
+            "pitcher": st.query_params.get("pitcher"),
+            "opponent": st.query_params.get("opponent"),
+        }
+    return None
 
 
 def display_bvp_game_log(selected_row):
@@ -1571,8 +1917,15 @@ def load_schedule(game_date, refresh_count):
 
 
 @st.cache_data(show_spinner=True, ttl=900)
-def load_weather(schedule, refresh_count):
-    return enrich_schedule_with_weather(schedule)
+def load_weather(schedule, refresh_count, cache_version):
+    weather = enrich_schedule_with_weather(schedule)
+    available = weather.get(
+        "weather_status",
+        pd.Series(dtype=str),
+    ).eq("Forecast available")
+    if not weather.empty and not available.any():
+        weather = enrich_schedule_with_weather(schedule)
+    return weather
 
 
 @st.cache_data(show_spinner=True)
@@ -1595,7 +1948,7 @@ if schedule_df.empty:
     st.warning("No MLB games found for this date.")
     st.stop()
 
-schedule_df = load_weather(schedule_df, live_refresh_count)
+schedule_df = load_weather(schedule_df, live_refresh_count, cache_version=2)
 batters_df = load_batter_stats(season, force_refresh)
 pitchers_df = load_pitcher_stats(season, force_refresh)
 
@@ -1759,13 +2112,10 @@ with matchup_tab:
 
             available_bvp_rows = len(display_bvp)
             display_bvp = apply_matchup_row_limit(display_bvp, matchup_rows)
-            display_bvp = prepare_batter_matchup_table(display_bvp)
+            display_bvp = display_bvp.reset_index(drop=True)
 
             bvp_cols = [
-                "grade_bar",
-                "game_away_logo",
-                "game_at",
-                "game_home_logo",
+                "game",
                 "batter",
                 "opposing_pitcher",
                 "opposing_pitcher_hand",
@@ -1783,7 +2133,6 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
-                "weather_icon_url",
                 "weather_condition",
                 "weather_display",
                 "humidity_pct",
@@ -1799,19 +2148,16 @@ with matchup_tab:
 
             st.html(
                 f'<div class="research-table-note">Showing {len(display_bvp):,} '
-                f'of {available_bvp_rows:,} matchups. Click a batter name cell '
+                f'of {available_bvp_rows:,} matchups. Click a batter name '
                 "to open the career game log.</div>"
             )
-            bvp_event = show_table(
-                display_bvp[bvp_cols],
-                key=f"bvp_table_{selected_game}_{matchup_rows}_{min_bvp_pa}",
-                selectable_column="batter",
+            render_research_table(
+                display_bvp,
+                bvp_cols,
+                player_column="batter",
+                log_type="bvp",
+                table_key="bvp-research-table",
             )
-            selected_row = selected_name_row(bvp_event, display_bvp, "batter")
-
-            if selected_row is not None:
-                st.html('<div class="matchup-log-shell"></div>')
-                display_bvp_game_log(selected_row)
 
     with tab2:
         st.markdown(
@@ -1850,13 +2196,10 @@ with matchup_tab:
 
             available_hand_rows = len(display_hand)
             display_hand = apply_matchup_row_limit(display_hand, matchup_rows)
-            display_hand = prepare_batter_matchup_table(display_hand)
+            display_hand = display_hand.reset_index(drop=True)
 
             hand_cols = [
-                "grade_bar",
-                "game_away_logo",
-                "game_at",
-                "game_home_logo",
+                "game",
                 "batter",
                 "opposing_pitcher",
                 "opposing_pitcher_hand",
@@ -1875,7 +2218,6 @@ with matchup_tab:
                 "OPS",
                 "K%",
                 "BB%",
-                "weather_icon_url",
                 "weather_condition",
                 "weather_display",
                 "humidity_pct",
@@ -1893,26 +2235,16 @@ with matchup_tab:
 
             st.html(
                 f'<div class="research-table-note">Showing {len(display_hand):,} '
-                f'of {available_hand_rows:,} matchups. Click a batter name cell '
+                f'of {available_hand_rows:,} matchups. Click a batter name '
                 "to open the game log against today's probable pitcher.</div>"
             )
-            hand_event = show_table(
-                display_hand[hand_cols],
-                key=(
-                    f"hand_table_{selected_game}_{matchup_rows}_"
-                    f"{min_hand_pa}_{min_hand_obp}"
-                ),
-                selectable_column="batter",
-            )
-            selected_hand_row = selected_name_row(
-                hand_event,
+            render_research_table(
                 display_hand,
-                "batter",
+                hand_cols,
+                player_column="batter",
+                log_type="bvp",
+                table_key="hand-research-table",
             )
-
-            if selected_hand_row is not None:
-                st.html('<div class="matchup-log-shell"></div>')
-                display_bvp_game_log(selected_hand_row)
 
     with tab3:
         st.markdown(
@@ -1950,13 +2282,10 @@ with matchup_tab:
                 filtered_pitcher_k_matchups,
                 matchup_rows,
             )
-            display_k = prepare_pitcher_matchup_table(display_k)
+            display_k = display_k.reset_index(drop=True)
 
             k_cols = [
-                "grade_bar",
-                "game_away_logo",
-                "game_at",
-                "game_home_logo",
+                "game",
                 "pitcher",
                 "pitcher_hand",
                 "opponent",
@@ -1971,7 +2300,6 @@ with matchup_tab:
                 "K/9",
                 "SwStr%",
                 "opponent_avg_k%",
-                "weather_icon_url",
                 "weather_condition",
                 "weather_display",
                 "humidity_pct",
@@ -1989,22 +2317,27 @@ with matchup_tab:
             st.html(
                 f'<div class="research-table-note">Showing {len(display_k):,} '
                 f'of {available_pitcher_rows:,} matchups. Click a pitcher name '
-                "cell to open the career opponent game log.</div>"
+                "to open the career opponent game log.</div>"
             )
-            k_event = show_table(
-                display_k[k_cols],
-                key=f"pitcher_k_table_{selected_game}_{matchup_rows}",
-                selectable_column="pitcher",
-            )
-            selected_pitcher_row = selected_name_row(
-                k_event,
+            render_research_table(
                 display_k,
-                "pitcher",
+                k_cols,
+                player_column="pitcher",
+                log_type="pitcher",
+                table_key="pitcher-research-table",
             )
 
-            if selected_pitcher_row is not None:
-                st.html('<div class="matchup-log-shell"></div>')
-                display_pitcher_vs_team_game_log(selected_pitcher_row)
+    selected_log = selected_log_from_query()
+    if selected_log is not None:
+        st.html(
+            '<div class="matchup-log-shell" id="matchup-log">'
+            '<a class="research-player-link" href="?">Close game log</a>'
+            "</div>"
+        )
+        if selected_log["log_type"] == "pitcher":
+            display_pitcher_vs_team_game_log(selected_log)
+        else:
+            display_bvp_game_log(selected_log)
 
 
 with info_tab:

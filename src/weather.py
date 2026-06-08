@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import math
+import time
 
 import pandas as pd
 import requests
@@ -207,22 +208,31 @@ def weather_edge_label(hitter_adjustment, roof_type):
 
 
 def fetch_hourly_forecast(latitude, longitude, forecast_date):
-    response = requests.get(
-        FORECAST_URL,
-        params={
-            "latitude": latitude,
-            "longitude": longitude,
-            "hourly": ",".join(HOURLY_FIELDS),
-            "temperature_unit": "fahrenheit",
-            "wind_speed_unit": "mph",
-            "timezone": "UTC",
-            "start_date": forecast_date,
-            "end_date": forecast_date,
-        },
-        timeout=20,
-    )
-    response.raise_for_status()
-    return response.json()
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "hourly": ",".join(HOURLY_FIELDS),
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "timezone": "UTC",
+        "start_date": forecast_date,
+        "end_date": forecast_date,
+    }
+    last_error = None
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                FORECAST_URL,
+                params=params,
+                timeout=20,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as error:
+            last_error = error
+            if attempt < 2:
+                time.sleep(0.4 * (attempt + 1))
+    raise last_error
 
 
 def nearest_hour_values(hourly, game_time):

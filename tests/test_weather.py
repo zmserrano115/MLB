@@ -1,10 +1,13 @@
 import unittest
+from unittest.mock import Mock, patch
 
 import pandas as pd
+import requests
 
 from src.weather import (
     calculate_weather_adjustments,
     enrich_schedule_with_weather,
+    fetch_hourly_forecast,
     field_wind_arrow,
     project_wind_to_field,
     weather_icon,
@@ -12,6 +15,23 @@ from src.weather import (
 
 
 class WeatherTests(unittest.TestCase):
+    @patch("src.weather.time.sleep")
+    @patch("src.weather.requests.get")
+    def test_forecast_retries_transient_request_errors(self, mock_get, mock_sleep):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"hourly": {"time": []}}
+        mock_get.side_effect = [
+            requests.ConnectionError("temporary"),
+            response,
+        ]
+
+        result = fetch_hourly_forecast(39.7, -104.9, "2026-06-08")
+
+        self.assertEqual(result, {"hourly": {"time": []}})
+        self.assertEqual(mock_get.call_count, 2)
+        mock_sleep.assert_called_once()
+
     def test_wind_is_projected_against_center_field_bearing(self):
         out_component, cross_component, label = project_wind_to_field(
             wind_speed_mph=10,
