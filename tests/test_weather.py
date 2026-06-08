@@ -6,11 +6,13 @@ import requests
 
 from src.weather import (
     calculate_weather_adjustments,
+    convert_mlb_game_weather,
     convert_met_forecast,
     enrich_schedule_with_weather,
     fetch_hourly_forecast,
     fetch_hourly_forecasts,
     field_wind_arrow,
+    merge_cached_weather,
     preserve_previous_weather,
     project_wind_to_field,
     weather_icon,
@@ -92,6 +94,65 @@ class WeatherTests(unittest.TestCase):
         self.assertAlmostEqual(result["hourly"]["temperature_2m"][0], 77.0)
         self.assertAlmostEqual(result["hourly"]["wind_speed_10m"][0], 8.947744)
         self.assertEqual(result["hourly"]["weather_code"][0], 0)
+
+    def test_mlb_game_weather_converts_to_shared_weather_schema(self):
+        game = {
+            "game_pk": 123,
+            "game_time_utc": "2026-06-08T19:10:00Z",
+            "venue_elevation_ft": 100,
+            "roof_type": "Open",
+        }
+
+        result = convert_mlb_game_weather(
+            game,
+            {
+                "condition": "Partly Cloudy",
+                "temp": "81",
+                "wind": "12 mph, Out To RF",
+            },
+        )
+
+        self.assertEqual(result["weather_source"], "MLB StatsAPI")
+        self.assertEqual(result["weather_status"], "Forecast available")
+        self.assertEqual(result["weather_condition"], "Partly Cloudy")
+        self.assertEqual(result["wind_speed_mph"], 12.0)
+        self.assertEqual(result["wind_field_direction"], "Out to CF")
+        self.assertGreater(result["hitter_weather_adjustment"], 0.0)
+
+    def test_published_cache_replaces_unavailable_runtime_weather(self):
+        current = pd.DataFrame(
+            [
+                {
+                    "game_pk": 123,
+                    "weather_status": "Forecast unavailable",
+                    "weather_display": "N/A",
+                    "weather_icon": "unknown",
+                }
+            ]
+        )
+        cached = pd.DataFrame(
+            [
+                {
+                    "game_pk": 123,
+                    "weather_status": "Forecast available",
+                    "weather_source": "Open-Meteo",
+                    "weather_display": "79",
+                    "weather_icon": "clear",
+                    "temperature_f": 79.0,
+                    "humidity_pct": 42.0,
+                    "wind_speed_mph": 9.0,
+                    "weather_edge": "Hitter boost",
+                }
+            ]
+        )
+
+        result = merge_cached_weather(current, cached)
+
+        self.assertEqual(result.iloc[0]["weather_status"], "Forecast available")
+        self.assertEqual(result.iloc[0]["weather_display"], "79")
+        self.assertEqual(result.iloc[0]["weather_icon"], "clear")
+        self.assertEqual(result.iloc[0]["humidity_pct"], 42.0)
+        self.assertEqual(result.iloc[0]["wind_speed_mph"], 9.0)
 
     @patch("src.weather.fetch_met_forecast")
     @patch("src.weather.fetch_hourly_forecasts")

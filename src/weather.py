@@ -9,6 +9,11 @@ import requests
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 FORECAST_HEADERS = {"User-Agent": "AllRiseAnalytics/1.0"}
 FORECAST_BATCH_SIZE = 20
+MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
+DEFAULT_WEATHER_CACHE_URL = (
+    "https://github.com/zmserrano115/MLB/"
+    "releases/download/mlb-data/weather.json"
+)
 MET_FORECAST_URL = (
     "https://api.met.no/weatherapi/locationforecast/2.0/compact"
 )
@@ -98,6 +103,19 @@ def weather_icon(condition):
     if "overcast" in text or "cloud" in text:
         return "cloudy"
     return "unknown"
+
+
+def weather_code_from_condition(condition):
+    icon = weather_icon(condition)
+    return {
+        "storm": 95,
+        "rain": 61,
+        "snow": 71,
+        "fog": 45,
+        "clear": 0,
+        "partly-cloudy": 2,
+        "cloudy": 3,
+    }.get(icon, 3)
 
 
 def field_wind_arrow(field_direction):
@@ -456,6 +474,170 @@ def fetch_met_forecast(latitude, longitude, elevation_ft=None):
     return convert_met_forecast(response.json(), elevation_ft=elevation_ft)
 
 
+def mlb_field_wind_direction(wind_text):
+    text = str(wind_text or "").lower()
+    if "out to" in text:
+        return "Out to CF"
+    if "in from" in text:
+        return "In from CF"
+    if "r to l" in text:
+        return "R to L"
+    if "l to r" in text:
+        return "L to R"
+    return "Direction unavailable"
+
+
+def convert_mlb_game_weather(game, weather):
+    if not weather:
+        raise ValueError("MLB StatsAPI returned no game weather")
+
+    condition = str(weather.get("condition") or "Unknown")
+    temp_f = safe_float(weather.get("temp"))
+    wind_text = str(weather.get("wind") or "")
+    wind_speed = safe_float(wind_text.split("mph", 1)[0].strip())
+    field_direction = mlb_field_wind_direction(wind_text)
+
+    out_component = None
+    cross_component = None
+    if wind_speed is not None:
+        if field_direction == "Out to CF":
+            out_component, cross_component = wind_speed, 0.0
+        elif field_direction == "In from CF":
+            out_component, cross_component = -wind_speed, 0.0
+        elif field_direction == "L to R":
+            out_component, cross_component = 0.0, wind_speed
+        elif field_direction == "R to L":
+            out_component, cross_component = 0.0, -wind_speed
+
+    pressure = pressure_at_elevation(
+        1013.25,
+        game.get("venue_elevation_ft"),
+    )
+    air_density = calculate_air_density(temp_f, 50.0, pressure)
+    hitter_adjustment, pitcher_adjustment = calculate_weather_adjustments(
+        out_component,
+        air_density,
+        game.get("roof_type"),
+    )
+    arrow = field_wind_arrow(field_direction)
+    icon = weather_icon(condition)
+    weather_display = f"{temp_f:.0f}\N{DEGREE SIGN}" if temp_f is not None else condition
+    wind_display = arrow
+    if wind_speed is not None:
+        wind_display += f" {wind_speed:.0f}"
+
+    return {
+        "weather_status": "Forecast available",
+        "weather_source": "MLB StatsAPI",
+        "forecast_time_utc": game.get("game_time_utc"),
+        "temperature_f": temp_f,
+        "humidity_pct": None,
+        "precip_probability_pct": (
+            70.0 if icon in {"rain", "storm", "snow"} else 0.0
+        ),
+        "surface_pressure_hpa": pressure,
+        "air_density_kg_m3": air_density,
+        "wind_speed_mph": wind_speed,
+        "wind_direction_deg": None,
+        "wind_direction_cardinal": None,
+        "wind_gust_mph": None,
+        "wind_out_mph": out_component,
+        "wind_cross_mph": cross_component,
+        "wind_field_direction": field_direction,
+        "weather_condition": condition,
+        "weather_icon": icon,
+        "weather_display": weather_display,
+        "weather_tooltip": (
+            f"{condition}, {weather_display}. "
+            "Source: MLB game weather."
+        ),
+        "weather_summary": f"{weather_display} | {wind_text} | {condition}",
+        "weather_edge": weather_edge_label(
+            hitter_adjustment,
+            game.get("roof_type"),
+        ),
+        "wind_arrow": arrow,
+        "wind_display": wind_display,
+        "wind_tooltip": (
+            f"{wind_text}. Wind direction is supplied by MLB relative to the field."
+        ),
+        "hitter_weather_adjustment": hitter_adjustment,
+        "pitcher_weather_adjustment": pitcher_adjustment,
+    }
+
+
+def fetch_mlb_game_weather(game):
+    game_pk = game.get("game_pk")
+    if game_pk is None:
+        raise ValueError("MLB game ID unavailable")
+
+    response = requests.get(
+        MLB_GAME_FEED_URL.format(game_pk=int(game_pk)),
+        headers=FORECAST_HEADERS,
+        timeout=20,
+    )
+    response.raise_for_status()
+    weather = response.json().get("gameData", {}).get("weather", {})
+    return convert_mlb_game_weather(game, weather)
+
+
+def fetch_published_weather_cache(cache_url=DEFAULT_WEATHER_CACHE_URL):
+    try:
+        response = requests.get(
+            cache_url,
+            headers=FORECAST_HEADERS,
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        records = payload.get("records", [])
+        return pd.DataFrame(records)
+    except Exception:
+        return pd.DataFrame()
+
+
+def merge_cached_weather(current_df, cached_df):
+    if (
+        current_df is None
+        or current_df.empty
+        or cached_df is None
+        or cached_df.empty
+        or "game_pk" not in current_df.columns
+        or "game_pk" not in cached_df.columns
+    ):
+        return current_df
+
+    result = current_df.copy()
+    available_cache = cached_df[
+        cached_df.get(
+            "weather_status",
+            pd.Series(index=cached_df.index, dtype=str),
+        ).eq("Forecast available")
+    ]
+    if available_cache.empty:
+        return result
+
+    cached_by_game = (
+        available_cache.drop_duplicates("game_pk", keep="last")
+        .set_index("game_pk")
+    )
+    weather_columns = WEATHER_OUTPUT_COLUMNS + ("weather_source",)
+    for index, row in result.iterrows():
+        if (
+            row.get("weather_status") == "Forecast available"
+            and row.get("weather_source") != "MLB StatsAPI"
+        ):
+            continue
+        game_pk = row.get("game_pk")
+        if game_pk not in cached_by_game.index:
+            continue
+        cached = cached_by_game.loc[game_pk]
+        for column in weather_columns:
+            if column in cached.index:
+                result.at[index, column] = cached.get(column)
+    return result
+
+
 def fetch_hourly_forecast(latitude, longitude, forecast_date, attempts=3):
     return request_forecast(
         forecast_params(
@@ -715,12 +897,18 @@ def enrich_schedule_with_weather(schedule_df, forecast_loader=None):
         location = (round(latitude, 5), round(longitude, 5))
         forecast = forecasts.get(location)
         if forecast is None:
-            game.update(
-                unavailable_weather(
-                    "Forecast unavailable",
-                    detail=forecast_errors.get(location),
+            try:
+                game.update(fetch_mlb_game_weather(game))
+            except Exception as mlb_error:
+                game.update(
+                    unavailable_weather(
+                        "Forecast unavailable",
+                        detail=(
+                            f"{forecast_errors.get(location)}; "
+                            f"MLB StatsAPI: {mlb_error}"
+                        ),
+                    )
                 )
-            )
         else:
             game.update(build_game_weather(game, forecast))
         rows.append(game)

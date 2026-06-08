@@ -66,7 +66,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m compileall -q app.py refresh_database.py refresh_nightly.py backfill_database.py src tests
+          python -m compileall -q app.py refresh_database.py refresh_nightly.py refresh_weather_cache.py backfill_database.py src tests
           python -m unittest discover -s tests -v
 
       - name: Download or build SQLite database

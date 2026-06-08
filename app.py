@@ -8,7 +8,7 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 from src.mlb_schedule import get_daily_schedule
-from src.weather import enrich_schedule_with_weather
+from src import weather as weather_service
 from src.stat_data import (
     get_batter_stats,
     get_pitcher_stats,
@@ -540,39 +540,6 @@ st.markdown(
         font-weight: 700;
         letter-spacing: 0.05em;
         text-transform: uppercase;
-    }
-
-    .research-sort-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 5px;
-        width: 100%;
-        color: inherit;
-        text-decoration: none;
-    }
-
-    .research-table th.align-left .research-sort-link,
-    .research-table th.sticky-player .research-sort-link {
-        justify-content: flex-start;
-    }
-
-    .research-sort-arrow {
-        color: #9aa6b5;
-        font-size: 9px;
-        letter-spacing: -0.08em;
-    }
-
-    .research-sort-link.active {
-        color: var(--navy);
-    }
-
-    .research-sort-link.active .research-sort-arrow {
-        color: var(--blue);
-    }
-
-    .research-sort-link:hover {
-        color: var(--blue);
     }
 
     .research-table tbody tr:hover td {
@@ -1556,6 +1523,10 @@ def matchup_grade_class(grade):
 
 
 RESEARCH_COLUMN_LABELS = {
+    "batter": "Batter",
+    "pitcher": "Pitcher",
+    "opponent": "Opponent",
+    "split": "Split",
     "opposing_pitcher": "Pitcher",
     "opposing_pitcher_hand": "Hand",
     "pitcher_hand": "Hand",
@@ -1701,10 +1672,6 @@ def research_log_url(row, log_type):
             if pd.notna(numeric_value):
                 value = int(numeric_value)
         clean_params[key] = value
-    for key in ("sort_table", "sort_column", "sort_direction"):
-        value = query_param_value(key)
-        if value:
-            clean_params[key] = value
     return "?" + urlencode(clean_params) + "#matchup-log"
 
 
@@ -1715,24 +1682,6 @@ def research_edge_class(value):
     if "pitcher boost" in edge:
         return "pitcher"
     return "neutral"
-
-
-def query_param_value(name):
-    value = st.query_params.get(name)
-    if isinstance(value, list):
-        return value[-1] if value else None
-    return value
-
-
-def research_sort_state(table_key):
-    if query_param_value("sort_table") != table_key:
-        return None, None
-
-    column = query_param_value("sort_column")
-    direction = query_param_value("sort_direction")
-    if direction not in {"asc", "desc"}:
-        direction = "asc"
-    return column, direction
 
 
 def sort_research_dataframe(df, column, direction):
@@ -1762,53 +1711,38 @@ def sort_research_dataframe(df, column, direction):
     return result.drop(columns="_research_sort_value")
 
 
-def apply_research_sort(df, table_key):
-    column, direction = research_sort_state(table_key)
-    return sort_research_dataframe(df, column, direction)
-
-
-def research_sort_link(table_key, column, label):
-    active_column, active_direction = research_sort_state(table_key)
-    is_active = active_column == column
-    next_direction = (
-        "desc"
-        if is_active and active_direction == "asc"
-        else "asc"
-    )
-    params = {
-        "sort_table": table_key,
-        "sort_column": column,
-        "sort_direction": next_direction,
+def research_sort_controls(table_key, columns):
+    sortable_columns = [
+        column
+        for column in columns
+        if column != "game"
+    ]
+    label_to_column = {
+        RESEARCH_COLUMN_LABELS.get(column, column): column
+        for column in sortable_columns
     }
-    arrow = "▲" if is_active and active_direction == "asc" else "▼"
-    if not is_active:
-        arrow = "↕"
-    active_class = " active" if is_active else ""
-    url = "?" + urlencode(params) + f"#{table_key}"
-    return (
-        f'<a class="research-sort-link{active_class}" '
-        f'href="{escape(url, quote=True)}">'
-        f"<span>{escape(label)}</span>"
-        f'<span class="research-sort-arrow">{arrow}</span>'
-        "</a>"
+    sort_labels = ["Default ranking"] + list(label_to_column)
+    selected_label = st.selectbox(
+        "Sort by",
+        sort_labels,
+        key=f"{table_key}_sort_column",
     )
-
-
-def research_sort_only_url():
-    params = {}
-    for key in ("sort_table", "sort_column", "sort_direction"):
-        value = query_param_value(key)
-        if value:
-            params[key] = value
-    return "?" + urlencode(params) if params else "?"
+    direction_label = st.radio(
+        "Direction",
+        ["Descending", "Ascending"],
+        horizontal=True,
+        key=f"{table_key}_sort_direction",
+    )
+    return (
+        label_to_column.get(selected_label),
+        "asc" if direction_label == "Ascending" else "desc",
+    )
 
 
 def render_research_table(df, columns, player_column, log_type, table_key):
     header_cells = [
         '<th class="sticky-game"></th>',
-        '<th class="sticky-player">'
-        f"{research_sort_link(table_key, player_column, player_column.title())}"
-        "</th>",
+        f'<th class="sticky-player">{escape(player_column.title())}</th>',
     ]
     data_columns = [
         column
@@ -1831,8 +1765,7 @@ def render_research_table(df, columns, player_column, log_type, table_key):
         } else ""
         header_cells.append(
             f'<th class="{align_class.strip()}" '
-            f'style="min-width:{width}px">'
-            f"{research_sort_link(table_key, column, label)}</th>"
+            f'style="min-width:{width}px">{escape(label)}</th>'
         )
 
     body_rows = []
@@ -2013,6 +1946,289 @@ def display_pitcher_vs_team_game_log(selected_row):
     show_table(game_log_df[game_log_cols])
 
 
+@st.fragment
+def render_bvp_table_fragment(filtered_bvp_matchups, display_game_date, matchup_rows):
+    st.markdown(
+        f"""
+        <div class="section-shell">
+        <div class="section-title">{display_game_date}</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if filtered_bvp_matchups.empty:
+        st.warning("No batter vs pitcher matchup data was found for this selection.")
+        return
+
+    bvp_cols = [
+        "game",
+        "batter",
+        "opposing_pitcher",
+        "opposing_pitcher_hand",
+        "PA",
+        "AB",
+        "H",
+        "BB",
+        "HBP",
+        "SO",
+        "HR",
+        "RBI",
+        "AVG",
+        "OBP",
+        "SLG",
+        "OPS",
+        "K%",
+        "BB%",
+        "weather_condition",
+        "weather_display",
+        "humidity_pct",
+        "precip_probability_pct",
+        "wind_speed_mph",
+        "wind_direction_cardinal",
+        "wind_field_direction",
+        "wind_out_mph",
+        "weather_edge",
+        "matchup_grade",
+    ]
+    bvp_cols = [
+        column for column in bvp_cols if column in filtered_bvp_matchups.columns
+    ]
+
+    with st.popover("Filters"):
+        min_bvp_pa = st.slider(
+            "Minimum PA vs Pitcher",
+            min_value=0,
+            max_value=50,
+            value=0,
+            step=1,
+            key="bvp_min_pa",
+        )
+        sort_column, sort_direction = research_sort_controls(
+            "bvp-research-table",
+            bvp_cols,
+        )
+
+    display_bvp = filtered_bvp_matchups[
+        filtered_bvp_matchups["PA"] >= min_bvp_pa
+    ].copy()
+
+    available_bvp_rows = len(display_bvp)
+    display_bvp = sort_research_dataframe(
+        display_bvp,
+        sort_column,
+        sort_direction,
+    )
+    display_bvp = apply_matchup_row_limit(display_bvp, matchup_rows)
+    display_bvp = display_bvp.reset_index(drop=True)
+
+    st.html(
+        f'<div class="research-table-note">Showing {len(display_bvp):,} '
+        f'of {available_bvp_rows:,} matchups. Click a batter name '
+        "to open the career game log.</div>"
+    )
+    render_research_table(
+        display_bvp,
+        bvp_cols,
+        player_column="batter",
+        log_type="bvp",
+        table_key="bvp-research-table",
+    )
+
+
+@st.fragment
+def render_hand_table_fragment(filtered_hand_matchups, display_game_date, matchup_rows):
+    st.markdown(
+        f"""
+        <div class="section-shell">
+            <div class="section-title">{display_game_date}</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if filtered_hand_matchups.empty:
+        st.warning("No batter vs pitcher-hand split data was found for this selection.")
+        return
+
+    hand_cols = [
+        "game",
+        "batter",
+        "opposing_pitcher",
+        "opposing_pitcher_hand",
+        "split",
+        "PA",
+        "AB",
+        "H",
+        "BB",
+        "HBP",
+        "SO",
+        "HR",
+        "RBI",
+        "AVG",
+        "OBP",
+        "SLG",
+        "OPS",
+        "K%",
+        "BB%",
+        "weather_condition",
+        "weather_display",
+        "humidity_pct",
+        "precip_probability_pct",
+        "wind_speed_mph",
+        "wind_direction_cardinal",
+        "wind_field_direction",
+        "wind_out_mph",
+        "weather_edge",
+        "matchup_grade",
+    ]
+    hand_cols = [
+        column for column in hand_cols if column in filtered_hand_matchups.columns
+    ]
+
+    with st.popover("Filters"):
+        min_hand_pa = st.slider(
+            "Minimum PA vs Throwing Hand",
+            min_value=0,
+            max_value=300,
+            value=20,
+            step=5,
+            key="hand_min_pa",
+        )
+
+        min_hand_obp = st.slider(
+            "Minimum OBP vs Throwing Hand",
+            min_value=0.150,
+            max_value=0.500,
+            value=0.320,
+            step=0.005,
+            key="hand_min_obp",
+        )
+        sort_column, sort_direction = research_sort_controls(
+            "hand-research-table",
+            hand_cols,
+        )
+
+    display_hand = filtered_hand_matchups[
+        (filtered_hand_matchups["PA"] >= min_hand_pa)
+        & (filtered_hand_matchups["OBP"] >= min_hand_obp)
+    ].copy()
+
+    available_hand_rows = len(display_hand)
+    display_hand = sort_research_dataframe(
+        display_hand,
+        sort_column,
+        sort_direction,
+    )
+    display_hand = apply_matchup_row_limit(display_hand, matchup_rows)
+    display_hand = display_hand.reset_index(drop=True)
+
+    st.html(
+        f'<div class="research-table-note">Showing {len(display_hand):,} '
+        f'of {available_hand_rows:,} matchups. Click a batter name '
+        "to open the game log against today's probable pitcher.</div>"
+    )
+    render_research_table(
+        display_hand,
+        hand_cols,
+        player_column="batter",
+        log_type="bvp",
+        table_key="hand-research-table",
+    )
+
+
+@st.fragment
+def render_pitcher_table_fragment(filtered_pitcher_k_matchups, display_game_date, matchup_rows):
+    st.markdown(
+        f"""
+        <div class="section-shell">
+            <div class="section-title">{display_game_date}</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if filtered_pitcher_k_matchups.empty:
+        st.warning("No pitcher strikeout matchups were created for this selection.")
+        return
+
+    required_projected_cols = [
+        "Projected IP",
+        "Projected Pitch Count",
+        "Projected Ks",
+    ]
+    missing_projected_cols = [
+        col
+        for col in required_projected_cols
+        if col not in filtered_pitcher_k_matchups.columns
+    ]
+    if missing_projected_cols:
+        st.warning(
+            "The cloud data has not been refreshed with the newest pitcher projection columns yet. "
+            "Run the GitHub Action refresh, then reboot the Streamlit app."
+        )
+
+    k_cols = [
+        "game",
+        "pitcher",
+        "pitcher_hand",
+        "opponent",
+        "Season IP",
+        "GS",
+        "Projected IP",
+        "Projected Pitch Count",
+        "Projected Ks",
+        "ERA",
+        "WHIP",
+        "K%",
+        "K/9",
+        "SwStr%",
+        "opponent_avg_k%",
+        "weather_condition",
+        "weather_display",
+        "humidity_pct",
+        "precip_probability_pct",
+        "wind_speed_mph",
+        "wind_direction_cardinal",
+        "wind_field_direction",
+        "wind_out_mph",
+        "weather_edge",
+        "k_matchup_score",
+        "k_matchup_grade",
+    ]
+    k_cols = [
+        column for column in k_cols if column in filtered_pitcher_k_matchups.columns
+    ]
+
+    with st.popover("Filters"):
+        sort_column, sort_direction = research_sort_controls(
+            "pitcher-research-table",
+            k_cols,
+        )
+
+    available_pitcher_rows = len(filtered_pitcher_k_matchups)
+    display_k = sort_research_dataframe(
+        filtered_pitcher_k_matchups,
+        sort_column,
+        sort_direction,
+    )
+    display_k = apply_matchup_row_limit(display_k, matchup_rows)
+    display_k = display_k.reset_index(drop=True)
+
+    st.html(
+        f'<div class="research-table-note">Showing {len(display_k):,} '
+        f'of {available_pitcher_rows:,} matchups. Click a pitcher name '
+        "to open the career opponent game log.</div>"
+    )
+    render_research_table(
+        display_k,
+        k_cols,
+        player_column="pitcher",
+        log_type="pitcher",
+        table_key="pitcher-research-table",
+    )
+
+
 current_year = date.today().year
 try:
     if "MLB_DB_URL" in st.secrets:
@@ -2050,7 +2266,22 @@ def load_schedule(game_date, refresh_count):
 
 @st.cache_data(show_spinner=True, ttl=900)
 def load_weather(schedule, refresh_count, cache_version):
-    return enrich_schedule_with_weather(schedule)
+    return weather_service.enrich_schedule_with_weather(schedule)
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def load_published_weather(cache_version):
+    fetcher = getattr(
+        weather_service,
+        "fetch_published_weather_cache",
+        None,
+    )
+    return fetcher() if fetcher else pd.DataFrame()
+
+
+def merge_published_weather(current_df, cached_df):
+    merger = getattr(weather_service, "merge_cached_weather", None)
+    return merger(current_df, cached_df) if merger else current_df
 
 
 def preserve_previous_weather(current_df, previous_df):
@@ -2115,6 +2346,7 @@ def load_pitcher_stats(season, force_refresh):
 if force_refresh:
     load_schedule.clear()
     load_weather.clear()
+    load_published_weather.clear()
 
 schedule_df = load_schedule(selected_date, live_refresh_count)
 
@@ -2122,7 +2354,24 @@ if schedule_df.empty:
     st.warning("No MLB games found for this date.")
     st.stop()
 
-schedule_df = load_weather(schedule_df, live_refresh_count, cache_version=4)
+published_weather = load_published_weather(cache_version=2)
+cached_schedule_df = merge_published_weather(
+    schedule_df,
+    published_weather,
+)
+cached_weather_available = cached_schedule_df.get(
+    "weather_status",
+    pd.Series(dtype=str),
+).eq("Forecast available")
+
+if len(cached_schedule_df) and cached_weather_available.all():
+    schedule_df = cached_schedule_df
+else:
+    schedule_df = load_weather(schedule_df, live_refresh_count, cache_version=5)
+    schedule_df = merge_published_weather(
+        schedule_df,
+        published_weather,
+    )
 weather_session_cache = st.session_state.setdefault(
     "last_successful_weather_by_date",
     {},
@@ -2273,267 +2522,31 @@ with matchup_tab:
     )
 
     with tab1:
-        st.markdown(
-            f"""
-            <div class="section-shell">
-            <div class="section-title">{display_game_date}</span></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        render_bvp_table_fragment(
+            filtered_bvp_matchups,
+            display_game_date,
+            matchup_rows,
         )
-
-        if filtered_bvp_matchups.empty:
-            st.warning("No batter vs pitcher matchup data was found for this selection.")
-        else:
-            with st.popover("Filters"):
-                min_bvp_pa = st.slider(
-                    "Minimum PA vs Pitcher",
-                    min_value=0,
-                    max_value=50,
-                    value=0,
-                    step=1,
-                )
-
-            display_bvp = filtered_bvp_matchups[
-                filtered_bvp_matchups["PA"] >= min_bvp_pa
-            ].copy()
-
-            available_bvp_rows = len(display_bvp)
-            display_bvp = apply_research_sort(
-                display_bvp,
-                "bvp-research-table",
-            )
-            display_bvp = apply_matchup_row_limit(display_bvp, matchup_rows)
-            display_bvp = display_bvp.reset_index(drop=True)
-
-            bvp_cols = [
-                "game",
-                "batter",
-                "opposing_pitcher",
-                "opposing_pitcher_hand",
-                "PA",
-                "AB",
-                "H",
-                "BB",
-                "HBP",
-                "SO",
-                "HR",
-                "RBI",
-                "AVG",
-                "OBP",
-                "SLG",
-                "OPS",
-                "K%",
-                "BB%",
-                "weather_condition",
-                "weather_display",
-                "humidity_pct",
-                "precip_probability_pct",
-                "wind_speed_mph",
-                "wind_direction_cardinal",
-                "wind_field_direction",
-                "wind_out_mph",
-                "weather_edge",
-                "matchup_grade",
-            ]
-            bvp_cols = [column for column in bvp_cols if column in display_bvp.columns]
-
-            st.html(
-                f'<div class="research-table-note">Showing {len(display_bvp):,} '
-                f'of {available_bvp_rows:,} matchups. Click a batter name '
-                "to open the career game log.</div>"
-            )
-            render_research_table(
-                display_bvp,
-                bvp_cols,
-                player_column="batter",
-                log_type="bvp",
-                table_key="bvp-research-table",
-            )
 
     with tab2:
-        st.markdown(
-            f"""
-            <div class="section-shell">
-                <div class="section-title">{display_game_date}</span></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        render_hand_table_fragment(
+            filtered_hand_matchups,
+            display_game_date,
+            matchup_rows,
         )
-
-        if filtered_hand_matchups.empty:
-            st.warning("No batter vs pitcher-hand split data was found for this selection.")
-        else:
-            with st.popover("Filters"):
-                min_hand_pa = st.slider(
-                    "Minimum PA vs Throwing Hand",
-                    min_value=0,
-                    max_value=300,
-                    value=20,
-                    step=5,
-                )
-
-                min_hand_obp = st.slider(
-                    "Minimum OBP vs Throwing Hand",
-                    min_value=0.150,
-                    max_value=0.500,
-                    value=0.320,
-                    step=0.005,
-                )
-
-            display_hand = filtered_hand_matchups[
-                (filtered_hand_matchups["PA"] >= min_hand_pa)
-                & (filtered_hand_matchups["OBP"] >= min_hand_obp)
-            ].copy()
-
-            available_hand_rows = len(display_hand)
-            display_hand = apply_research_sort(
-                display_hand,
-                "hand-research-table",
-            )
-            display_hand = apply_matchup_row_limit(display_hand, matchup_rows)
-            display_hand = display_hand.reset_index(drop=True)
-
-            hand_cols = [
-                "game",
-                "batter",
-                "opposing_pitcher",
-                "opposing_pitcher_hand",
-                "split",
-                "PA",
-                "AB",
-                "H",
-                "BB",
-                "HBP",
-                "SO",
-                "HR",
-                "RBI",
-                "AVG",
-                "OBP",
-                "SLG",
-                "OPS",
-                "K%",
-                "BB%",
-                "weather_condition",
-                "weather_display",
-                "humidity_pct",
-                "precip_probability_pct",
-                "wind_speed_mph",
-                "wind_direction_cardinal",
-                "wind_field_direction",
-                "wind_out_mph",
-                "weather_edge",
-                "matchup_grade",
-            ]
-            hand_cols = [
-                column for column in hand_cols if column in display_hand.columns
-            ]
-
-            st.html(
-                f'<div class="research-table-note">Showing {len(display_hand):,} '
-                f'of {available_hand_rows:,} matchups. Click a batter name '
-                "to open the game log against today's probable pitcher.</div>"
-            )
-            render_research_table(
-                display_hand,
-                hand_cols,
-                player_column="batter",
-                log_type="bvp",
-                table_key="hand-research-table",
-            )
 
     with tab3:
-        st.markdown(
-            f"""
-            <div class="section-shell">
-                <div class="section-title">{display_game_date}</span></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        render_pitcher_table_fragment(
+            filtered_pitcher_k_matchups,
+            display_game_date,
+            matchup_rows,
         )
-
-        if filtered_pitcher_k_matchups.empty:
-            st.warning("No pitcher strikeout matchups were created for this selection.")
-        else:
-            required_projected_cols = [
-                "Projected IP",
-                "Projected Pitch Count",
-                "Projected Ks",
-            ]
-
-            missing_projected_cols = [
-                col
-                for col in required_projected_cols
-                if col not in filtered_pitcher_k_matchups.columns
-            ]
-
-            if missing_projected_cols:
-                st.warning(
-                    "The cloud data has not been refreshed with the newest pitcher projection columns yet. "
-                    "Run the GitHub Action refresh, then reboot the Streamlit app."
-                )
-
-            available_pitcher_rows = len(filtered_pitcher_k_matchups)
-            sorted_pitcher_k_matchups = apply_research_sort(
-                filtered_pitcher_k_matchups,
-                "pitcher-research-table",
-            )
-            display_k = apply_matchup_row_limit(
-                sorted_pitcher_k_matchups,
-                matchup_rows,
-            )
-            display_k = display_k.reset_index(drop=True)
-
-            k_cols = [
-                "game",
-                "pitcher",
-                "pitcher_hand",
-                "opponent",
-                "Season IP",
-                "GS",
-                "Projected IP",
-                "Projected Pitch Count",
-                "Projected Ks",
-                "ERA",
-                "WHIP",
-                "K%",
-                "K/9",
-                "SwStr%",
-                "opponent_avg_k%",
-                "weather_condition",
-                "weather_display",
-                "humidity_pct",
-                "precip_probability_pct",
-                "wind_speed_mph",
-                "wind_direction_cardinal",
-                "wind_field_direction",
-                "wind_out_mph",
-                "weather_edge",
-                "k_matchup_score",
-                "k_matchup_grade",
-            ]
-            k_cols = [column for column in k_cols if column in display_k.columns]
-
-            st.html(
-                f'<div class="research-table-note">Showing {len(display_k):,} '
-                f'of {available_pitcher_rows:,} matchups. Click a pitcher name '
-                "to open the career opponent game log.</div>"
-            )
-            render_research_table(
-                display_k,
-                k_cols,
-                player_column="pitcher",
-                log_type="pitcher",
-                table_key="pitcher-research-table",
-            )
 
     selected_log = selected_log_from_query()
     if selected_log is not None:
         st.html(
             '<div class="matchup-log-shell" id="matchup-log">'
-            f'<a class="research-player-link" href="'
-            f'{escape(research_sort_only_url(), quote=True)}">'
-            "Close game log</a>"
+            '<a class="research-player-link" href="?">Close game log</a>'
             "</div>"
         )
         if selected_log["log_type"] == "pitcher":

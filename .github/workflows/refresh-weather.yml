@@ -1,0 +1,52 @@
+name: Refresh weather cache
+
+on:
+  push:
+    branches:
+      - main
+
+  schedule:
+    - cron: "*/15 * * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-mlb-weather
+  cancel-in-progress: true
+
+jobs:
+  refresh-weather:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build weather cache
+        run: |
+          python refresh_weather_cache.py --days 8 --output data/weather.json
+
+      - name: Publish weather cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view mlb-data >/dev/null 2>&1; then
+            gh release upload mlb-data data/weather.json --clobber
+          else
+            gh release create mlb-data data/weather.json \
+              --title "MLB data" \
+              --notes "Published MLB data and weather cache."
+          fi
