@@ -497,6 +497,8 @@ st.markdown(
     div[class*="st-key-pitcher_k_table"] [data-testid="stDataFrame"] {
         border: 1px solid var(--line);
         background: #ffffff;
+        overscroll-behavior-x: contain;
+        touch-action: pan-x pan-y;
     }
 
     .research-table-note {
@@ -800,6 +802,17 @@ st.markdown(
             display: none;
         }
 
+        div[class*="st-key-bvp_table"] [data-testid="stDataFrame"],
+        div[class*="st-key-hand_table"] [data-testid="stDataFrame"],
+        div[class*="st-key-pitcher_k_table"] [data-testid="stDataFrame"] {
+            max-height: 540px;
+        }
+
+        .research-table-note {
+            line-height: 1.45;
+            margin-bottom: 6px;
+        }
+
     }
     </style>
     """,
@@ -852,7 +865,7 @@ def grade_bar_url(grade):
     return "data:image/svg+xml;utf8," + quote(svg)
 
 
-def weather_icon_svg(icon_name, size=18):
+def weather_icon_svg(icon_name, size=18, padding=0):
     paths = {
         "clear": (
             "<circle cx='12' cy='12' r='4'/>"
@@ -898,17 +911,21 @@ def weather_icon_svg(icon_name, size=18):
     }
 
     icon_paths = paths.get(str(icon_name or "unknown"), paths["unknown"])
+    viewbox_size = 24 + (padding * 2)
 
     return (
         "<svg class='weather-svg' xmlns='http://www.w3.org/2000/svg' "
-        f"viewBox='0 0 24 24' width='{size}' height='{size}' fill='none' "
+        f"viewBox='{-padding} {-padding} {viewbox_size} {viewbox_size}' "
+        f"width='{size}' height='{size}' fill='none' "
         "stroke='#617083' stroke-width='1.7' stroke-linecap='round' "
         f"stroke-linejoin='round'>{icon_paths}</svg>"
     )
 
 
-def weather_icon_data_url(icon_name, size=18):
-    return "data:image/svg+xml;utf8," + quote(weather_icon_svg(icon_name, size=size))
+def weather_icon_data_url(icon_name, size=18, padding=0):
+    return "data:image/svg+xml;utf8," + quote(
+        weather_icon_svg(icon_name, size=size, padding=padding)
+    )
 
 
 def grade_cell_style(value):
@@ -999,7 +1016,8 @@ def make_light_table(df):
 
 def show_table(df, key=None, selectable_column=None):
     table_data = make_light_table(df)
-    table_height = min(44 * (len(df) + 1) + 8, 820)
+    row_height = 36
+    table_height = min(row_height * (len(df) + 1) + 8, 540)
 
     kwargs = {
         "data": table_data,
@@ -1007,7 +1025,8 @@ def show_table(df, key=None, selectable_column=None):
         "height": max(table_height, 180),
         "hide_index": True,
         "column_config": table_column_config(),
-        "row_height": 42,
+        "row_height": row_height,
+        "placeholder": "-",
     }
 
     if selectable_column:
@@ -1095,10 +1114,23 @@ def is_missing_value(value):
 def table_column_config():
     return {
         "grade_bar": st.column_config.ImageColumn("", width=18),
-        "game_away_logo": st.column_config.ImageColumn("Game", width=34),
-        "game_at": st.column_config.TextColumn("", width=22),
-        "game_home_logo": st.column_config.ImageColumn("", width=34),
-        "weather_icon_url": st.column_config.ImageColumn("", width=24),
+        "game_away_logo": st.column_config.ImageColumn(
+            "",
+            width=28,
+            pinned=True,
+        ),
+        "game_at": st.column_config.TextColumn(
+            "",
+            width=18,
+            pinned=True,
+            alignment="center",
+        ),
+        "game_home_logo": st.column_config.ImageColumn(
+            "",
+            width=28,
+            pinned=True,
+        ),
+        "weather_icon_url": st.column_config.ImageColumn("", width=20),
         "team_logo": st.column_config.ImageColumn("", width=32),
         "opponent_logo": st.column_config.ImageColumn("", width=32),
         "away_logo": st.column_config.ImageColumn("", width=32),
@@ -1117,15 +1149,17 @@ def table_column_config():
         "home_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
         "batter": st.column_config.TextColumn(
             "Batter",
-            width=150,
+            width=135,
             help="Click a batter name cell to open the career game log.",
+            pinned=True,
         ),
         "pitcher": st.column_config.TextColumn(
             "Pitcher",
-            width=150,
+            width=135,
             help="Click a pitcher name cell to open the opponent game log.",
+            pinned=True,
         ),
-        "opposing_pitcher": st.column_config.TextColumn("Pitcher", width=140),
+        "opposing_pitcher": st.column_config.TextColumn("Pitcher", width=125),
         "pitcher_hand": st.column_config.TextColumn("Hand", width=60),
         "opposing_pitcher_hand": st.column_config.TextColumn("Hand", width=60),
         "split": st.column_config.TextColumn("Split", width=75),
@@ -1169,7 +1203,7 @@ def table_column_config():
         "k_matchup_score": st.column_config.NumberColumn("K Score", width=80, format="%.2f"),
         "venue_name": st.column_config.TextColumn("Ballpark", width=145),
         "roof_type": st.column_config.TextColumn("Roof", width=90),
-        "weather_condition": st.column_config.TextColumn("Weather", width=115),
+        "weather_condition": st.column_config.TextColumn("Weather", width=95),
         "weather_display": st.column_config.TextColumn(
             "Temp",
             width=65,
@@ -1382,9 +1416,9 @@ def prepare_batter_matchup_table(df):
         pd.Series("No History", index=result.index),
     ).apply(grade_bar_url)
     result["weather_icon_url"] = result.get(
-    "weather_icon",
-    pd.Series("unknown", index=result.index),
-    ).apply(lambda icon: weather_icon_data_url(icon, size=22))
+        "weather_icon",
+        pd.Series("unknown", index=result.index),
+    ).apply(lambda icon: weather_icon_data_url(icon, size=14, padding=8))
     return result
 
 
@@ -1397,7 +1431,7 @@ def prepare_pitcher_matchup_table(df):
     result["weather_icon_url"] = result.get(
         "weather_icon",
         pd.Series("unknown", index=result.index),
-    ).apply(weather_icon_data_url)
+    ).apply(lambda icon: weather_icon_data_url(icon, size=14, padding=8))
     return result
 
 
