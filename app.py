@@ -1,10 +1,12 @@
 from datetime import date
 from html import escape
+import json
 import os
-from urllib.parse import urlencode
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit_autorefresh import st_autorefresh
 
 from src.mlb_schedule import get_daily_schedule
@@ -26,6 +28,11 @@ from src import database
 st.set_page_config(
     page_title="All Rise Analytics",
     layout="wide",
+)
+
+RESEARCH_TABLE_COMPONENT = components.declare_component(
+    "research_table",
+    path=str(Path(__file__).parent / "components" / "research_table"),
 )
 
 live_refresh_count = st_autorefresh(
@@ -1647,32 +1654,32 @@ def research_game_html(game):
     )
 
 
-def research_log_url(row, log_type):
+def research_log_payload(row, log_type):
     if log_type == "pitcher":
-        params = {
+        payload = {
             "log_type": "pitcher",
             "pitcher_id": row.get("pitcher_id"),
             "pitcher": row.get("pitcher"),
             "opponent": row.get("opponent"),
         }
     else:
-        params = {
+        payload = {
             "log_type": "bvp",
             "batter_id": row.get("batter_id"),
-            "pitcher_id": row.get("opposing_pitcher_id"),
+            "opposing_pitcher_id": row.get("opposing_pitcher_id"),
             "batter": row.get("batter"),
-            "pitcher": row.get("opposing_pitcher"),
+            "opposing_pitcher": row.get("opposing_pitcher"),
         }
-    clean_params = {}
-    for key, value in params.items():
+    clean_payload = {}
+    for key, value in payload.items():
         if is_missing_value(value):
             continue
         if key.endswith("_id"):
             numeric_value = pd.to_numeric(value, errors="coerce")
             if pd.notna(numeric_value):
                 value = int(numeric_value)
-        clean_params[key] = value
-    return "?" + urlencode(clean_params) + "#matchup-log"
+        clean_payload[key] = value
+    return clean_payload
 
 
 def research_edge_class(value):
@@ -1684,65 +1691,26 @@ def research_edge_class(value):
     return "neutral"
 
 
-def sort_research_dataframe(df, column, direction):
-    if df.empty or not column or column == "game":
-        return df
-
+def research_sort_metadata(row, column):
     sort_column = RESEARCH_SORT_ALIASES.get(column, column)
-    if sort_column not in df.columns:
-        return df
+    value = row.get(sort_column)
+    if is_missing_value(value):
+        return "", "missing"
 
-    result = df.copy()
-    sort_values = result[sort_column]
-    numeric_values = pd.to_numeric(sort_values, errors="coerce")
-    if numeric_values.notna().any():
-        result["_research_sort_value"] = numeric_values
-    else:
-        result["_research_sort_value"] = (
-            sort_values.fillna("").astype(str).str.lower()
-        )
-
-    result = result.sort_values(
-        "_research_sort_value",
-        ascending=direction != "desc",
-        na_position="last",
-        kind="mergesort",
-    )
-    return result.drop(columns="_research_sort_value")
-
-
-def research_sort_controls(table_key, columns):
-    sortable_columns = [
-        column
-        for column in columns
-        if column != "game"
-    ]
-    label_to_column = {
-        RESEARCH_COLUMN_LABELS.get(column, column): column
-        for column in sortable_columns
-    }
-    sort_labels = ["Default ranking"] + list(label_to_column)
-    selected_label = st.selectbox(
-        "Sort by",
-        sort_labels,
-        key=f"{table_key}_sort_column",
-    )
-    direction_label = st.radio(
-        "Direction",
-        ["Descending", "Ascending"],
-        horizontal=True,
-        key=f"{table_key}_sort_direction",
-    )
-    return (
-        label_to_column.get(selected_label),
-        "asc" if direction_label == "Ascending" else "desc",
-    )
+    numeric_value = pd.to_numeric(value, errors="coerce")
+    if pd.notna(numeric_value):
+        return str(float(numeric_value)), "number"
+    return str(value).strip().lower(), "text"
 
 
 def render_research_table(df, columns, player_column, log_type, table_key):
     header_cells = [
         '<th class="sticky-game"></th>',
-        f'<th class="sticky-player">{escape(player_column.title())}</th>',
+        '<th class="sticky-player align-left" aria-sort="none">'
+        f'<button type="button" class="research-sort-button" data-column-index="1">'
+        f"<span>{escape(player_column.title())}</span>"
+        '<span class="research-sort-indicator" aria-hidden="true"></span>'
+        "</button></th>",
     ]
     data_columns = [
         column
@@ -1764,22 +1732,38 @@ def render_research_table(df, columns, player_column, log_type, table_key):
             "k_matchup_grade",
         } else ""
         header_cells.append(
-            f'<th class="{align_class.strip()}" '
-            f'style="min-width:{width}px">{escape(label)}</th>'
+            f'<th class="{align_class.strip()}" style="min-width:{width}px" '
+            'aria-sort="none">'
+            f'<button type="button" class="research-sort-button" '
+            f'data-column-index="{len(header_cells)}">'
+            f"<span>{escape(label)}</span>"
+            '<span class="research-sort-indicator" aria-hidden="true"></span>'
+            "</button></th>"
         )
 
     body_rows = []
     for _, row in df.iterrows():
         player_name = str(row.get(player_column) or "Unknown")
-        player_url = research_log_url(row, log_type)
+        player_payload = json.dumps(
+            research_log_payload(row, log_type),
+            separators=(",", ":"),
+        )
+        player_sort_value, player_sort_kind = research_sort_metadata(
+            row,
+            player_column,
+        )
         cells = [
             f'<td class="sticky-game">{research_game_html(row.get("game"))}</td>',
-            '<td class="sticky-player">'
-            f'<a class="research-player-link" href="{escape(player_url, quote=True)}">'
-            f"{escape(player_name)}</a></td>",
+            '<td class="sticky-player" '
+            f'data-sort-value="{escape(player_sort_value, quote=True)}" '
+            f'data-sort-kind="{player_sort_kind}">'
+            '<button type="button" class="research-player-link" '
+            f'data-research-event="{escape(player_payload, quote=True)}">'
+            f"{escape(player_name)}</button></td>",
         ]
         for column in data_columns:
             value = row.get(column)
+            sort_value, sort_kind = research_sort_metadata(row, column)
             align_class = "align-left" if column in {
                 "opposing_pitcher",
                 "opponent",
@@ -1793,10 +1777,28 @@ def render_research_table(df, columns, player_column, log_type, table_key):
             } else ""
             if column == "weather_condition":
                 icon = weather_icon_svg(row.get("weather_icon"), size=17)
+                tooltip = escape(
+                    str(row.get("weather_tooltip") or ""),
+                    quote=True,
+                )
                 content = (
-                    '<span class="research-weather">'
+                    f'<span class="research-weather" title="{tooltip}">'
                     f"{icon}<span>{escape(research_cell_value(column, value))}</span>"
                     "</span>"
+                )
+            elif column in {
+                "wind_speed_mph",
+                "wind_direction_cardinal",
+                "wind_field_direction",
+                "wind_out_mph",
+            }:
+                tooltip = escape(
+                    str(row.get("wind_tooltip") or ""),
+                    quote=True,
+                )
+                content = (
+                    f'<span title="{tooltip}">'
+                    f"{escape(research_cell_value(column, value))}</span>"
                 )
             elif column == "weather_edge":
                 content = (
@@ -1811,39 +1813,60 @@ def render_research_table(df, columns, player_column, log_type, table_key):
                 )
             else:
                 content = escape(research_cell_value(column, value))
-            cells.append(f'<td class="{align_class}">{content}</td>')
+            cells.append(
+                f'<td class="{align_class}" '
+                f'data-sort-value="{escape(sort_value, quote=True)}" '
+                f'data-sort-kind="{sort_kind}">{content}</td>'
+            )
         body_rows.append("<tr>" + "".join(cells) + "</tr>")
 
-    st.html(
-        f"""
+    return RESEARCH_TABLE_COMPONENT(
+        table_html=f"""
         <div class="research-table-shell" id="{escape(table_key, quote=True)}">
             <table class="research-table">
                 <thead><tr>{''.join(header_cells)}</tr></thead>
                 <tbody>{''.join(body_rows)}</tbody>
             </table>
         </div>
-        """
+        """,
+        table_height=542,
+        key=table_key,
+        default=None,
     )
 
 
-def selected_log_from_query():
-    log_type = st.query_params.get("log_type")
-    if log_type == "bvp":
-        return {
-            "log_type": "bvp",
-            "batter_id": st.query_params.get("batter_id"),
-            "opposing_pitcher_id": st.query_params.get("pitcher_id"),
-            "batter": st.query_params.get("batter"),
-            "opposing_pitcher": st.query_params.get("pitcher"),
-        }
-    if log_type == "pitcher":
-        return {
-            "log_type": "pitcher",
-            "pitcher_id": st.query_params.get("pitcher_id"),
-            "pitcher": st.query_params.get("pitcher"),
-            "opponent": st.query_params.get("opponent"),
-        }
-    return None
+def selected_log_from_event(table_key, event):
+    selected_key = f"{table_key}_selected_log"
+    event_key = f"{table_key}_processed_event"
+    if isinstance(event, dict) and event.get("type") == "select_player":
+        event_id = str(event.get("event_id") or "")
+        payload = event.get("payload")
+        if (
+            event_id
+            and event_id != st.session_state.get(event_key)
+            and isinstance(payload, dict)
+        ):
+            st.session_state[event_key] = event_id
+            st.session_state[selected_key] = payload
+    return st.session_state.get(selected_key)
+
+
+def render_selected_research_log(table_key, selected_log):
+    if selected_log is None:
+        return
+
+    if st.button(
+        "Close game log",
+        key=f"{table_key}_close_log",
+        type="tertiary",
+    ):
+        st.session_state[f"{table_key}_selected_log"] = None
+        return
+
+    if selected_log.get("log_type") == "pitcher":
+        display_pitcher_vs_team_game_log(selected_log)
+    else:
+        display_bvp_game_log(selected_log)
 
 
 def display_bvp_game_log(selected_row):
@@ -1995,7 +2018,7 @@ def render_bvp_table_fragment(filtered_bvp_matchups, display_game_date, matchup_
         column for column in bvp_cols if column in filtered_bvp_matchups.columns
     ]
 
-    with st.popover("Filters"):
+    with st.popover("Minimum sample"):
         min_bvp_pa = st.slider(
             "Minimum PA vs Pitcher",
             min_value=0,
@@ -2004,21 +2027,12 @@ def render_bvp_table_fragment(filtered_bvp_matchups, display_game_date, matchup_
             step=1,
             key="bvp_min_pa",
         )
-        sort_column, sort_direction = research_sort_controls(
-            "bvp-research-table",
-            bvp_cols,
-        )
 
     display_bvp = filtered_bvp_matchups[
         filtered_bvp_matchups["PA"] >= min_bvp_pa
     ].copy()
 
     available_bvp_rows = len(display_bvp)
-    display_bvp = sort_research_dataframe(
-        display_bvp,
-        sort_column,
-        sort_direction,
-    )
     display_bvp = apply_matchup_row_limit(display_bvp, matchup_rows)
     display_bvp = display_bvp.reset_index(drop=True)
 
@@ -2027,12 +2041,16 @@ def render_bvp_table_fragment(filtered_bvp_matchups, display_game_date, matchup_
         f'of {available_bvp_rows:,} matchups. Click a batter name '
         "to open the career game log.</div>"
     )
-    render_research_table(
+    table_event = render_research_table(
         display_bvp,
         bvp_cols,
         player_column="batter",
         log_type="bvp",
         table_key="bvp-research-table",
+    )
+    render_selected_research_log(
+        "bvp-research-table",
+        selected_log_from_event("bvp-research-table", table_event),
     )
 
 
@@ -2086,7 +2104,7 @@ def render_hand_table_fragment(filtered_hand_matchups, display_game_date, matchu
         column for column in hand_cols if column in filtered_hand_matchups.columns
     ]
 
-    with st.popover("Filters"):
+    with st.popover("Minimum sample"):
         min_hand_pa = st.slider(
             "Minimum PA vs Throwing Hand",
             min_value=0,
@@ -2104,10 +2122,6 @@ def render_hand_table_fragment(filtered_hand_matchups, display_game_date, matchu
             step=0.005,
             key="hand_min_obp",
         )
-        sort_column, sort_direction = research_sort_controls(
-            "hand-research-table",
-            hand_cols,
-        )
 
     display_hand = filtered_hand_matchups[
         (filtered_hand_matchups["PA"] >= min_hand_pa)
@@ -2115,11 +2129,6 @@ def render_hand_table_fragment(filtered_hand_matchups, display_game_date, matchu
     ].copy()
 
     available_hand_rows = len(display_hand)
-    display_hand = sort_research_dataframe(
-        display_hand,
-        sort_column,
-        sort_direction,
-    )
     display_hand = apply_matchup_row_limit(display_hand, matchup_rows)
     display_hand = display_hand.reset_index(drop=True)
 
@@ -2128,12 +2137,16 @@ def render_hand_table_fragment(filtered_hand_matchups, display_game_date, matchu
         f'of {available_hand_rows:,} matchups. Click a batter name '
         "to open the game log against today's probable pitcher.</div>"
     )
-    render_research_table(
+    table_event = render_research_table(
         display_hand,
         hand_cols,
         player_column="batter",
         log_type="bvp",
         table_key="hand-research-table",
+    )
+    render_selected_research_log(
+        "hand-research-table",
+        selected_log_from_event("hand-research-table", table_event),
     )
 
 
@@ -2200,19 +2213,11 @@ def render_pitcher_table_fragment(filtered_pitcher_k_matchups, display_game_date
         column for column in k_cols if column in filtered_pitcher_k_matchups.columns
     ]
 
-    with st.popover("Filters"):
-        sort_column, sort_direction = research_sort_controls(
-            "pitcher-research-table",
-            k_cols,
-        )
-
     available_pitcher_rows = len(filtered_pitcher_k_matchups)
-    display_k = sort_research_dataframe(
+    display_k = apply_matchup_row_limit(
         filtered_pitcher_k_matchups,
-        sort_column,
-        sort_direction,
+        matchup_rows,
     )
-    display_k = apply_matchup_row_limit(display_k, matchup_rows)
     display_k = display_k.reset_index(drop=True)
 
     st.html(
@@ -2220,12 +2225,16 @@ def render_pitcher_table_fragment(filtered_pitcher_k_matchups, display_game_date
         f'of {available_pitcher_rows:,} matchups. Click a pitcher name '
         "to open the career opponent game log.</div>"
     )
-    render_research_table(
+    table_event = render_research_table(
         display_k,
         k_cols,
         player_column="pitcher",
         log_type="pitcher",
         table_key="pitcher-research-table",
+    )
+    render_selected_research_log(
+        "pitcher-research-table",
+        selected_log_from_event("pitcher-research-table", table_event),
     )
 
 
@@ -2269,14 +2278,17 @@ def load_weather(schedule, refresh_count, cache_version):
     return weather_service.enrich_schedule_with_weather(schedule)
 
 
-@st.cache_data(show_spinner=False, ttl=60)
-def load_published_weather(cache_version):
+def load_published_weather(cache_version, refresh_count):
     fetcher = getattr(
         weather_service,
         "fetch_published_weather_cache",
         None,
     )
-    return fetcher() if fetcher else pd.DataFrame()
+    if not fetcher:
+        return pd.DataFrame()
+    return fetcher(
+        cache_bust=f"{date.today().isoformat()}-{cache_version}-{refresh_count}",
+    )
 
 
 def merge_published_weather(current_df, cached_df):
@@ -2346,7 +2358,6 @@ def load_pitcher_stats(season, force_refresh):
 if force_refresh:
     load_schedule.clear()
     load_weather.clear()
-    load_published_weather.clear()
 
 schedule_df = load_schedule(selected_date, live_refresh_count)
 
@@ -2354,7 +2365,10 @@ if schedule_df.empty:
     st.warning("No MLB games found for this date.")
     st.stop()
 
-published_weather = load_published_weather(cache_version=2)
+published_weather = load_published_weather(
+    cache_version=3,
+    refresh_count=live_refresh_count,
+)
 cached_schedule_df = merge_published_weather(
     schedule_df,
     published_weather,
@@ -2386,6 +2400,27 @@ if schedule_df.get(
     pd.Series(dtype=str),
 ).eq("Forecast available").any():
     weather_session_cache[weather_cache_key] = schedule_df.copy()
+
+weather_available = schedule_df.get(
+    "weather_status",
+    pd.Series(dtype=str),
+).eq("Forecast available")
+if len(schedule_df) and not weather_available.any():
+    published_error = published_weather.attrs.get("weather_error")
+    runtime_errors = schedule_df.get(
+        "weather_error",
+        pd.Series(dtype=str),
+    ).dropna()
+    error_detail = published_error
+    if not runtime_errors.empty:
+        error_detail = runtime_errors.iloc[0]
+    message = (
+        "Game-time weather could not be loaded from the published forecast, "
+        "Open-Meteo, MET Norway, or MLB StatsAPI."
+    )
+    if error_detail:
+        message += f" Provider detail: {error_detail}"
+    st.error(message)
 batters_df = load_batter_stats(season, force_refresh)
 pitchers_df = load_pitcher_stats(season, force_refresh)
 
@@ -2541,19 +2576,6 @@ with matchup_tab:
             display_game_date,
             matchup_rows,
         )
-
-    selected_log = selected_log_from_query()
-    if selected_log is not None:
-        st.html(
-            '<div class="matchup-log-shell" id="matchup-log">'
-            '<a class="research-player-link" href="?">Close game log</a>'
-            "</div>"
-        )
-        if selected_log["log_type"] == "pitcher":
-            display_pitcher_vs_team_game_log(selected_log)
-        else:
-            display_bvp_game_log(selected_log)
-
 
 with info_tab:
     st.markdown(

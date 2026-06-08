@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --text: #111827;
+      --muted: #647184;
+      --muted-2: #87919c;
+      --line: #d6dde6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--text);
+      font-family: "Source Sans 3", "Source Sans Pro", sans-serif;
+    }
+
+    .research-table-shell {
+      max-height: 540px;
+      overflow: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      scrollbar-gutter: stable;
+    }
+
+    .research-table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      color: var(--text);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .research-table th,
+    .research-table td {
+      height: 36px;
+      padding: 0 10px;
+      border: 0;
+      border-bottom: 1px solid #edf0f4;
+      background: #ffffff;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .research-table th {
+      position: sticky;
+      top: 0;
+      z-index: 8;
+      height: 38px;
+      background: #eef2f6;
+      color: #647184;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .research-table tbody tr:hover td {
+      background: #f7fafc;
+    }
+
+    .research-table .align-left {
+      text-align: left;
+    }
+
+    .research-table .sticky-game {
+      position: sticky;
+      left: 0;
+      z-index: 5;
+      width: 92px;
+      min-width: 92px;
+      text-align: center;
+      box-shadow: 1px 0 0 #dfe5ec;
+    }
+
+    .research-table .sticky-player {
+      position: sticky;
+      left: 92px;
+      z-index: 5;
+      width: 150px;
+      min-width: 150px;
+      text-align: left;
+      box-shadow: 1px 0 0 #dfe5ec;
+    }
+
+    .research-table th.sticky-game,
+    .research-table th.sticky-player {
+      z-index: 10;
+      background: #e8edf3;
+    }
+
+    .research-sort-button {
+      width: 100%;
+      height: 38px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      font: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+    }
+
+    .align-left .research-sort-button {
+      justify-content: flex-start;
+    }
+
+    .research-sort-button:hover,
+    .research-sort-button:focus-visible {
+      color: #245f96;
+      outline: none;
+    }
+
+    .research-sort-indicator {
+      width: 9px;
+      color: #245f96;
+      font-size: 10px;
+      line-height: 1;
+    }
+
+    th[aria-sort="ascending"] .research-sort-indicator::after {
+      content: "\2191";
+    }
+
+    th[aria-sort="descending"] .research-sort-indicator::after {
+      content: "\2193";
+    }
+
+    .research-game {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .research-game img {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+    }
+
+    .research-at {
+      color: var(--muted-2);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .research-player-link {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #245f96;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+      text-align: left;
+      text-decoration: none;
+    }
+
+    .research-player-link:hover,
+    .research-player-link:focus-visible {
+      color: #123f69;
+      text-decoration: underline;
+      outline: none;
+    }
+
+    .research-weather {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 86px;
+    }
+
+    .research-weather .weather-svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .research-grade,
+    .research-edge {
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 2px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .research-grade.good,
+    .research-edge.hitter {
+      color: #247a4d;
+      background: #edf8f2;
+    }
+
+    .research-grade.neutral {
+      color: #9a6810;
+      background: #fff8e8;
+    }
+
+    .research-grade.avoid,
+    .research-edge.pitcher {
+      color: #b43b3b;
+      background: #fff0f0;
+    }
+
+    .research-grade.sample {
+      color: #3f6fa8;
+      background: #eef5ff;
+    }
+
+    .research-grade.none,
+    .research-edge.neutral {
+      color: #687384;
+      background: #f2f4f7;
+    }
+
+    @media (max-width: 680px) {
+      .research-table-shell {
+        max-height: 500px;
+      }
+
+      .research-table {
+        font-size: 11px;
+      }
+
+      .research-table th,
+      .research-table td {
+        padding: 0 8px;
+      }
+
+      .research-table .sticky-game {
+        width: 82px;
+        min-width: 82px;
+      }
+
+      .research-table .sticky-player {
+        left: 82px;
+        width: 132px;
+        min-width: 132px;
+      }
+
+      .research-game img {
+        width: 21px;
+        height: 21px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const root = document.getElementById("root");
+    let activeSort = null;
+
+    function sendMessage(type, payload = {}) {
+      window.parent.postMessage(
+        {
+          isStreamlitMessage: true,
+          type,
+          ...payload,
+        },
+        "*",
+      );
+    }
+
+    function setFrameHeight(requestedHeight) {
+      const mobileHeight = window.innerWidth <= 680 ? 502 : requestedHeight;
+      sendMessage("streamlit:setFrameHeight", { height: mobileHeight });
+    }
+
+    function compareRows(rowA, rowB, columnIndex, direction) {
+      const cellA = rowA.children[columnIndex];
+      const cellB = rowB.children[columnIndex];
+      const kindA = cellA?.dataset.sortKind || "missing";
+      const kindB = cellB?.dataset.sortKind || "missing";
+
+      if (kindA === "missing" && kindB !== "missing") return 1;
+      if (kindB === "missing" && kindA !== "missing") return -1;
+      if (kindA === "missing" && kindB === "missing") return 0;
+
+      const valueA = cellA.dataset.sortValue || "";
+      const valueB = cellB.dataset.sortValue || "";
+      let comparison;
+      if (kindA === "number" && kindB === "number") {
+        comparison = Number(valueA) - Number(valueB);
+      } else {
+        comparison = valueA.localeCompare(valueB, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+      }
+      return direction === "asc" ? comparison : -comparison;
+    }
+
+    function applySort(columnIndex, direction, remember = true) {
+      const table = root.querySelector(".research-table");
+      const body = table?.tBodies[0];
+      if (!table || !body) return;
+
+      const rows = Array.from(body.rows).map((row, originalIndex) => ({
+        row,
+        originalIndex,
+      }));
+      rows.sort((itemA, itemB) => {
+        const comparison = compareRows(
+          itemA.row,
+          itemB.row,
+          columnIndex,
+          direction,
+        );
+        return comparison || itemA.originalIndex - itemB.originalIndex;
+      });
+      rows.forEach(({ row }) => body.appendChild(row));
+
+      table.querySelectorAll("th[aria-sort]").forEach((header) => {
+        header.setAttribute("aria-sort", "none");
+      });
+      const header = table.tHead?.rows[0]?.cells[columnIndex];
+      if (header) {
+        header.setAttribute(
+          "aria-sort",
+          direction === "asc" ? "ascending" : "descending",
+        );
+      }
+      if (remember) activeSort = { columnIndex, direction };
+    }
+
+    function wireInteractions() {
+      root.querySelectorAll(".research-sort-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          const columnIndex = Number(button.dataset.columnIndex);
+          const direction = (
+            activeSort?.columnIndex === columnIndex
+            && activeSort.direction === "asc"
+          ) ? "desc" : "asc";
+          applySort(columnIndex, direction);
+        });
+      });
+
+      root.querySelectorAll("[data-research-event]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const payload = JSON.parse(button.dataset.researchEvent);
+          sendMessage("streamlit:setComponentValue", {
+            dataType: "json",
+            value: {
+              type: "select_player",
+              event_id: `${Date.now()}-${Math.random()}`,
+              payload,
+            },
+          });
+        });
+      });
+    }
+
+    function render(args) {
+      root.innerHTML = args.table_html || "";
+      wireInteractions();
+      if (activeSort) {
+        applySort(
+          activeSort.columnIndex,
+          activeSort.direction,
+          false,
+        );
+      }
+      setFrameHeight(args.table_height || 542);
+    }
+
+    window.addEventListener("message", (event) => {
+      if (event.data?.type === "streamlit:render") {
+        render(event.data.args || {});
+      }
+    });
+
+    window.addEventListener("resize", () => setFrameHeight(542));
+    sendMessage("streamlit:componentReady", { apiVersion: 1 });
+  </script>
+</body>
+</html>

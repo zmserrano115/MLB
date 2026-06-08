@@ -581,10 +581,14 @@ def fetch_mlb_game_weather(game):
     return convert_mlb_game_weather(game, weather)
 
 
-def fetch_published_weather_cache(cache_url=DEFAULT_WEATHER_CACHE_URL):
+def fetch_published_weather_cache(
+    cache_url=DEFAULT_WEATHER_CACHE_URL,
+    cache_bust=None,
+):
     try:
         response = requests.get(
             cache_url,
+            params={"v": cache_bust} if cache_bust else None,
             headers=FORECAST_HEADERS,
             timeout=30,
         )
@@ -592,8 +596,10 @@ def fetch_published_weather_cache(cache_url=DEFAULT_WEATHER_CACHE_URL):
         payload = response.json()
         records = payload.get("records", [])
         return pd.DataFrame(records)
-    except Exception:
-        return pd.DataFrame()
+    except Exception as error:
+        result = pd.DataFrame()
+        result.attrs["weather_error"] = str(error)
+        return result
 
 
 def merge_cached_weather(current_df, cached_df):

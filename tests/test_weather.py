@@ -11,6 +11,7 @@ from src.weather import (
     enrich_schedule_with_weather,
     fetch_hourly_forecast,
     fetch_hourly_forecasts,
+    fetch_published_weather_cache,
     field_wind_arrow,
     merge_cached_weather,
     preserve_previous_weather,
@@ -36,6 +37,37 @@ def forecast_payload(forecast_time):
 
 
 class WeatherTests(unittest.TestCase):
+    @patch("src.weather.requests.get")
+    def test_published_cache_uses_cache_bust_and_returns_records(self, mock_get):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "records": [
+                {
+                    "game_pk": 1,
+                    "weather_status": "Forecast available",
+                }
+            ]
+        }
+        mock_get.return_value = response
+
+        result = fetch_published_weather_cache(cache_bust="build-7")
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(
+            mock_get.call_args.kwargs["params"],
+            {"v": "build-7"},
+        )
+
+    @patch("src.weather.requests.get")
+    def test_published_cache_preserves_download_error(self, mock_get):
+        mock_get.side_effect = requests.ConnectionError("release unavailable")
+
+        result = fetch_published_weather_cache(cache_bust="build-8")
+
+        self.assertTrue(result.empty)
+        self.assertIn("release unavailable", result.attrs["weather_error"])
+
     @patch("src.weather.requests.get")
     def test_slate_forecasts_use_one_batched_request(self, mock_get):
         response = Mock()
