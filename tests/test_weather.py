@@ -8,19 +8,61 @@ from src.weather import (
     calculate_weather_adjustments,
     enrich_schedule_with_weather,
     fetch_hourly_forecast,
+    fetch_hourly_forecasts,
     field_wind_arrow,
+    preserve_previous_weather,
     project_wind_to_field,
     weather_icon,
 )
 
 
+def forecast_payload(forecast_time):
+    return {
+        "hourly": {
+            "time": [forecast_time],
+            "temperature_2m": [75.0],
+            "relative_humidity_2m": [50.0],
+            "precipitation_probability": [5.0],
+            "surface_pressure": [1000.0],
+            "wind_speed_10m": [8.0],
+            "wind_direction_10m": [180.0],
+            "wind_gusts_10m": [12.0],
+            "weather_code": [1],
+        }
+    }
+
+
 class WeatherTests(unittest.TestCase):
+    @patch("src.weather.requests.get")
+    def test_slate_forecasts_use_one_batched_request(self, mock_get):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = [
+            forecast_payload("2026-06-08T19:00"),
+            forecast_payload("2026-06-08T20:00"),
+        ]
+        mock_get.return_value = response
+        locations = [(39.7, -104.9), (33.8, -117.9)]
+
+        result = fetch_hourly_forecasts(
+            locations,
+            "2026-06-08",
+            "2026-06-09",
+        )
+
+        self.assertEqual(mock_get.call_count, 1)
+        self.assertEqual(set(result), set(locations))
+        params = mock_get.call_args.kwargs["params"]
+        self.assertEqual(params["latitude"], "39.7,33.8")
+        self.assertEqual(params["start_date"], "2026-06-08")
+        self.assertEqual(params["end_date"], "2026-06-09")
+
     @patch("src.weather.time.sleep")
     @patch("src.weather.requests.get")
     def test_forecast_retries_transient_request_errors(self, mock_get, mock_sleep):
         response = Mock()
         response.raise_for_status.return_value = None
-        response.json.return_value = {"hourly": {"time": []}}
+        response.json.return_value = forecast_payload("2026-06-08T19:00")
         mock_get.side_effect = [
             requests.ConnectionError("temporary"),
             response,
@@ -28,9 +70,24 @@ class WeatherTests(unittest.TestCase):
 
         result = fetch_hourly_forecast(39.7, -104.9, "2026-06-08")
 
-        self.assertEqual(result, {"hourly": {"time": []}})
+        self.assertEqual(result, forecast_payload("2026-06-08T19:00"))
         self.assertEqual(mock_get.call_count, 2)
         mock_sleep.assert_called_once()
+
+    @patch("src.weather.requests.get")
+    def test_forecast_rejects_incomplete_provider_payload(self, mock_get):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"hourly": {"time": []}}
+        mock_get.return_value = response
+
+        with self.assertRaisesRegex(ValueError, "no hourly forecast"):
+            fetch_hourly_forecast(
+                39.7,
+                -104.9,
+                "2026-06-08",
+                attempts=1,
+            )
 
     def test_wind_is_projected_against_center_field_bearing(self):
         out_component, cross_component, label = project_wind_to_field(
@@ -82,6 +139,73 @@ class WeatherTests(unittest.TestCase):
         self.assertEqual(result.iloc[0]["weather_display"], "85°")
         self.assertEqual(result.iloc[0]["wind_display"], "↑ 10")
         self.assertIn("up = out to center", result.iloc[0]["wind_tooltip"])
+
+    def test_empty_forecast_keeps_complete_weather_columns(self):
+        schedule = pd.DataFrame(
+            [
+                {
+                    "game_time_utc": "2026-06-01T19:10:00Z",
+                    "venue_latitude": 39.756,
+                    "venue_longitude": -104.994,
+                    "field_azimuth": 90.0,
+                    "roof_type": "Open",
+                }
+            ]
+        )
+
+        result = enrich_schedule_with_weather(
+            schedule,
+            lambda latitude, longitude, forecast_date: {"hourly": {"time": []}},
+        )
+
+        self.assertEqual(result.iloc[0]["weather_status"], "Forecast unavailable")
+        self.assertEqual(result.iloc[0]["weather_condition"], "Unavailable")
+        self.assertEqual(result.iloc[0]["weather_icon"], "unknown")
+        self.assertEqual(result.iloc[0]["weather_display"], "N/A")
+        self.assertEqual(result.iloc[0]["weather_edge"], "Neutral")
+        self.assertEqual(result.iloc[0]["hitter_weather_adjustment"], 0.0)
+
+    def test_previous_successful_forecast_survives_transient_failure(self):
+        previous = pd.DataFrame(
+            [
+                {
+                    "game_pk": 123,
+                    "weather_status": "Forecast available",
+                    "weather_condition": "Clear",
+                    "weather_icon": "clear",
+                    "weather_display": "78°",
+                    "temperature_f": 78.0,
+                    "wind_speed_mph": 8.0,
+                    "weather_edge": "Hitter boost",
+                    "hitter_weather_adjustment": 1.5,
+                }
+            ]
+        )
+        current = pd.DataFrame(
+            [
+                {
+                    "game_pk": 123,
+                    "weather_status": "Forecast unavailable",
+                    "weather_condition": "Unavailable",
+                    "weather_icon": "unknown",
+                    "weather_display": "N/A",
+                    "temperature_f": None,
+                    "wind_speed_mph": None,
+                    "weather_edge": "Neutral",
+                    "hitter_weather_adjustment": 0.0,
+                }
+            ]
+        )
+
+        result = preserve_previous_weather(current, previous)
+
+        self.assertEqual(result.iloc[0]["weather_status"], "Forecast available")
+        self.assertEqual(result.iloc[0]["weather_display"], "78°")
+        self.assertEqual(result.iloc[0]["wind_speed_mph"], 8.0)
+        self.assertEqual(
+            result.iloc[0]["weather_source"],
+            "Last successful forecast",
+        )
 
     def test_retractable_roof_is_projection_neutral(self):
         hitter_adjustment, pitcher_adjustment = calculate_weather_adjustments(

@@ -7,6 +7,8 @@ import requests
 
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+FORECAST_HEADERS = {"User-Agent": "AllRiseAnalytics/1.0"}
+FORECAST_BATCH_SIZE = 20
 HOURLY_FIELDS = (
     "temperature_2m",
     "relative_humidity_2m",
@@ -41,6 +43,36 @@ WEATHER_CODES = {
     96: "Thunderstorms",
     99: "Thunderstorms",
 }
+
+WEATHER_VALUE_COLUMNS = (
+    "forecast_time_utc",
+    "temperature_f",
+    "humidity_pct",
+    "precip_probability_pct",
+    "surface_pressure_hpa",
+    "air_density_kg_m3",
+    "wind_speed_mph",
+    "wind_direction_deg",
+    "wind_direction_cardinal",
+    "wind_gust_mph",
+    "wind_out_mph",
+    "wind_cross_mph",
+    "wind_field_direction",
+)
+WEATHER_OUTPUT_COLUMNS = WEATHER_VALUE_COLUMNS + (
+    "weather_status",
+    "weather_condition",
+    "weather_icon",
+    "weather_display",
+    "weather_tooltip",
+    "weather_summary",
+    "weather_edge",
+    "wind_arrow",
+    "wind_display",
+    "wind_tooltip",
+    "hitter_weather_adjustment",
+    "pitcher_weather_adjustment",
+)
 
 
 def weather_icon(condition):
@@ -78,6 +110,29 @@ def safe_float(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def unavailable_weather(status, detail=None):
+    result = {column: None for column in WEATHER_VALUE_COLUMNS}
+    result.update(
+        {
+            "weather_status": status,
+            "weather_condition": "Unavailable",
+            "weather_icon": "unknown",
+            "weather_display": "N/A",
+            "weather_tooltip": "Forecast unavailable.",
+            "weather_summary": "Forecast unavailable",
+            "weather_edge": "Neutral",
+            "wind_arrow": "\u00b7",
+            "wind_display": "\u00b7",
+            "wind_tooltip": "Wind forecast unavailable.",
+            "hitter_weather_adjustment": 0.0,
+            "pitcher_weather_adjustment": 0.0,
+        }
+    )
+    if detail:
+        result["weather_error"] = str(detail)
+    return result
 
 
 def parse_utc_datetime(value):
@@ -207,32 +262,99 @@ def weather_edge_label(hitter_adjustment, roof_type):
     return "Neutral"
 
 
-def fetch_hourly_forecast(latitude, longitude, forecast_date):
-    params = {
+def validate_forecast_payload(payload):
+    payloads = payload if isinstance(payload, list) else [payload]
+    if not payloads:
+        raise ValueError("Weather provider returned an empty response")
+
+    for forecast in payloads:
+        if not isinstance(forecast, dict):
+            raise ValueError("Weather provider returned invalid forecast data")
+        if forecast.get("error"):
+            raise ValueError(forecast.get("reason") or "Weather provider error")
+
+        hourly = forecast.get("hourly")
+        times = hourly.get("time") if isinstance(hourly, dict) else None
+        if not isinstance(times, list) or not times:
+            raise ValueError("Weather provider returned no hourly forecast")
+
+        for field in HOURLY_FIELDS:
+            values = hourly.get(field)
+            if not isinstance(values, list) or len(values) != len(times):
+                raise ValueError(
+                    f"Weather provider returned incomplete {field} data"
+                )
+
+
+def request_forecast(params, attempts=3, timeout=20):
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            response = requests.get(
+                FORECAST_URL,
+                params=params,
+                headers=FORECAST_HEADERS,
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            validate_forecast_payload(payload)
+            return payload
+        except (requests.RequestException, ValueError) as error:
+            last_error = error
+            if attempt < attempts - 1:
+                time.sleep(0.4 * (attempt + 1))
+    raise last_error
+
+
+def forecast_params(latitude, longitude, start_date, end_date):
+    return {
         "latitude": latitude,
         "longitude": longitude,
         "hourly": ",".join(HOURLY_FIELDS),
         "temperature_unit": "fahrenheit",
         "wind_speed_unit": "mph",
         "timezone": "UTC",
-        "start_date": forecast_date,
-        "end_date": forecast_date,
+        "start_date": start_date,
+        "end_date": end_date,
     }
-    last_error = None
-    for attempt in range(3):
-        try:
-            response = requests.get(
-                FORECAST_URL,
-                params=params,
-                timeout=20,
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException as error:
-            last_error = error
-            if attempt < 2:
-                time.sleep(0.4 * (attempt + 1))
-    raise last_error
+
+
+def fetch_hourly_forecast(latitude, longitude, forecast_date, attempts=3):
+    return request_forecast(
+        forecast_params(
+            latitude,
+            longitude,
+            forecast_date,
+            forecast_date,
+        ),
+        attempts=attempts,
+    )
+
+
+def fetch_hourly_forecasts(locations, start_date, end_date):
+    forecasts = {}
+    unique_locations = list(dict.fromkeys(locations))
+
+    for offset in range(0, len(unique_locations), FORECAST_BATCH_SIZE):
+        batch = unique_locations[offset : offset + FORECAST_BATCH_SIZE]
+        latitudes = ",".join(str(latitude) for latitude, _ in batch)
+        longitudes = ",".join(str(longitude) for _, longitude in batch)
+        payload = request_forecast(
+            forecast_params(
+                latitudes,
+                longitudes,
+                start_date,
+                end_date,
+            ),
+            attempts=2,
+        )
+        payloads = payload if isinstance(payload, list) else [payload]
+        if len(payloads) != len(batch):
+            raise ValueError("Weather provider returned an incomplete slate")
+        forecasts.update(zip(batch, payloads))
+
+    return forecasts
 
 
 def nearest_hour_values(hourly, game_time):
@@ -259,11 +381,11 @@ def nearest_hour_values(hourly, game_time):
 def build_game_weather(game, forecast_data):
     game_time = parse_utc_datetime(game.get("game_time_utc"))
     if game_time is None:
-        return {"weather_status": "Game time unavailable"}
+        return unavailable_weather("Game time unavailable")
 
     values = nearest_hour_values(forecast_data.get("hourly", {}), game_time)
     if values is None:
-        return {"weather_status": "Forecast unavailable"}
+        return unavailable_weather("Forecast unavailable")
 
     wind_speed = safe_float(values.get("wind_speed_10m"))
     wind_direction = safe_float(values.get("wind_direction_10m"))
@@ -367,61 +489,143 @@ def enrich_schedule_with_weather(schedule_df, forecast_loader=None):
     if schedule_df.empty:
         return schedule_df
 
-    forecast_loader = forecast_loader or fetch_hourly_forecast
+    games = [game_row.to_dict() for _, game_row in schedule_df.iterrows()]
     rows = []
-    forecast_cache = {}
 
-    for _, game_row in schedule_df.iterrows():
-        game = game_row.to_dict()
+    if forecast_loader is not None:
+        forecast_cache = {}
+        for game in games:
+            latitude = safe_float(game.get("venue_latitude"))
+            longitude = safe_float(game.get("venue_longitude"))
+            game_time = parse_utc_datetime(game.get("game_time_utc"))
+            if latitude is None or longitude is None or game_time is None:
+                game.update(unavailable_weather("Venue forecast unavailable"))
+                rows.append(game)
+                continue
+
+            forecast_date = game_time.date().isoformat()
+            cache_key = (round(latitude, 5), round(longitude, 5), forecast_date)
+            try:
+                if cache_key not in forecast_cache:
+                    forecast_cache[cache_key] = forecast_loader(
+                        latitude,
+                        longitude,
+                        forecast_date,
+                    )
+                game.update(build_game_weather(game, forecast_cache[cache_key]))
+            except Exception as error:
+                game.update(
+                    unavailable_weather("Forecast unavailable", detail=error)
+                )
+            rows.append(game)
+        return pd.DataFrame(rows)
+
+    locations = []
+    forecast_dates = []
+    for game in games:
         latitude = safe_float(game.get("venue_latitude"))
         longitude = safe_float(game.get("venue_longitude"))
         game_time = parse_utc_datetime(game.get("game_time_utc"))
-
         if latitude is None or longitude is None or game_time is None:
-            game.update(
-                {
-                    "weather_status": "Venue forecast unavailable",
-                    "weather_icon": "unknown",
-                    "weather_display": "N/A",
-                    "weather_tooltip": "Forecast unavailable.",
-                    "weather_summary": "Forecast unavailable",
-                    "weather_edge": "Neutral",
-                    "wind_arrow": "·",
-                    "wind_display": "·",
-                    "wind_tooltip": "Wind forecast unavailable.",
-                    "hitter_weather_adjustment": 0.0,
-                    "pitcher_weather_adjustment": 0.0,
-                }
+            continue
+        locations.append((round(latitude, 5), round(longitude, 5)))
+        forecast_dates.append(game_time.date().isoformat())
+
+    forecasts = {}
+    forecast_errors = {}
+    if locations:
+        unique_locations = list(dict.fromkeys(locations))
+        start_date = min(forecast_dates)
+        end_date = max(forecast_dates)
+        try:
+            forecasts = fetch_hourly_forecasts(
+                unique_locations,
+                start_date,
+                end_date,
             )
+        except Exception as batch_error:
+            status_code = getattr(
+                getattr(batch_error, "response", None),
+                "status_code",
+                None,
+            )
+            allow_individual_fallback = (
+                isinstance(batch_error, ValueError)
+                or status_code == 400
+            )
+            if not allow_individual_fallback:
+                forecast_errors = {
+                    location: batch_error for location in unique_locations
+                }
+            else:
+                for location in unique_locations:
+                    try:
+                        forecasts[location] = request_forecast(
+                            forecast_params(
+                                location[0],
+                                location[1],
+                                start_date,
+                                end_date,
+                            ),
+                            attempts=1,
+                            timeout=10,
+                        )
+                    except Exception as fallback_error:
+                        forecast_errors[location] = fallback_error
+
+    for game in games:
+        latitude = safe_float(game.get("venue_latitude"))
+        longitude = safe_float(game.get("venue_longitude"))
+        game_time = parse_utc_datetime(game.get("game_time_utc"))
+        if latitude is None or longitude is None or game_time is None:
+            game.update(unavailable_weather("Venue forecast unavailable"))
             rows.append(game)
             continue
 
-        forecast_date = game_time.date().isoformat()
-        cache_key = (round(latitude, 5), round(longitude, 5), forecast_date)
-        try:
-            if cache_key not in forecast_cache:
-                forecast_cache[cache_key] = forecast_loader(
-                    latitude,
-                    longitude,
-                    forecast_date,
-                )
-            game.update(build_game_weather(game, forecast_cache[cache_key]))
-        except Exception as error:
+        location = (round(latitude, 5), round(longitude, 5))
+        forecast = forecasts.get(location)
+        if forecast is None:
             game.update(
-                {
-                    "weather_status": f"Forecast unavailable: {error}",
-                    "weather_icon": "unknown",
-                    "weather_display": "N/A",
-                    "weather_tooltip": "Forecast unavailable.",
-                    "weather_summary": "Forecast unavailable",
-                    "weather_edge": "Neutral",
-                    "wind_arrow": "·",
-                    "wind_display": "·",
-                    "wind_tooltip": "Wind forecast unavailable.",
-                    "hitter_weather_adjustment": 0.0,
-                    "pitcher_weather_adjustment": 0.0,
-                }
+                unavailable_weather(
+                    "Forecast unavailable",
+                    detail=forecast_errors.get(location),
+                )
             )
+        else:
+            game.update(build_game_weather(game, forecast))
         rows.append(game)
 
     return pd.DataFrame(rows)
+
+
+def preserve_previous_weather(current_df, previous_df):
+    if (
+        current_df is None
+        or current_df.empty
+        or previous_df is None
+        or previous_df.empty
+        or "game_pk" not in current_df.columns
+        or "game_pk" not in previous_df.columns
+    ):
+        return current_df
+
+    result = current_df.copy()
+    previous_by_game = previous_df.drop_duplicates("game_pk").set_index("game_pk")
+    for index, row in result.iterrows():
+        if row.get("weather_status") == "Forecast available":
+            continue
+
+        game_pk = row.get("game_pk")
+        if game_pk not in previous_by_game.index:
+            continue
+
+        previous = previous_by_game.loc[game_pk]
+        if previous.get("weather_status") != "Forecast available":
+            continue
+
+        for column in WEATHER_OUTPUT_COLUMNS:
+            if column in previous.index:
+                result.at[index, column] = previous.get(column)
+        result.at[index, "weather_source"] = "Last successful forecast"
+
+    return result

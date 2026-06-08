@@ -8,7 +8,10 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 from src.mlb_schedule import get_daily_schedule
-from src.weather import enrich_schedule_with_weather
+from src.weather import (
+    enrich_schedule_with_weather,
+    preserve_previous_weather,
+)
 from src.stat_data import (
     get_batter_stats,
     get_pitcher_stats,
@@ -1918,14 +1921,7 @@ def load_schedule(game_date, refresh_count):
 
 @st.cache_data(show_spinner=True, ttl=900)
 def load_weather(schedule, refresh_count, cache_version):
-    weather = enrich_schedule_with_weather(schedule)
-    available = weather.get(
-        "weather_status",
-        pd.Series(dtype=str),
-    ).eq("Forecast available")
-    if not weather.empty and not available.any():
-        weather = enrich_schedule_with_weather(schedule)
-    return weather
+    return enrich_schedule_with_weather(schedule)
 
 
 @st.cache_data(show_spinner=True)
@@ -1948,7 +1944,21 @@ if schedule_df.empty:
     st.warning("No MLB games found for this date.")
     st.stop()
 
-schedule_df = load_weather(schedule_df, live_refresh_count, cache_version=2)
+schedule_df = load_weather(schedule_df, live_refresh_count, cache_version=3)
+weather_session_cache = st.session_state.setdefault(
+    "last_successful_weather_by_date",
+    {},
+)
+weather_cache_key = str(selected_date)
+schedule_df = preserve_previous_weather(
+    schedule_df,
+    weather_session_cache.get(weather_cache_key),
+)
+if schedule_df.get(
+    "weather_status",
+    pd.Series(dtype=str),
+).eq("Forecast available").any():
+    weather_session_cache[weather_cache_key] = schedule_df.copy()
 batters_df = load_batter_stats(season, force_refresh)
 pitchers_df = load_pitcher_stats(season, force_refresh)
 
