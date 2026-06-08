@@ -542,6 +542,39 @@ st.markdown(
         text-transform: uppercase;
     }
 
+    .research-sort-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 5px;
+        width: 100%;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .research-table th.align-left .research-sort-link,
+    .research-table th.sticky-player .research-sort-link {
+        justify-content: flex-start;
+    }
+
+    .research-sort-arrow {
+        color: #9aa6b5;
+        font-size: 9px;
+        letter-spacing: -0.08em;
+    }
+
+    .research-sort-link.active {
+        color: var(--navy);
+    }
+
+    .research-sort-link.active .research-sort-arrow {
+        color: var(--blue);
+    }
+
+    .research-sort-link:hover {
+        color: var(--blue);
+    }
+
     .research-table tbody tr:hover td {
         background: #f7fafc;
     }
@@ -1594,6 +1627,12 @@ TWO_DECIMAL_RESEARCH_COLUMNS = {
 }
 ONE_DECIMAL_RESEARCH_COLUMNS = {"Season IP"}
 PERCENT_RESEARCH_COLUMNS = {"humidity_pct", "precip_probability_pct"}
+RESEARCH_SORT_ALIASES = {
+    "weather_display": "temperature_f",
+    "weather_edge": "hitter_weather_adjustment",
+    "matchup_grade": "weather_adjusted_score",
+    "k_matchup_grade": "k_matchup_score",
+}
 
 
 def research_cell_value(column, value):
@@ -1662,6 +1701,10 @@ def research_log_url(row, log_type):
             if pd.notna(numeric_value):
                 value = int(numeric_value)
         clean_params[key] = value
+    for key in ("sort_table", "sort_column", "sort_direction"):
+        value = query_param_value(key)
+        if value:
+            clean_params[key] = value
     return "?" + urlencode(clean_params) + "#matchup-log"
 
 
@@ -1674,10 +1717,98 @@ def research_edge_class(value):
     return "neutral"
 
 
+def query_param_value(name):
+    value = st.query_params.get(name)
+    if isinstance(value, list):
+        return value[-1] if value else None
+    return value
+
+
+def research_sort_state(table_key):
+    if query_param_value("sort_table") != table_key:
+        return None, None
+
+    column = query_param_value("sort_column")
+    direction = query_param_value("sort_direction")
+    if direction not in {"asc", "desc"}:
+        direction = "asc"
+    return column, direction
+
+
+def sort_research_dataframe(df, column, direction):
+    if df.empty or not column or column == "game":
+        return df
+
+    sort_column = RESEARCH_SORT_ALIASES.get(column, column)
+    if sort_column not in df.columns:
+        return df
+
+    result = df.copy()
+    sort_values = result[sort_column]
+    numeric_values = pd.to_numeric(sort_values, errors="coerce")
+    if numeric_values.notna().any():
+        result["_research_sort_value"] = numeric_values
+    else:
+        result["_research_sort_value"] = (
+            sort_values.fillna("").astype(str).str.lower()
+        )
+
+    result = result.sort_values(
+        "_research_sort_value",
+        ascending=direction != "desc",
+        na_position="last",
+        kind="mergesort",
+    )
+    return result.drop(columns="_research_sort_value")
+
+
+def apply_research_sort(df, table_key):
+    column, direction = research_sort_state(table_key)
+    return sort_research_dataframe(df, column, direction)
+
+
+def research_sort_link(table_key, column, label):
+    active_column, active_direction = research_sort_state(table_key)
+    is_active = active_column == column
+    next_direction = (
+        "desc"
+        if is_active and active_direction == "asc"
+        else "asc"
+    )
+    params = {
+        "sort_table": table_key,
+        "sort_column": column,
+        "sort_direction": next_direction,
+    }
+    arrow = "▲" if is_active and active_direction == "asc" else "▼"
+    if not is_active:
+        arrow = "↕"
+    active_class = " active" if is_active else ""
+    url = "?" + urlencode(params) + f"#{table_key}"
+    return (
+        f'<a class="research-sort-link{active_class}" '
+        f'href="{escape(url, quote=True)}">'
+        f"<span>{escape(label)}</span>"
+        f'<span class="research-sort-arrow">{arrow}</span>'
+        "</a>"
+    )
+
+
+def research_sort_only_url():
+    params = {}
+    for key in ("sort_table", "sort_column", "sort_direction"):
+        value = query_param_value(key)
+        if value:
+            params[key] = value
+    return "?" + urlencode(params) if params else "?"
+
+
 def render_research_table(df, columns, player_column, log_type, table_key):
     header_cells = [
         '<th class="sticky-game"></th>',
-        f'<th class="sticky-player">{escape(player_column.title())}</th>',
+        '<th class="sticky-player">'
+        f"{research_sort_link(table_key, player_column, player_column.title())}"
+        "</th>",
     ]
     data_columns = [
         column
@@ -1700,7 +1831,8 @@ def render_research_table(df, columns, player_column, log_type, table_key):
         } else ""
         header_cells.append(
             f'<th class="{align_class.strip()}" '
-            f'style="min-width:{width}px">{escape(label)}</th>'
+            f'style="min-width:{width}px">'
+            f"{research_sort_link(table_key, column, label)}</th>"
         )
 
     body_rows = []
@@ -1990,7 +2122,7 @@ if schedule_df.empty:
     st.warning("No MLB games found for this date.")
     st.stop()
 
-schedule_df = load_weather(schedule_df, live_refresh_count, cache_version=3)
+schedule_df = load_weather(schedule_df, live_refresh_count, cache_version=4)
 weather_session_cache = st.session_state.setdefault(
     "last_successful_weather_by_date",
     {},
@@ -2167,6 +2299,10 @@ with matchup_tab:
             ].copy()
 
             available_bvp_rows = len(display_bvp)
+            display_bvp = apply_research_sort(
+                display_bvp,
+                "bvp-research-table",
+            )
             display_bvp = apply_matchup_row_limit(display_bvp, matchup_rows)
             display_bvp = display_bvp.reset_index(drop=True)
 
@@ -2251,6 +2387,10 @@ with matchup_tab:
             ].copy()
 
             available_hand_rows = len(display_hand)
+            display_hand = apply_research_sort(
+                display_hand,
+                "hand-research-table",
+            )
             display_hand = apply_matchup_row_limit(display_hand, matchup_rows)
             display_hand = display_hand.reset_index(drop=True)
 
@@ -2334,8 +2474,12 @@ with matchup_tab:
                 )
 
             available_pitcher_rows = len(filtered_pitcher_k_matchups)
-            display_k = apply_matchup_row_limit(
+            sorted_pitcher_k_matchups = apply_research_sort(
                 filtered_pitcher_k_matchups,
+                "pitcher-research-table",
+            )
+            display_k = apply_matchup_row_limit(
+                sorted_pitcher_k_matchups,
                 matchup_rows,
             )
             display_k = display_k.reset_index(drop=True)
@@ -2387,7 +2531,9 @@ with matchup_tab:
     if selected_log is not None:
         st.html(
             '<div class="matchup-log-shell" id="matchup-log">'
-            '<a class="research-player-link" href="?">Close game log</a>'
+            f'<a class="research-player-link" href="'
+            f'{escape(research_sort_only_url(), quote=True)}">'
+            "Close game log</a>"
             "</div>"
         )
         if selected_log["log_type"] == "pitcher":

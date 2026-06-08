@@ -6,6 +6,7 @@ import requests
 
 from src.weather import (
     calculate_weather_adjustments,
+    convert_met_forecast,
     enrich_schedule_with_weather,
     fetch_hourly_forecast,
     fetch_hourly_forecasts,
@@ -56,6 +57,72 @@ class WeatherTests(unittest.TestCase):
         self.assertEqual(params["latitude"], "39.7,33.8")
         self.assertEqual(params["start_date"], "2026-06-08")
         self.assertEqual(params["end_date"], "2026-06-09")
+
+    def test_met_forecast_converts_to_shared_weather_schema(self):
+        payload = {
+            "properties": {
+                "timeseries": [
+                    {
+                        "time": "2026-06-08T19:00:00Z",
+                        "data": {
+                            "instant": {
+                                "details": {
+                                    "air_pressure_at_sea_level": 1015.0,
+                                    "air_temperature": 25.0,
+                                    "cloud_area_fraction": 5.0,
+                                    "relative_humidity": 50.0,
+                                    "wind_from_direction": 180.0,
+                                    "wind_speed": 4.0,
+                                }
+                            },
+                            "next_1_hours": {
+                                "summary": {"symbol_code": "clearsky_day"},
+                                "details": {"precipitation_amount": 0.0},
+                            },
+                        },
+                    }
+                ]
+            }
+        }
+
+        result = convert_met_forecast(payload, elevation_ft=0)
+
+        self.assertEqual(result["weather_source"], "MET Norway")
+        self.assertEqual(result["hourly"]["time"], ["2026-06-08T19:00:00Z"])
+        self.assertAlmostEqual(result["hourly"]["temperature_2m"][0], 77.0)
+        self.assertAlmostEqual(result["hourly"]["wind_speed_10m"][0], 8.947744)
+        self.assertEqual(result["hourly"]["weather_code"][0], 0)
+
+    @patch("src.weather.fetch_met_forecast")
+    @patch("src.weather.fetch_hourly_forecasts")
+    def test_enrichment_falls_back_to_met_when_primary_fails(
+        self,
+        mock_open_meteo,
+        mock_met,
+    ):
+        mock_open_meteo.side_effect = requests.ConnectionError("blocked")
+        fallback = forecast_payload("2026-06-08T19:00")
+        fallback["weather_source"] = "MET Norway"
+        mock_met.return_value = fallback
+        schedule = pd.DataFrame(
+            [
+                {
+                    "game_time_utc": "2026-06-08T19:10:00Z",
+                    "venue_latitude": 39.756,
+                    "venue_longitude": -104.994,
+                    "venue_elevation_ft": 5200,
+                    "field_azimuth": 90.0,
+                    "roof_type": "Open",
+                }
+            ]
+        )
+
+        result = enrich_schedule_with_weather(schedule)
+
+        self.assertEqual(result.iloc[0]["weather_status"], "Forecast available")
+        self.assertEqual(result.iloc[0]["weather_source"], "MET Norway")
+        self.assertTrue(str(result.iloc[0]["weather_display"]).startswith("75"))
+        self.assertEqual(mock_met.call_count, 1)
 
     @patch("src.weather.time.sleep")
     @patch("src.weather.requests.get")

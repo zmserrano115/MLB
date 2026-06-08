@@ -9,6 +9,12 @@ import requests
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 FORECAST_HEADERS = {"User-Agent": "AllRiseAnalytics/1.0"}
 FORECAST_BATCH_SIZE = 20
+MET_FORECAST_URL = (
+    "https://api.met.no/weatherapi/locationforecast/2.0/compact"
+)
+MET_FORECAST_HEADERS = {
+    "User-Agent": "AllRiseAnalytics/1.0 https://allriseanalytics.streamlit.app"
+}
 HOURLY_FIELDS = (
     "temperature_2m",
     "relative_humidity_2m",
@@ -320,6 +326,136 @@ def forecast_params(latitude, longitude, start_date, end_date):
     }
 
 
+def met_weather_code(symbol_code, cloud_fraction=None):
+    symbol = str(symbol_code or "").lower()
+    if "thunder" in symbol:
+        return 95
+    if "heavyrain" in symbol:
+        return 65
+    if "rain" in symbol or "sleet" in symbol:
+        return 61 if "light" in symbol else 63
+    if "heavysnow" in symbol:
+        return 75
+    if "snow" in symbol:
+        return 71 if "light" in symbol else 73
+    if "fog" in symbol:
+        return 45
+    if "partlycloudy" in symbol:
+        return 2
+    if "cloudy" in symbol:
+        return 3
+    if "fair" in symbol:
+        return 1
+    if "clearsky" in symbol:
+        return 0
+
+    cloud = safe_float(cloud_fraction)
+    if cloud is None:
+        return 3
+    if cloud < 20:
+        return 0
+    if cloud < 65:
+        return 2
+    return 3
+
+
+def pressure_at_elevation(sea_level_hpa, elevation_ft):
+    pressure = safe_float(sea_level_hpa)
+    elevation = safe_float(elevation_ft)
+    if pressure is None:
+        return None
+    if elevation is None:
+        return pressure
+
+    elevation_m = max(-430.0, elevation * 0.3048)
+    pressure_ratio = max(0.1, 1.0 - 2.25577e-5 * elevation_m)
+    return pressure * pressure_ratio**5.25588
+
+
+def convert_met_forecast(payload, elevation_ft=None):
+    timeseries = payload.get("properties", {}).get("timeseries", [])
+    if not timeseries:
+        raise ValueError("MET Norway returned no hourly forecast")
+
+    hourly = {"time": []}
+    for field in HOURLY_FIELDS:
+        hourly[field] = []
+
+    for period in timeseries:
+        data = period.get("data", {})
+        details = data.get("instant", {}).get("details", {})
+        next_hour = data.get("next_1_hours", {})
+        summary = next_hour.get("summary", {})
+        next_details = next_hour.get("details", {})
+        symbol_code = summary.get("symbol_code")
+        precipitation_amount = safe_float(
+            next_details.get("precipitation_amount")
+        )
+        weather_code = met_weather_code(
+            symbol_code,
+            details.get("cloud_area_fraction"),
+        )
+        has_precipitation = (
+            precipitation_amount is not None
+            and precipitation_amount > 0
+        )
+
+        temperature_c = safe_float(details.get("air_temperature"))
+        temperature_f = (
+            temperature_c * 9.0 / 5.0 + 32.0
+            if temperature_c is not None
+            else None
+        )
+        wind_speed_ms = safe_float(details.get("wind_speed"))
+        wind_speed_mph = (
+            wind_speed_ms * 2.236936
+            if wind_speed_ms is not None
+            else None
+        )
+
+        hourly["time"].append(period.get("time"))
+        hourly["temperature_2m"].append(temperature_f)
+        hourly["relative_humidity_2m"].append(
+            safe_float(details.get("relative_humidity"))
+        )
+        hourly["precipitation_probability"].append(
+            70.0 if has_precipitation else 0.0
+        )
+        hourly["surface_pressure"].append(
+            pressure_at_elevation(
+                details.get("air_pressure_at_sea_level"),
+                elevation_ft,
+            )
+        )
+        hourly["wind_speed_10m"].append(wind_speed_mph)
+        hourly["wind_direction_10m"].append(
+            safe_float(details.get("wind_from_direction"))
+        )
+        hourly["wind_gusts_10m"].append(None)
+        hourly["weather_code"].append(weather_code)
+
+    forecast = {
+        "hourly": hourly,
+        "weather_source": "MET Norway",
+    }
+    validate_forecast_payload(forecast)
+    return forecast
+
+
+def fetch_met_forecast(latitude, longitude, elevation_ft=None):
+    response = requests.get(
+        MET_FORECAST_URL,
+        params={
+            "lat": round(float(latitude), 4),
+            "lon": round(float(longitude), 4),
+        },
+        headers=MET_FORECAST_HEADERS,
+        timeout=20,
+    )
+    response.raise_for_status()
+    return convert_met_forecast(response.json(), elevation_ft=elevation_ft)
+
+
 def fetch_hourly_forecast(latitude, longitude, forecast_date, attempts=3):
     return request_forecast(
         forecast_params(
@@ -458,6 +594,10 @@ def build_game_weather(game, forecast_data):
 
     return {
         "weather_status": "Forecast available",
+        "weather_source": forecast_data.get(
+            "weather_source",
+            "Open-Meteo",
+        ),
         "forecast_time_utc": values.get("forecast_time_utc"),
         "temperature_f": temp_f,
         "humidity_pct": humidity,
@@ -521,6 +661,7 @@ def enrich_schedule_with_weather(schedule_df, forecast_loader=None):
         return pd.DataFrame(rows)
 
     locations = []
+    location_elevations = {}
     forecast_dates = []
     for game in games:
         latitude = safe_float(game.get("venue_latitude"))
@@ -528,7 +669,12 @@ def enrich_schedule_with_weather(schedule_df, forecast_loader=None):
         game_time = parse_utc_datetime(game.get("game_time_utc"))
         if latitude is None or longitude is None or game_time is None:
             continue
-        locations.append((round(latitude, 5), round(longitude, 5)))
+        location = (round(latitude, 5), round(longitude, 5))
+        locations.append(location)
+        location_elevations.setdefault(
+            location,
+            safe_float(game.get("venue_elevation_ft")),
+        )
         forecast_dates.append(game_time.date().isoformat())
 
     forecasts = {}
@@ -544,34 +690,18 @@ def enrich_schedule_with_weather(schedule_df, forecast_loader=None):
                 end_date,
             )
         except Exception as batch_error:
-            status_code = getattr(
-                getattr(batch_error, "response", None),
-                "status_code",
-                None,
-            )
-            allow_individual_fallback = (
-                isinstance(batch_error, ValueError)
-                or status_code == 400
-            )
-            if not allow_individual_fallback:
-                forecast_errors = {
-                    location: batch_error for location in unique_locations
-                }
-            else:
-                for location in unique_locations:
-                    try:
-                        forecasts[location] = request_forecast(
-                            forecast_params(
-                                location[0],
-                                location[1],
-                                start_date,
-                                end_date,
-                            ),
-                            attempts=1,
-                            timeout=10,
-                        )
-                    except Exception as fallback_error:
-                        forecast_errors[location] = fallback_error
+            for location in unique_locations:
+                try:
+                    forecasts[location] = fetch_met_forecast(
+                        location[0],
+                        location[1],
+                        elevation_ft=location_elevations.get(location),
+                    )
+                except Exception as fallback_error:
+                    forecast_errors[location] = (
+                        f"Open-Meteo: {batch_error}; "
+                        f"MET Norway: {fallback_error}"
+                    )
 
     for game in games:
         latitude = safe_float(game.get("venue_latitude"))
