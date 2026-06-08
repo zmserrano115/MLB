@@ -159,6 +159,29 @@
       object-fit: contain;
     }
 
+    .research-log-opponent {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #245f96;
+      font-weight: 700;
+    }
+
+    .research-log-opponent img {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+    }
+
+    .game-log-table-shell {
+      max-height: 540px;
+    }
+
+    .game-log-table .sticky-game {
+      text-align: center;
+      font-weight: 600;
+    }
+
     .research-at {
       color: var(--muted-2);
       font-size: 10px;
@@ -263,6 +286,11 @@
         width: 21px;
         height: 21px;
       }
+
+      .research-log-opponent img {
+        width: 21px;
+        height: 21px;
+      }
     }
   </style>
 </head>
@@ -271,6 +299,7 @@
   <script>
     const root = document.getElementById("root");
     let activeSort = null;
+    let requestedFrameHeight = 542;
 
     function sendMessage(type, payload = {}) {
       window.parent.postMessage(
@@ -284,7 +313,9 @@
     }
 
     function setFrameHeight(requestedHeight) {
-      const mobileHeight = window.innerWidth <= 680 ? 502 : requestedHeight;
+      const mobileHeight = window.innerWidth <= 680
+        ? Math.min(502, requestedHeight)
+        : requestedHeight;
       sendMessage("streamlit:setFrameHeight", { height: mobileHeight });
     }
 
@@ -374,6 +405,7 @@
 
     function render(args) {
       root.innerHTML = args.table_html || "";
+      requestedFrameHeight = args.table_height || 542;
       wireInteractions();
       if (activeSort) {
         applySort(
@@ -382,7 +414,7 @@
           false,
         );
       }
-      setFrameHeight(args.table_height || 542);
+      setFrameHeight(requestedFrameHeight);
     }
 
     window.addEventListener("message", (event) => {
@@ -391,7 +423,10 @@
       }
     });
 
-    window.addEventListener("resize", () => setFrameHeight(542));
+    window.addEventListener(
+      "resize",
+      () => setFrameHeight(requestedFrameHeight),
+    );
     sendMessage("streamlit:componentReady", { apiVersion: 1 });
   </script>
 </body>

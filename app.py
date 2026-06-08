@@ -1530,9 +1530,12 @@ def matchup_grade_class(grade):
 
 
 RESEARCH_COLUMN_LABELS = {
+    "game_date": "Date",
     "batter": "Batter",
     "pitcher": "Pitcher",
     "opponent": "Opponent",
+    "home_away": "H/A",
+    "Pitch Count": "PC",
     "split": "Split",
     "opposing_pitcher": "Pitcher",
     "opposing_pitcher_hand": "Hand",
@@ -1557,6 +1560,9 @@ RESEARCH_COLUMN_LABELS = {
 }
 
 RESEARCH_COLUMN_WIDTHS = {
+    "game_date": 82,
+    "home_away": 54,
+    "Pitch Count": 58,
     "opposing_pitcher": 130,
     "opposing_pitcher_hand": 54,
     "pitcher_hand": 54,
@@ -1835,6 +1841,124 @@ def render_research_table(df, columns, player_column, log_type, table_key):
     )
 
 
+def game_log_date_display(value):
+    parsed_date = pd.to_datetime(value, errors="coerce")
+    if pd.isna(parsed_date):
+        return research_cell_value("game_date", value)
+    return parsed_date.strftime("%m/%d/%y")
+
+
+def game_log_matchup_html(row, log_type):
+    if log_type == "bvp":
+        team = str(row.get("team") or "")
+        opponent = str(row.get("opponent") or "")
+        if str(row.get("home_away") or "").lower() == "home":
+            game = f"{opponent} @ {team}"
+        else:
+            game = f"{team} @ {opponent}"
+        return research_game_html(game)
+
+    opponent = str(row.get("opponent") or "")
+    logo = team_logo_url(opponent)
+    return (
+        '<span class="research-log-opponent">'
+        f'<img src="{escape(logo, quote=True)}" '
+        f'alt="{escape(opponent, quote=True)}" '
+        f'title="{escape(opponent, quote=True)}">'
+        f"<span>{escape(opponent)}</span>"
+        "</span>"
+    )
+
+
+def render_game_log_table(game_log_df, columns, log_type, table_key):
+    identity_label = "Matchup" if log_type == "bvp" else "Opponent"
+    header_cells = [
+        '<th class="sticky-game" aria-sort="none">'
+        '<button type="button" class="research-sort-button" data-column-index="0">'
+        '<span>Date</span>'
+        '<span class="research-sort-indicator" aria-hidden="true"></span>'
+        "</button></th>",
+        '<th class="sticky-player align-left" aria-sort="none">'
+        '<button type="button" class="research-sort-button" data-column-index="1">'
+        f"<span>{identity_label}</span>"
+        '<span class="research-sort-indicator" aria-hidden="true"></span>'
+        "</button></th>",
+    ]
+    data_columns = [
+        column
+        for column in columns
+        if column
+        not in {
+            "game_date",
+            "team_logo",
+            "team",
+            "opponent_logo",
+            "opponent",
+        }
+    ]
+    for column in data_columns:
+        label = RESEARCH_COLUMN_LABELS.get(column, column)
+        width = RESEARCH_COLUMN_WIDTHS.get(column, 62)
+        align_class = "align-left" if column == "home_away" else ""
+        header_cells.append(
+            f'<th class="{align_class}" style="min-width:{width}px" '
+            'aria-sort="none">'
+            f'<button type="button" class="research-sort-button" '
+            f'data-column-index="{len(header_cells)}">'
+            f"<span>{escape(label)}</span>"
+            '<span class="research-sort-indicator" aria-hidden="true"></span>'
+            "</button></th>"
+        )
+
+    body_rows = []
+    for _, row in game_log_df.iterrows():
+        date_sort_value, date_sort_kind = research_sort_metadata(
+            row,
+            "game_date",
+        )
+        opponent_sort_value, opponent_sort_kind = research_sort_metadata(
+            row,
+            "opponent",
+        )
+        cells = [
+            '<td class="sticky-game" '
+            f'data-sort-value="{escape(date_sort_value, quote=True)}" '
+            f'data-sort-kind="{date_sort_kind}">'
+            f"{escape(game_log_date_display(row.get('game_date')))}</td>",
+            '<td class="sticky-player" '
+            f'data-sort-value="{escape(opponent_sort_value, quote=True)}" '
+            f'data-sort-kind="{opponent_sort_kind}">'
+            f"{game_log_matchup_html(row, log_type)}</td>",
+        ]
+        for column in data_columns:
+            value = row.get(column)
+            sort_value, sort_kind = research_sort_metadata(row, column)
+            align_class = "align-left" if column == "home_away" else ""
+            cells.append(
+                f'<td class="{align_class}" '
+                f'data-sort-value="{escape(sort_value, quote=True)}" '
+                f'data-sort-kind="{sort_kind}">'
+                f"{escape(research_cell_value(column, value))}</td>"
+            )
+        body_rows.append("<tr>" + "".join(cells) + "</tr>")
+
+    table_height = min(540, max(112, 40 + (len(game_log_df) * 36)))
+    RESEARCH_TABLE_COMPONENT(
+        table_html=f"""
+        <div class="research-table-shell game-log-table-shell"
+             id="{escape(table_key, quote=True)}">
+            <table class="research-table game-log-table">
+                <thead><tr>{''.join(header_cells)}</tr></thead>
+                <tbody>{''.join(body_rows)}</tbody>
+            </table>
+        </div>
+        """,
+        table_height=table_height,
+        key=table_key,
+        default=None,
+    )
+
+
 def selected_log_from_event(table_key, event):
     selected_key = f"{table_key}_selected_log"
     event_key = f"{table_key}_processed_event"
@@ -1875,7 +1999,17 @@ def display_bvp_game_log(selected_row):
     batter_id = selected_row.get("batter_id")
     pitcher_id = selected_row.get("opposing_pitcher_id")
 
-    st.subheader(f"Career Game Log: {batter_name} vs {pitcher_name}")
+    st.markdown(
+        f"""
+        <div class="section-shell game-log-heading">
+            <div class="section-label">Career Game Log</div>
+            <div class="section-title">
+                {escape(str(batter_name))} vs {escape(str(pitcher_name))}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if is_missing_value(batter_id) or is_missing_value(pitcher_id):
         st.warning("Player ID was not found for this row.")
@@ -1922,7 +2056,12 @@ def display_bvp_game_log(selected_row):
 
     game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
 
-    show_table(game_log_df[game_log_cols])
+    render_game_log_table(
+        game_log_df[game_log_cols],
+        game_log_cols,
+        log_type="bvp",
+        table_key=f"bvp-game-log-{int(batter_id)}-{int(pitcher_id)}",
+    )
 
 
 def display_pitcher_vs_team_game_log(selected_row):
@@ -1930,7 +2069,17 @@ def display_pitcher_vs_team_game_log(selected_row):
     opponent_team = selected_row.get("opponent")
     pitcher_id = selected_row.get("pitcher_id")
 
-    st.subheader(f"Career Game Log: {pitcher_name} vs {opponent_team}")
+    st.markdown(
+        f"""
+        <div class="section-shell game-log-heading">
+            <div class="section-label">Career Game Log</div>
+            <div class="section-title">
+                {escape(str(pitcher_name))} vs {escape(str(opponent_team))}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if is_missing_value(pitcher_id):
         st.warning("Pitcher ID was not found for this row.")
@@ -1966,7 +2115,12 @@ def display_pitcher_vs_team_game_log(selected_row):
 
     game_log_cols = [col for col in game_log_cols if col in game_log_df.columns]
 
-    show_table(game_log_df[game_log_cols])
+    render_game_log_table(
+        game_log_df[game_log_cols],
+        game_log_cols,
+        log_type="pitcher",
+        table_key=f"pitcher-game-log-{int(pitcher_id)}-{opponent_team}",
+    )
 
 
 @st.fragment
