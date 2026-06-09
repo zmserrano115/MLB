@@ -34,10 +34,6 @@ def scale_value(value, low, high):
     return max(0, min(100, score))
 
 
-def scale_series(series, low, high):
-    return ((series - low) / (high - low) * 100).clip(0, 100)
-
-
 def find_player_row(df, player_name):
     if player_name is None or pd.isna(player_name):
         return None
@@ -140,19 +136,6 @@ def estimate_projected_pitch_count(pitcher_row):
     return max(55, min(105, estimated_pitches))
 
 
-def grade_hitter_score(score):
-    if score >= 75:
-        return "Elite Matchup"
-    elif score >= 65:
-        return "Strong Matchup"
-    elif score >= 55:
-        return "Good Matchup"
-    elif score >= 45:
-        return "Neutral"
-    else:
-        return "Avoid"
-
-
 def grade_k_score(score):
     if score >= 75:
         return "Elite K Matchup"
@@ -164,58 +147,6 @@ def grade_k_score(score):
         return "Neutral"
     else:
         return "Avoid"
-
-
-def score_hitter_matchups(batter_df, opposing_pitcher_row=None):
-    df = batter_df.copy()
-
-    for col in ["AVG", "OBP", "OPS", "wOBA", "K%"]:
-        if col not in df.columns:
-            df[col] = np.nan
-
-    avg_score = scale_series(df["AVG"], 0.220, 0.320)
-    obp_score = scale_series(df["OBP"], 0.290, 0.400)
-    ops_score = scale_series(df["OPS"], 0.650, 0.950)
-    woba_score = scale_series(df["wOBA"], 0.290, 0.400)
-
-    contact_score = 100 - scale_series(df["K%"], 15, 32)
-
-    hitter_ability_score = (
-        avg_score * 0.20 +
-        obp_score * 0.30 +
-        ops_score * 0.20 +
-        woba_score * 0.20 +
-        contact_score * 0.10
-    )
-
-    pitcher_weakness_score = 50
-
-    if opposing_pitcher_row is not None:
-        pitcher_era = opposing_pitcher_row.get("ERA", np.nan)
-        pitcher_whip = opposing_pitcher_row.get("WHIP", np.nan)
-        pitcher_k_pct = opposing_pitcher_row.get("K%", np.nan)
-
-        era_score = scale_value(pitcher_era, 2.50, 5.50)
-        whip_score = scale_value(pitcher_whip, 0.95, 1.50)
-        pitcher_low_k_score = 100 - scale_value(pitcher_k_pct, 18, 32)
-
-        pitcher_weakness_score = np.nanmean([
-            era_score,
-            whip_score,
-            pitcher_low_k_score
-        ])
-
-    df["hitter_ability_score"] = hitter_ability_score
-    df["pitcher_weakness_score"] = pitcher_weakness_score
-
-    df["matchup_score"] = (
-        df["hitter_ability_score"] * 0.75 +
-        df["pitcher_weakness_score"] * 0.25
-    )
-
-    df["matchup_grade"] = df["matchup_score"].apply(grade_hitter_score)
-
-    return df.sort_values("matchup_score", ascending=False)
 
 
 def score_pitcher_k_matchup(pitcher_row, opposing_batters):

@@ -105,19 +105,6 @@ def weather_icon(condition):
     return "unknown"
 
 
-def weather_code_from_condition(condition):
-    icon = weather_icon(condition)
-    return {
-        "storm": 95,
-        "rain": 61,
-        "snow": 71,
-        "fog": 45,
-        "clear": 0,
-        "partly-cloudy": 2,
-        "cloudy": 3,
-    }.get(icon, 3)
-
-
 def field_wind_arrow(field_direction):
     return {
         "Out to CF": "↑",

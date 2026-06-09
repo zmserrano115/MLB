@@ -5,7 +5,6 @@ import pandas as pd
 from src.scoring import (
     find_player_row,
     grade_k_score,
-    score_hitter_matchups,
     score_pitcher_k_matchup
 )
 from src.stat_data import (
@@ -118,23 +117,6 @@ def apply_pitcher_weather_adjustment(score_row, game):
     score_row.update(game_weather_context(game))
     return score_row
 
-
-def is_valid_player_id(value):
-    if value is None:
-        return False
-
-    try:
-        if pd.isna(value):
-            return False
-    except Exception:
-        pass
-
-    text_value = str(value).strip().lower()
-
-    if text_value in ["", "nan", "none", "null"]:
-        return False
-
-    return True
 
 def get_team_batters(batters_df, team_id, min_pa=100):
     """
