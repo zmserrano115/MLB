@@ -1,3 +1,4 @@
+from datetime import timedelta
 from html import escape
 import json
 import os
@@ -30,6 +31,7 @@ from src.time_utils import current_app_date
 st.set_page_config(
     page_title="All Rise Analytics",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
 
 RESEARCH_TABLE_COMPONENT = components.declare_component(
@@ -459,111 +461,39 @@ st.markdown(
         color: var(--text);
     }
 
-    section[data-testid="stSidebar"] {
-        background: #ffffff !important;
-        border-right: 1px solid #cfd7e2 !important;
-        box-shadow: 6px 0 22px rgba(15, 23, 42, 0.08);
-    }
+    @media (max-width: 680px) {
+        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"] {
+            display: grid !important;
+            grid-template-columns: 44px minmax(0, 1fr) 44px !important;
+            gap: 8px !important;
+        }
 
-    section[data-testid="stSidebar"] > div {
-        background: #ffffff !important;
-        padding-top: 1.25rem;
-    }
+        .st-key-matchup_toolbar [data-testid="stColumn"] {
+            width: 100% !important;
+            min-width: 0 !important;
+            flex: none !important;
+        }
 
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3 {
-        color: #111827 !important;
-        font-weight: 500 !important;
-    }
+        .st-key-matchup_toolbar [data-testid="stColumn"]:nth-child(1),
+        .st-key-matchup_toolbar [data-testid="stColumn"]:nth-child(2),
+        .st-key-matchup_toolbar [data-testid="stColumn"]:nth-child(3) {
+            grid-column: 1 / -1;
+        }
 
-    section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] span,
-    section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] {
-        color: #111827 !important;
-    }
+        .st-key-matchup_toolbar [data-testid="stColumn"]:nth-child(4) {
+            grid-column: 1;
+            grid-row: 4;
+        }
 
-    section[data-testid="stSidebar"] label p {
-        color: #374151 !important;
-        font-size: 13px !important;
-        font-weight: 500 !important;
-    }
+        .st-key-matchup_toolbar [data-testid="stColumn"]:nth-child(5) {
+            grid-column: 2;
+            grid-row: 4;
+        }
 
-    section[data-testid="stSidebar"] small {
-        color: #4b5563 !important;
-    }
-
-    section[data-testid="stSidebar"] input {
-        background: #f8fafc !important;
-        color: #111827 !important;
-        border: 1px solid #cfd7e2 !important;
-        border-radius: 0 !important;
-    }
-
-    section[data-testid="stSidebar"] [data-baseweb="select"] > div {
-        background: #f8fafc !important;
-        color: #111827 !important;
-        border: 1px solid #cfd7e2 !important;
-        border-radius: 0 !important;
-    }
-
-    section[data-testid="stSidebar"] [data-baseweb="select"] span {
-        color: #111827 !important;
-    }
-
-    section[data-testid="stSidebar"] button {
-        background: #0f3b66 !important;
-        color: #ffffff !important;
-        border: 1px solid #0f3b66 !important;
-        border-radius: 0 !important;
-        font-weight: 500 !important;
-    }
-
-    section[data-testid="stSidebar"] button * {
-        color: #ffffff !important;
-        fill: #ffffff !important;
-        stroke: #ffffff !important;
-    }
-
-    section[data-testid="stSidebar"] button:hover {
-        background: #145083 !important;
-        border-color: #145083 !important;
-        color: #ffffff !important;
-    }
-
-    section[data-testid="stSidebar"] button:hover * {
-        color: #ffffff !important;
-        fill: #ffffff !important;
-        stroke: #ffffff !important;
-    }
-
-    section[data-testid="stSidebar"] [data-testid="stNumberInput"] button {
-        background: #eef3f8 !important;
-        color: #111827 !important;
-        border: 1px solid #cfd7e2 !important;
-    }
-
-    section[data-testid="stSidebar"] [data-testid="stNumberInput"] button * {
-        color: #111827 !important;
-        fill: #111827 !important;
-        stroke: #111827 !important;
-    }
-
-    section[data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover {
-        background: #e2eaf3 !important;
-        color: #111827 !important;
-        border-color: #b9c3cf !important;
-    }
-
-    section[data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover * {
-        color: #111827 !important;
-        fill: #111827 !important;
-        stroke: #111827 !important;
-    }
-
-    section[data-testid="stSidebar"] [data-testid="stDateInput"] input {
-        color: #111827 !important;
+        .st-key-matchup_toolbar [data-testid="stColumn"]:nth-child(6) {
+            grid-column: 3;
+            grid-row: 4;
+        }
     }
 
     @media (max-width: 900px) {
@@ -692,12 +622,6 @@ def weather_icon_svg(icon_name, size=18, padding=0):
     )
 
 
-def apply_matchup_row_limit(df, row_setting):
-    if row_setting == "All matchups":
-        return df.copy()
-    return df.head(int(row_setting)).copy()
-
-
 def add_game_column(df):
     if df.empty:
         return df
@@ -733,6 +657,42 @@ def filter_by_game(df, selected_game):
         return df
 
     return df[df["game"] == selected_game].copy()
+
+
+def get_player_options(dataframes, columns):
+    names = set()
+    for dataframe in dataframes:
+        if dataframe is None or dataframe.empty:
+            continue
+        for column in columns:
+            if column not in dataframe.columns:
+                continue
+            names.update(
+                str(value).strip()
+                for value in dataframe[column].dropna()
+                if str(value).strip()
+            )
+    return sorted(names, key=str.casefold)
+
+
+def filter_by_players(df, selected_batter=None, selected_pitcher=None):
+    if df.empty:
+        return df
+
+    result = df
+    if selected_batter and "batter" in result.columns:
+        result = result[result["batter"] == selected_batter]
+
+    if selected_pitcher:
+        pitcher_column = None
+        if "opposing_pitcher" in result.columns:
+            pitcher_column = "opposing_pitcher"
+        elif "pitcher" in result.columns:
+            pitcher_column = "pitcher"
+        if pitcher_column:
+            result = result[result[pitcher_column] == selected_pitcher]
+
+    return result.copy()
 
 
 def is_missing_value(value):
@@ -1074,7 +1034,8 @@ def render_research_table(df, columns, player_column, log_type, table_key):
     for column in data_columns:
         label = RESEARCH_COLUMN_LABELS.get(column, column)
         width = RESEARCH_COLUMN_WIDTHS.get(column, 62)
-        align_class = " align-left" if column in {
+        header_classes = []
+        if column in {
             "opposing_pitcher",
             "opponent",
             "split",
@@ -1084,9 +1045,13 @@ def render_research_table(df, columns, player_column, log_type, table_key):
             "weather_edge",
             "matchup_grade",
             "k_matchup_grade",
-        } else ""
+        }:
+            header_classes.append("align-left")
+        if column in {"matchup_grade", "k_matchup_grade"}:
+            header_classes.append("sticky-grade")
         header_cells.append(
-            f'<th class="{align_class.strip()}" style="min-width:{width}px" '
+            f'<th class="{" ".join(header_classes)}" '
+            f'style="min-width:{width}px" '
             'aria-sort="none">'
             f'<button type="button" class="research-sort-button" '
             f'data-column-index="{len(header_cells)}">'
@@ -1119,7 +1084,8 @@ def render_research_table(df, columns, player_column, log_type, table_key):
         for column in data_columns:
             value = row.get(column)
             sort_value, sort_kind = research_sort_metadata(row, column)
-            align_class = "align-left" if column in {
+            cell_classes = []
+            if column in {
                 "opposing_pitcher",
                 "opponent",
                 "split",
@@ -1129,7 +1095,10 @@ def render_research_table(df, columns, player_column, log_type, table_key):
                 "weather_edge",
                 "matchup_grade",
                 "k_matchup_grade",
-            } else ""
+            }:
+                cell_classes.append("align-left")
+            if column in {"matchup_grade", "k_matchup_grade"}:
+                cell_classes.append("sticky-grade")
             if column == "weather_condition":
                 icon = weather_icon_svg(row.get("weather_icon"), size=17)
                 tooltip = escape(
@@ -1169,7 +1138,7 @@ def render_research_table(df, columns, player_column, log_type, table_key):
             else:
                 content = escape(research_cell_value(column, value))
             cells.append(
-                f'<td class="{align_class}" '
+                f'<td class="{" ".join(cell_classes)}" '
                 f'data-sort-value="{escape(sort_value, quote=True)}" '
                 f'data-sort-kind="{sort_kind}">{content}</td>'
             )
@@ -1494,16 +1463,7 @@ def display_pitcher_vs_team_game_log(selected_row):
 
 
 @st.fragment
-def render_bvp_table_fragment(filtered_bvp_matchups, display_game_date, matchup_rows):
-    st.markdown(
-        f"""
-        <div class="section-shell">
-        <div class="section-title">{display_game_date}</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
+def render_bvp_table_fragment(filtered_bvp_matchups):
     if filtered_bvp_matchups.empty:
         st.warning("No batter vs pitcher matchup data was found for this selection.")
         return
@@ -1556,13 +1516,11 @@ def render_bvp_table_fragment(filtered_bvp_matchups, display_game_date, matchup_
         filtered_bvp_matchups["PA"] >= min_bvp_pa
     ].copy()
 
-    available_bvp_rows = len(display_bvp)
-    display_bvp = apply_matchup_row_limit(display_bvp, matchup_rows)
     display_bvp = display_bvp.reset_index(drop=True)
 
     st.html(
         f'<div class="research-table-note">Showing {len(display_bvp):,} '
-        f'of {available_bvp_rows:,} matchups. Click a batter name '
+        'matchups. Click a batter name '
         "to open the career game log.</div>"
     )
     table_event = render_research_table(
@@ -1579,16 +1537,7 @@ def render_bvp_table_fragment(filtered_bvp_matchups, display_game_date, matchup_
 
 
 @st.fragment
-def render_hand_table_fragment(filtered_hand_matchups, display_game_date, matchup_rows):
-    st.markdown(
-        f"""
-        <div class="section-shell">
-            <div class="section-title">{display_game_date}</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
+def render_hand_table_fragment(filtered_hand_matchups):
     if filtered_hand_matchups.empty:
         st.warning("No batter vs pitcher-hand split data was found for this selection.")
         return
@@ -1633,18 +1582,18 @@ def render_hand_table_fragment(filtered_hand_matchups, display_game_date, matchu
             "Minimum PA vs Throwing Hand",
             min_value=0,
             max_value=300,
-            value=20,
+            value=0,
             step=5,
-            key="hand_min_pa",
+            key="hand_min_pa_all_default",
         )
 
         min_hand_obp = st.slider(
             "Minimum OBP vs Throwing Hand",
-            min_value=0.150,
+            min_value=0.000,
             max_value=0.500,
-            value=0.320,
+            value=0.000,
             step=0.005,
-            key="hand_min_obp",
+            key="hand_min_obp_all_default",
         )
 
     display_hand = filtered_hand_matchups[
@@ -1652,13 +1601,11 @@ def render_hand_table_fragment(filtered_hand_matchups, display_game_date, matchu
         & (filtered_hand_matchups["OBP"] >= min_hand_obp)
     ].copy()
 
-    available_hand_rows = len(display_hand)
-    display_hand = apply_matchup_row_limit(display_hand, matchup_rows)
     display_hand = display_hand.reset_index(drop=True)
 
     st.html(
         f'<div class="research-table-note">Showing {len(display_hand):,} '
-        f'of {available_hand_rows:,} matchups. Click a batter name '
+        'matchups. Click a batter name '
         "to open the game log against today's probable pitcher.</div>"
     )
     table_event = render_research_table(
@@ -1675,16 +1622,7 @@ def render_hand_table_fragment(filtered_hand_matchups, display_game_date, matchu
 
 
 @st.fragment
-def render_pitcher_table_fragment(filtered_pitcher_k_matchups, display_game_date, matchup_rows):
-    st.markdown(
-        f"""
-        <div class="section-shell">
-            <div class="section-title">{display_game_date}</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
+def render_pitcher_table_fragment(filtered_pitcher_k_matchups):
     if filtered_pitcher_k_matchups.empty:
         st.warning("No pitcher strikeout matchups were created for this selection.")
         return
@@ -1737,16 +1675,11 @@ def render_pitcher_table_fragment(filtered_pitcher_k_matchups, display_game_date
         column for column in k_cols if column in filtered_pitcher_k_matchups.columns
     ]
 
-    available_pitcher_rows = len(filtered_pitcher_k_matchups)
-    display_k = apply_matchup_row_limit(
-        filtered_pitcher_k_matchups,
-        matchup_rows,
-    )
-    display_k = display_k.reset_index(drop=True)
+    display_k = filtered_pitcher_k_matchups.reset_index(drop=True)
 
     st.html(
         f'<div class="research-table-note">Showing {len(display_k):,} '
-        f'of {available_pitcher_rows:,} matchups. Click a pitcher name '
+        'matchups. Click a pitcher name '
         "to open the career opponent game log.</div>"
     )
     table_event = render_research_table(
@@ -1763,7 +1696,6 @@ def render_pitcher_table_fragment(filtered_pitcher_k_matchups, display_game_date
 
 
 app_today = current_app_date()
-current_year = app_today.year
 try:
     if "MLB_DB_URL" in st.secrets:
         os.environ.setdefault("MLB_DB_URL", st.secrets["MLB_DB_URL"])
@@ -1772,25 +1704,54 @@ except Exception:
 database.init_database()
 
 
-with st.sidebar:
-    st.header("Controls")
+if "selected_game_date" not in st.session_state:
+    st.session_state.selected_game_date = app_today
 
-    selected_date = st.date_input("Game Date", value=app_today)
 
-    season = st.selectbox(
-        "Season",
-        list(range(current_year, current_year - 26, -1)),
+def shift_selected_date(days):
+    st.session_state.selected_game_date += timedelta(days=days)
+
+
+with st.container(key="matchup_toolbar"):
+    toolbar_columns = st.columns(
+        [2.2, 1.45, 2.2, 0.42, 1.6, 0.42],
+        gap="small",
+        vertical_alignment="bottom",
     )
+    with toolbar_columns[0]:
+        batter_filter_slot = st.empty()
+    with toolbar_columns[1]:
+        game_filter_slot = st.empty()
+    with toolbar_columns[2]:
+        pitcher_filter_slot = st.empty()
+    with toolbar_columns[3]:
+        st.button(
+            "\u2039",
+            key="previous_game_date",
+            help="Previous day",
+            on_click=shift_selected_date,
+            args=(-1,),
+            use_container_width=True,
+        )
+    with toolbar_columns[4]:
+        selected_date = st.date_input(
+            "Game Date",
+            key="selected_game_date",
+            label_visibility="collapsed",
+        )
+    with toolbar_columns[5]:
+        st.button(
+            "\u203a",
+            key="next_game_date",
+            help="Next day",
+            on_click=shift_selected_date,
+            args=(1,),
+            use_container_width=True,
+        )
 
-    min_pa = st.number_input(
-        "Minimum PA",
-        min_value=0,
-        max_value=700,
-        value=100,
-        step=10,
-    )
-
-    force_refresh = st.button("Refresh Live Context")
+season = selected_date.year
+min_pa = 0
+force_refresh = False
 
 
 @st.cache_data(show_spinner=True, ttl=900)
@@ -2028,26 +1989,61 @@ if schedule_df.empty:
 
 schedule_df = add_game_column(schedule_df)
 game_options = get_game_options(schedule_df)
+batter_options = get_player_options(
+    [bvp_matchups, hand_matchups],
+    ["batter"],
+)
+pitcher_options = get_player_options(
+    [bvp_matchups, hand_matchups, pitcher_k_matchups],
+    ["opposing_pitcher", "pitcher"],
+)
 
-game_filter_col, row_filter_col, _ = st.columns([2.2, 1.5, 2.3])
-with game_filter_col:
-    selected_game = st.selectbox(
-        "Game",
-        game_options,
-        index=0,
-    )
-with row_filter_col:
-    matchup_rows = st.selectbox(
-        "Rows per chart",
-        [10, 20, 30, 50, "All matchups"],
-        index=2,
-    )
+if st.session_state.get("selected_batter") not in [None, *batter_options]:
+    st.session_state.selected_batter = None
+if st.session_state.get("selected_pitcher") not in [None, *pitcher_options]:
+    st.session_state.selected_pitcher = None
+if st.session_state.get("selected_game") not in game_options:
+    st.session_state.selected_game = "All Games"
 
+selected_batter = batter_filter_slot.selectbox(
+    "Batter",
+    batter_options,
+    index=None,
+    placeholder="Batter...",
+    key="selected_batter",
+    label_visibility="collapsed",
+)
+selected_game = game_filter_slot.selectbox(
+    "Game",
+    game_options,
+    key="selected_game",
+    label_visibility="collapsed",
+)
+selected_pitcher = pitcher_filter_slot.selectbox(
+    "Pitcher",
+    pitcher_options,
+    index=None,
+    placeholder="Pitcher...",
+    key="selected_pitcher",
+    label_visibility="collapsed",
+)
 
 filtered_schedule_df = filter_by_game(schedule_df, selected_game)
-filtered_bvp_matchups = filter_by_game(bvp_matchups, selected_game)
-filtered_hand_matchups = filter_by_game(hand_matchups, selected_game)
-filtered_pitcher_k_matchups = filter_by_game(pitcher_k_matchups, selected_game)
+filtered_bvp_matchups = filter_by_players(
+    filter_by_game(bvp_matchups, selected_game),
+    selected_batter,
+    selected_pitcher,
+)
+filtered_hand_matchups = filter_by_players(
+    filter_by_game(hand_matchups, selected_game),
+    selected_batter,
+    selected_pitcher,
+)
+filtered_pitcher_k_matchups = filter_by_players(
+    filter_by_game(pitcher_k_matchups, selected_game),
+    selected_batter,
+    selected_pitcher,
+)
 
 
 display_game_date = format_display_date(selected_date)
@@ -2121,25 +2117,13 @@ with matchup_tab:
     )
 
     with tab1:
-        render_bvp_table_fragment(
-            filtered_bvp_matchups,
-            display_game_date,
-            matchup_rows,
-        )
+        render_bvp_table_fragment(filtered_bvp_matchups)
 
     with tab2:
-        render_hand_table_fragment(
-            filtered_hand_matchups,
-            display_game_date,
-            matchup_rows,
-        )
+        render_hand_table_fragment(filtered_hand_matchups)
 
     with tab3:
-        render_pitcher_table_fragment(
-            filtered_pitcher_k_matchups,
-            display_game_date,
-            matchup_rows,
-        )
+        render_pitcher_table_fragment(filtered_pitcher_k_matchups)
 
 with info_tab:
     st.markdown(
