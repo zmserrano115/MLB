@@ -21,6 +21,8 @@ from src.matchups import (
     build_batter_vs_hand_matchups,
     build_pitcher_k_matchups,
 )
+from src.injuries import add_injury_columns, fetch_injury_report
+from src.recent_form import build_recent_bar_chart_html
 from src import database
 from src.time_utils import current_app_date
 
@@ -918,6 +920,7 @@ INTEGER_RESEARCH_COLUMNS = {
     "PA",
     "AB",
     "H",
+    "TB",
     "BB",
     "HBP",
     "SO",
@@ -1021,6 +1024,18 @@ def research_log_payload(row, log_type):
     return clean_payload
 
 
+def research_injury_badge_html(row):
+    tooltip = row.get("injury_tooltip")
+    if is_missing_value(tooltip):
+        return ""
+    tooltip = escape(str(tooltip), quote=True)
+    return (
+        '<span class="research-injury-badge" tabindex="0" '
+        f'aria-label="{tooltip}" title="{tooltip}" '
+        f'data-tooltip="{tooltip}">inj</span>'
+    )
+
+
 def research_edge_class(value):
     edge = str(value or "").lower()
     if "hitter boost" in edge:
@@ -1098,7 +1113,8 @@ def render_research_table(df, columns, player_column, log_type, table_key):
             f'data-sort-kind="{player_sort_kind}">'
             '<button type="button" class="research-player-link" '
             f'data-research-event="{escape(player_payload, quote=True)}">'
-            f"{escape(player_name)}</button></td>",
+            f"{escape(player_name)}</button>"
+            f"{research_injury_badge_html(row)}</td>",
         ]
         for column in data_columns:
             value = row.get(column)
@@ -1374,6 +1390,7 @@ def display_bvp_game_log(selected_row):
         "PA",
         "AB",
         "H",
+        "TB",
         "BB",
         "HBP",
         "SO",
@@ -1395,6 +1412,16 @@ def display_bvp_game_log(selected_row):
         log_type="bvp",
         table_key=f"bvp-game-log-{int(batter_id)}-{int(pitcher_id)}",
     )
+    chart_html = build_recent_bar_chart_html(
+        game_log_df,
+        value_column="TB",
+        title="Total Bases - Last 5 Meetings",
+        subtitle=f"{batter_name} vs {pitcher_name}",
+        scale_floor=4,
+        accent="#245f96",
+    )
+    if chart_html:
+        st.html(chart_html)
 
 
 def display_pitcher_vs_team_game_log(selected_row):
@@ -1454,6 +1481,16 @@ def display_pitcher_vs_team_game_log(selected_row):
         log_type="pitcher",
         table_key=f"pitcher-game-log-{int(pitcher_id)}-{opponent_team}",
     )
+    chart_html = build_recent_bar_chart_html(
+        game_log_df,
+        value_column="SO",
+        title="Strikeouts - Last 5 Appearances",
+        subtitle=f"{pitcher_name} vs {opponent_team}",
+        scale_floor=10,
+        accent="#173f67",
+    )
+    if chart_html:
+        st.html(chart_html)
 
 
 @st.fragment
@@ -1766,6 +1803,11 @@ def load_weather(schedule, refresh_count, cache_version):
     return weather_service.enrich_schedule_with_weather(schedule)
 
 
+@st.cache_data(show_spinner=False, ttl=900)
+def load_injuries(team_ids, game_date, refresh_count):
+    return fetch_injury_report(team_ids, game_date)
+
+
 def load_published_weather(cache_version, refresh_count):
     fetcher = getattr(
         weather_service,
@@ -1846,6 +1888,7 @@ def load_pitcher_stats(season, force_refresh):
 if force_refresh:
     load_schedule.clear()
     load_weather.clear()
+    load_injuries.clear()
 
 schedule_df = load_schedule(selected_date, live_refresh_count)
 
@@ -1943,6 +1986,39 @@ with st.spinner("Building pitcher strikeout matchups..."):
         pitchers_df=pitchers_df,
         min_pa=min_pa,
     )
+
+schedule_team_ids = tuple(
+    sorted(
+        {
+            int(team_id)
+            for column in ("away_team_id", "home_team_id")
+            for team_id in schedule_df.get(
+                column,
+                pd.Series(dtype=float),
+            ).dropna()
+        }
+    )
+)
+injury_report = load_injuries(
+    schedule_team_ids,
+    selected_date,
+    live_refresh_count,
+)
+bvp_matchups = add_injury_columns(
+    bvp_matchups,
+    "batter_id",
+    injury_report,
+)
+hand_matchups = add_injury_columns(
+    hand_matchups,
+    "batter_id",
+    injury_report,
+)
+pitcher_k_matchups = add_injury_columns(
+    pitcher_k_matchups,
+    "pitcher_id",
+    injury_report,
+)
 
 
 if schedule_df.empty:

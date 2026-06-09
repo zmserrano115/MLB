@@ -7,6 +7,8 @@ import time
 import urllib.error
 import urllib.request
 
+from src.matchup_grading import grade_hitter_matchup
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "mlb.db"
@@ -900,18 +902,8 @@ def empty_bvp_result(grade):
     }
 
 
-def grade_bvp(pa, ops, obp):
-    if pa == 0:
-        return "No History"
-    if pa < 5:
-        return "Small Sample"
-    if ops >= 0.900 or obp >= 0.380:
-        return "Strong"
-    if ops >= 0.750 or obp >= 0.330:
-        return "Good"
-    if ops >= 0.650 or obp >= 0.300:
-        return "Neutral"
-    return "Avoid"
+def grade_bvp(at_bats, batting_average):
+    return grade_hitter_matchup(at_bats, batting_average)
 
 
 def get_batter_vs_pitcher_stats_from_db(batter_id, pitcher_id):
@@ -946,7 +938,7 @@ def get_batter_vs_pitcher_stats_from_db(batter_id, pitcher_id):
         "OPS": row["OPS"],
         "K%": row["K_pct"],
         "BB%": row["BB_pct"],
-        "matchup_grade": grade_bvp(row["PA"], row["OPS"], row["OBP"]),
+        "matchup_grade": grade_bvp(row["AB"], row["AVG"]),
     }
 
 
@@ -964,7 +956,7 @@ def get_batter_vs_pitcher_game_logs_from_db(batter_id, pitcher_id):
                     WHEN gl.batting_team = g.away_team THEN 'Away'
                     ELSE NULL
                 END AS home_away,
-                gl.PA, gl.AB, gl.H, gl.BB, gl.HBP, gl.SO, gl.HR, gl.RBI,
+                gl.PA, gl.AB, gl.H, gl.TB, gl.BB, gl.HBP, gl.SO, gl.HR, gl.RBI,
                 CASE WHEN gl.AB > 0 THEN ROUND(gl.H * 1.0 / gl.AB, 3) END AS AVG,
                 CASE WHEN gl.AB + gl.BB + gl.HBP + gl.SF > 0
                     THEN ROUND(

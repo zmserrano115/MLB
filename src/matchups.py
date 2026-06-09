@@ -2,6 +2,7 @@
 
 import pandas as pd
 
+from src.matchup_grading import grade_hitter_matchup
 from src.scoring import (
     find_player_row,
     grade_k_score,
@@ -61,6 +62,8 @@ def game_weather_context(game):
 def weather_adjusted_hitter_grade(history_grade, adjustment):
     if history_grade not in HITTER_GRADE_ORDER:
         return history_grade
+    if history_grade == "Avoid":
+        return history_grade
 
     adjustment = pd.to_numeric(adjustment, errors="coerce")
     if pd.isna(adjustment):
@@ -69,7 +72,10 @@ def weather_adjusted_hitter_grade(history_grade, adjustment):
     shift = 1 if adjustment >= 2.5 else -1 if adjustment <= -2.5 else 0
     index = HITTER_GRADE_ORDER.index(history_grade)
     index = max(0, min(len(HITTER_GRADE_ORDER) - 1, index + shift))
-    return HITTER_GRADE_ORDER[index]
+    adjusted_grade = HITTER_GRADE_ORDER[index]
+    if adjusted_grade == "Strong Matchup" and history_grade != "Strong Matchup":
+        return history_grade
+    return adjusted_grade
 
 
 def apply_hitter_weather_adjustment(result_df):
@@ -233,38 +239,16 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
         return result_df
 
     result_df["PA"] = pd.to_numeric(result_df["PA"], errors="coerce").fillna(0)
-
-    # Grade direct BvP results with simple sample-aware labels.
-    result_df["matchup_grade"] = "No History"
-
-    result_df.loc[
-        (result_df["PA"] > 0) & (result_df["PA"] < 5),
-        "matchup_grade"
-    ] = "Small Sample"
-
-    result_df.loc[
-        (result_df["PA"] >= 5) & (result_df["OBP"] >= 0.360),
-        "matchup_grade"
-    ] = "Strong Matchup"
-
-    result_df.loc[
-        (result_df["PA"] >= 5) & (result_df["OBP"] >= 0.320) & (result_df["OBP"] < 0.360),
-        "matchup_grade"
-    ] = "Good Matchup"
-
-    result_df.loc[
-        (result_df["PA"] >= 5) & (result_df["OBP"] >= 0.280) & (result_df["OBP"] < 0.320),
-        "matchup_grade"
-    ] = "Neutral"
-
-    result_df.loc[
-        (result_df["PA"] >= 5) & (result_df["OBP"] < 0.280),
-        "matchup_grade"
-    ] = "Avoid"
+    result_df["AB"] = pd.to_numeric(result_df["AB"], errors="coerce").fillna(0)
+    result_df["AVG"] = pd.to_numeric(result_df["AVG"], errors="coerce").fillna(0)
+    result_df["matchup_grade"] = [
+        grade_hitter_matchup(at_bats, batting_average)
+        for at_bats, batting_average in zip(result_df["AB"], result_df["AVG"])
+    ]
 
     result_df = apply_hitter_weather_adjustment(result_df)
     result_df = result_df.sort_values(
-        by=["weather_adjusted_score", "PA", "OBP", "OPS"],
+        by=["weather_adjusted_score", "AB", "AVG", "H"],
         ascending=[False, False, False, False]
     )
 
@@ -365,39 +349,16 @@ def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=100):
         return result_df
 
     result_df["PA"] = pd.to_numeric(result_df["PA"], errors="coerce").fillna(0)
-    result_df["OBP"] = pd.to_numeric(result_df["OBP"], errors="coerce")
-    result_df["OPS"] = pd.to_numeric(result_df["OPS"], errors="coerce")
-
-    result_df["matchup_grade"] = "No History"
-
-    result_df.loc[
-        (result_df["PA"] > 0) & (result_df["PA"] < 20),
-        "matchup_grade"
-    ] = "Small Sample"
-
-    result_df.loc[
-        (result_df["PA"] >= 20) & (result_df["OBP"] >= 0.360),
-        "matchup_grade"
-    ] = "Strong Matchup"
-
-    result_df.loc[
-        (result_df["PA"] >= 20) & (result_df["OBP"] >= 0.320) & (result_df["OBP"] < 0.360),
-        "matchup_grade"
-    ] = "Good Matchup"
-
-    result_df.loc[
-        (result_df["PA"] >= 20) & (result_df["OBP"] >= 0.280) & (result_df["OBP"] < 0.320),
-        "matchup_grade"
-    ] = "Neutral"
-
-    result_df.loc[
-        (result_df["PA"] >= 20) & (result_df["OBP"] < 0.280),
-        "matchup_grade"
-    ] = "Avoid"
+    result_df["AB"] = pd.to_numeric(result_df["AB"], errors="coerce").fillna(0)
+    result_df["AVG"] = pd.to_numeric(result_df["AVG"], errors="coerce").fillna(0)
+    result_df["matchup_grade"] = [
+        grade_hitter_matchup(at_bats, batting_average)
+        for at_bats, batting_average in zip(result_df["AB"], result_df["AVG"])
+    ]
 
     result_df = apply_hitter_weather_adjustment(result_df)
     result_df = result_df.sort_values(
-        by=["weather_adjusted_score", "OBP", "OPS", "PA"],
+        by=["weather_adjusted_score", "AB", "AVG", "H"],
         ascending=[False, False, False, False]
     )
 

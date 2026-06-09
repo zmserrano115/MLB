@@ -208,6 +208,61 @@
       outline: none;
     }
 
+    .research-injury-badge {
+      position: absolute;
+      top: 3px;
+      right: 4px;
+      z-index: 12;
+      min-width: 21px;
+      padding: 1px 3px;
+      border: 1px solid #dbc94a;
+      border-radius: 2px;
+      background: #fff8a8;
+      color: #4a4315;
+      font-size: 8px;
+      font-weight: 800;
+      line-height: 12px;
+      text-align: center;
+      text-transform: lowercase;
+      cursor: help;
+    }
+
+    .research-injury-badge::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      top: calc(100% + 5px);
+      right: 0;
+      z-index: 30;
+      display: none;
+      width: 230px;
+      padding: 8px 10px;
+      border-radius: 4px;
+      background: #26303a;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1.35;
+      text-align: left;
+      text-transform: none;
+      white-space: normal;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
+    }
+
+    .research-injury-badge:hover::after,
+    .research-injury-badge:focus::after {
+      display: block;
+    }
+
+    .research-injury-badge:focus {
+      outline: 2px solid #245f96;
+      outline-offset: 1px;
+    }
+
+    .research-table .sticky-player:focus-within,
+    .research-table .sticky-player:has(.research-injury-badge:hover) {
+      z-index: 25;
+    }
+
     .research-weather {
       display: inline-flex;
       align-items: center;
@@ -280,6 +335,11 @@
         left: 82px;
         width: 132px;
         min-width: 132px;
+      }
+
+      .research-injury-badge::after {
+        right: -2px;
+        width: 205px;
       }
 
       .research-game img {

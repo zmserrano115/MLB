@@ -84,6 +84,7 @@ class DatabaseTests(unittest.TestCase):
         game_logs = database.get_batter_vs_pitcher_game_logs_from_db(10, 20)
         self.assertEqual(len(game_logs), 1)
         self.assertEqual(game_logs[0]["home_away"], "Away")
+        self.assertEqual(game_logs[0]["TB"], 2)
 
         pitcher_stats = database.get_pitcher_stats_from_db(2026, 20)
         self.assertEqual(pitcher_stats["starts"], 1)
