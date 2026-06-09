@@ -2,11 +2,11 @@ import argparse
 from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from src.mlb_schedule import get_daily_schedule
+from src.time_utils import current_app_date
 from src.weather import enrich_schedule_with_weather
 
 
@@ -55,7 +55,7 @@ def parse_args():
     parser.add_argument(
         "--start-date",
         type=date.fromisoformat,
-        default=datetime.now(ZoneInfo("America/Denver")).date(),
+        default=current_app_date(),
     )
     parser.add_argument("--days", type=int, default=8)
     parser.add_argument(

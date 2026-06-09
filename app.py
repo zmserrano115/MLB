@@ -1,4 +1,3 @@
-from datetime import date
 from html import escape
 import json
 import os
@@ -23,6 +22,7 @@ from src.matchups import (
     build_pitcher_k_matchups,
 )
 from src import database
+from src.time_utils import current_app_date
 
 
 st.set_page_config(
@@ -1725,7 +1725,8 @@ def render_pitcher_table_fragment(filtered_pitcher_k_matchups, display_game_date
     )
 
 
-current_year = date.today().year
+app_today = current_app_date()
+current_year = app_today.year
 try:
     if "MLB_DB_URL" in st.secrets:
         os.environ.setdefault("MLB_DB_URL", st.secrets["MLB_DB_URL"])
@@ -1737,7 +1738,7 @@ database.init_database()
 with st.sidebar:
     st.header("Controls")
 
-    selected_date = st.date_input("Game Date", value=date.today())
+    selected_date = st.date_input("Game Date", value=app_today)
 
     season = st.selectbox(
         "Season",
@@ -1774,7 +1775,7 @@ def load_published_weather(cache_version, refresh_count):
     if not fetcher:
         return pd.DataFrame()
     return fetcher(
-        cache_bust=f"{date.today().isoformat()}-{cache_version}-{refresh_count}",
+        cache_bust=f"{app_today.isoformat()}-{cache_version}-{refresh_count}",
     )
 
 

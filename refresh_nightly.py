@@ -6,6 +6,7 @@ import traceback
 
 from refresh_database import refresh_completed_games
 from src import database
+from src.time_utils import current_app_date
 
 
 def refresh_dates(end_date, lookback_days):
@@ -89,7 +90,7 @@ def main():
     )
     parser.add_argument(
         "--date",
-        default=(date.today() - timedelta(days=1)).strftime("%Y-%m-%d"),
+        default=(current_app_date() - timedelta(days=1)).strftime("%Y-%m-%d"),
         help="Last completed-game date to check. Defaults to yesterday.",
     )
     parser.add_argument(
