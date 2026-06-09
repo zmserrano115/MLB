@@ -9,23 +9,23 @@ class RecentFormTests(unittest.TestCase):
     def setUp(self):
         self.logs = pd.DataFrame(
             [
-                {"game_date": "2026-06-06", "TB": 2, "SO": 8},
-                {"game_date": "2026-06-05", "TB": 0, "SO": 5},
-                {"game_date": "2026-06-04", "TB": 4, "SO": 10},
-                {"game_date": "2026-06-03", "TB": 1, "SO": 7},
-                {"game_date": "2026-06-02", "TB": 3, "SO": 9},
-                {"game_date": "2026-06-01", "TB": 1, "SO": 4},
+                {"game_date": "2026-06-06", "TB": 2, "SO": 8, "home_away": "Home"},
+                {"game_date": "2026-06-05", "TB": 0, "SO": 5, "home_away": "Away"},
+                {"game_date": "2026-06-04", "TB": 4, "SO": 10, "home_away": "Home"},
+                {"game_date": "2026-06-03", "TB": 1, "SO": 7, "home_away": "Away"},
+                {"game_date": "2026-06-02", "TB": 3, "SO": 9, "home_away": "Home"},
+                {"game_date": "2026-06-01", "TB": 1, "SO": 4, "home_away": "Away"},
             ]
         )
 
     def test_recent_values_use_latest_five_in_chronological_chart_order(self):
         values = recent_game_values(self.logs, "TB")
         self.assertEqual([item["date"] for item in values], [
-            "6/2",
-            "6/3",
-            "6/4",
-            "6/5",
-            "6/6",
+            "6/2 (H)",
+            "6/3 (A)",
+            "6/4 (H)",
+            "6/5 (A)",
+            "6/6 (H)",
         ])
         self.assertEqual([item["value"] for item in values], [3, 1, 4, 0, 2])
 
