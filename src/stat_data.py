@@ -205,6 +205,7 @@ def get_pitcher_stats(season, force_refresh=False):
 
     rename_cols = {
         "inningsPitched": "IP",
+        "hits": "H",
         "era": "ERA",
         "whip": "WHIP",
         "strikeoutsPer9Inn": "K/9",
@@ -233,6 +234,7 @@ def get_pitcher_stats(season, force_refresh=False):
         "IP",
         "GS",
         "Pitches",
+        "H",
         "ERA",
         "WHIP",
         "K/9",
@@ -250,6 +252,7 @@ def get_pitcher_stats(season, force_refresh=False):
         "team_id",
         "GS",
         "Pitches",
+        "H",
         "ERA",
         "WHIP",
         "K/9",

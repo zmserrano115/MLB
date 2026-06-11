@@ -1004,14 +1004,21 @@ def get_pitcher_vs_team_game_logs_from_db(pitcher_id, opponent):
         rows = conn.execute(
             """
             SELECT
-                game_date,
-                opponent,
-                IP,
-                pitch_count AS "Pitch Count",
-                BF, H, BB, HBP, SO, HR, R, ER
-            FROM pitcher_game_logs
-            WHERE pitcher_id = ? AND opponent = ?
-            ORDER BY game_date DESC
+                gl.game_date,
+                gl.team,
+                gl.opponent,
+                CASE
+                    WHEN gl.team = g.home_team THEN 'Home'
+                    WHEN gl.team = g.away_team THEN 'Away'
+                    ELSE NULL
+                END AS home_away,
+                gl.IP,
+                gl.pitch_count AS "Pitch Count",
+                gl.BF, gl.H, gl.BB, gl.HBP, gl.SO, gl.HR, gl.R, gl.ER
+            FROM pitcher_game_logs gl
+            LEFT JOIN games g ON gl.game_pk = g.game_pk
+            WHERE gl.pitcher_id = ? AND gl.opponent = ?
+            ORDER BY gl.game_date DESC
             """,
             (int(pitcher_id), opponent),
         ).fetchall()

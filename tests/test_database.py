@@ -95,6 +95,8 @@ class DatabaseTests(unittest.TestCase):
             20,
             "New York Yankees",
         )
+        self.assertEqual(pitcher_logs[0]["team"], "Boston Red Sox")
+        self.assertEqual(pitcher_logs[0]["home_away"], "Home")
         self.assertEqual(pitcher_logs[0]["Pitch Count"], 88)
 
         with database.read_connection() as conn:

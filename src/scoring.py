@@ -174,6 +174,11 @@ def score_pitcher_k_matchup(pitcher_row, opposing_batters):
     projected_pitch_count = estimate_projected_pitch_count(pitcher_row)
 
     opponent_avg_k_pct = safe_number(opposing_batters["K%"].mean())
+    opponent_avg = (
+        safe_number(opposing_batters["AVG"].mean())
+        if "AVG" in opposing_batters.columns
+        else np.nan
+    )
 
     pitcher_k_score = scale_value(pitcher_k_pct, 18, 35)
     pitcher_k9_score = scale_value(pitcher_k9, 6.5, 12.5)
@@ -202,6 +207,17 @@ def score_pitcher_k_matchup(pitcher_row, opposing_batters):
     else:
         projected_ks = (pitcher_k9 * projected_ip / 9) * opponent_k_adjustment
 
+    pitcher_hits = safe_number(pitcher_row.get("H", np.nan))
+    if pd.isna(pitcher_hits) or pd.isna(season_ip) or season_ip <= 0:
+        projected_hits = np.nan
+    else:
+        opponent_hit_adjustment = 1.0
+        if not pd.isna(opponent_avg):
+            opponent_hit_adjustment = max(0.75, min(1.25, opponent_avg / 0.245))
+        projected_hits = (
+            pitcher_hits / season_ip
+        ) * projected_ip * opponent_hit_adjustment
+
     return {
         "pitcher_id": pitcher_row.get("player_id"),
         "pitcher": pitcher_row.get("Name"),
@@ -213,6 +229,7 @@ def score_pitcher_k_matchup(pitcher_row, opposing_batters):
         "Projected IP": projected_ip,
         "Projected Pitch Count": projected_pitch_count,
         "Projected Ks": projected_ks,
+        "Projected Hits": projected_hits,
 
         "ERA": pitcher_row.get("ERA"),
         "WHIP": pitcher_row.get("WHIP"),

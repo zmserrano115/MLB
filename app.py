@@ -3,11 +3,11 @@ from html import escape
 import json
 import os
 from pathlib import Path
+import uuid
 
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
-from streamlit_autorefresh import st_autorefresh
 
 from src.mlb_schedule import get_daily_schedule
 from src import weather as weather_service
@@ -38,12 +38,6 @@ RESEARCH_TABLE_COMPONENT = components.declare_component(
     "research_table",
     path=str(Path(__file__).parent / "components" / "research_table"),
 )
-
-live_refresh_count = st_autorefresh(
-    interval=15 * 60 * 1000,
-    key="live_context_autorefresh",
-)
-
 
 TEAM_ID_BY_NAME = {
     "Arizona Diamondbacks": 109,
@@ -839,6 +833,7 @@ RESEARCH_COLUMN_LABELS = {
     "Projected IP": "Proj IP",
     "Projected Pitch Count": "Proj PC",
     "Projected Ks": "Proj K",
+    "Projected Hits": "Proj H",
     "opponent_avg_k%": "Opp K%",
     "weather_condition": "Weather",
     "weather_display": "Temp",
@@ -903,6 +898,7 @@ TWO_DECIMAL_RESEARCH_COLUMNS = {
     "opponent_avg_k%",
     "Projected IP",
     "Projected Ks",
+    "Projected Hits",
     "k_matchup_score",
 }
 ONE_DECIMAL_RESEARCH_COLUMNS = {"Season IP"}
@@ -1167,16 +1163,15 @@ def game_log_date_display(value):
 
 
 def game_log_matchup_html(row, log_type):
-    if log_type == "bvp":
-        team = str(row.get("team") or "")
-        opponent = str(row.get("opponent") or "")
+    team = str(row.get("team") or "")
+    opponent = str(row.get("opponent") or "")
+    if team and opponent:
         if str(row.get("home_away") or "").lower() == "home":
             game = f"{opponent} @ {team}"
         else:
             game = f"{team} @ {opponent}"
         return research_game_html(game)
 
-    opponent = str(row.get("opponent") or "")
     logo = team_logo_url(opponent)
     return (
         '<span class="research-log-opponent">'
@@ -1189,7 +1184,7 @@ def game_log_matchup_html(row, log_type):
 
 
 def render_game_log_table(game_log_df, columns, log_type, table_key):
-    identity_label = "Matchup" if log_type == "bvp" else "Opponent"
+    identity_label = "Matchup"
     header_cells = [
         '<th class="sticky-game" aria-sort="none">'
         '<button type="button" class="research-sort-button" data-column-index="0">'
@@ -1429,8 +1424,10 @@ def display_pitcher_vs_team_game_log(selected_row):
 
     game_log_cols = [
         "game_date",
+        "team",
         "opponent_logo",
         "opponent",
+        "home_away",
         "IP",
         "Pitch Count",
         "BF",
@@ -1631,6 +1628,7 @@ def render_pitcher_table_fragment(filtered_pitcher_k_matchups):
         "Projected IP",
         "Projected Pitch Count",
         "Projected Ks",
+        "Projected Hits",
     ]
     missing_projected_cols = [
         col
@@ -1653,6 +1651,7 @@ def render_pitcher_table_fragment(filtered_pitcher_k_matchups):
         "Projected IP",
         "Projected Pitch Count",
         "Projected Ks",
+        "Projected Hits",
         "ERA",
         "WHIP",
         "K%",
@@ -1706,6 +1705,8 @@ database.init_database()
 
 if "selected_game_date" not in st.session_state:
     st.session_state.selected_game_date = app_today
+if "data_snapshot_id" not in st.session_state:
+    st.session_state.data_snapshot_id = uuid.uuid4().hex
 
 
 def shift_selected_date(days):
@@ -1752,24 +1753,25 @@ with st.container(key="matchup_toolbar"):
 season = selected_date.year
 min_pa = 0
 force_refresh = False
+data_snapshot_id = st.session_state.data_snapshot_id
 
 
-@st.cache_data(show_spinner=True, ttl=900)
-def load_schedule(game_date, refresh_count):
+@st.cache_data(show_spinner=True)
+def load_schedule(game_date, snapshot_id):
     return get_daily_schedule(str(game_date))
 
 
-@st.cache_data(show_spinner=True, ttl=900)
-def load_weather(schedule, refresh_count, cache_version):
+@st.cache_data(show_spinner=True)
+def load_weather(schedule, snapshot_id, cache_version):
     return weather_service.enrich_schedule_with_weather(schedule)
 
 
-@st.cache_data(show_spinner=False, ttl=900)
-def load_injuries(team_ids, game_date, refresh_count):
+@st.cache_data(show_spinner=False)
+def load_injuries(team_ids, game_date, snapshot_id):
     return fetch_injury_report(team_ids, game_date)
 
 
-def load_published_weather(cache_version, refresh_count):
+def load_published_weather(cache_version, snapshot_id):
     fetcher = getattr(
         weather_service,
         "fetch_published_weather_cache",
@@ -1778,7 +1780,7 @@ def load_published_weather(cache_version, refresh_count):
     if not fetcher:
         return pd.DataFrame()
     return fetcher(
-        cache_bust=f"{app_today.isoformat()}-{cache_version}-{refresh_count}",
+        cache_bust=f"{app_today.isoformat()}-{cache_version}-{snapshot_id}",
     )
 
 
@@ -1837,12 +1839,12 @@ def preserve_previous_weather(current_df, previous_df):
 
 
 @st.cache_data(show_spinner=True)
-def load_batter_stats(season, force_refresh):
+def load_batter_stats(season, force_refresh, snapshot_id):
     return get_batter_stats(season, force_refresh=force_refresh)
 
 
 @st.cache_data(show_spinner=True)
-def load_pitcher_stats(season, force_refresh):
+def load_pitcher_stats(season, force_refresh, snapshot_id):
     return get_pitcher_stats(season, force_refresh=force_refresh)
 
 
@@ -1851,7 +1853,7 @@ if force_refresh:
     load_weather.clear()
     load_injuries.clear()
 
-schedule_df = load_schedule(selected_date, live_refresh_count)
+schedule_df = load_schedule(selected_date, data_snapshot_id)
 
 if schedule_df.empty:
     st.warning("No MLB games found for this date.")
@@ -1859,7 +1861,7 @@ if schedule_df.empty:
 
 published_weather = load_published_weather(
     cache_version=3,
-    refresh_count=live_refresh_count,
+    snapshot_id=data_snapshot_id,
 )
 cached_schedule_df = merge_published_weather(
     schedule_df,
@@ -1873,7 +1875,11 @@ cached_weather_available = cached_schedule_df.get(
 if len(cached_schedule_df) and cached_weather_available.all():
     schedule_df = cached_schedule_df
 else:
-    schedule_df = load_weather(schedule_df, live_refresh_count, cache_version=5)
+    schedule_df = load_weather(
+        schedule_df,
+        data_snapshot_id,
+        cache_version=5,
+    )
     schedule_df = merge_published_weather(
         schedule_df,
         published_weather,
@@ -1913,13 +1919,13 @@ if len(schedule_df) and not weather_available.any():
     if error_detail:
         message += f" Provider detail: {error_detail}"
     st.error(message)
-batters_df = load_batter_stats(season, force_refresh)
-pitchers_df = load_pitcher_stats(season, force_refresh)
+batters_df = load_batter_stats(season, force_refresh, data_snapshot_id)
+pitchers_df = load_pitcher_stats(season, force_refresh, data_snapshot_id)
 
 cloud_status_html = """
 <div class="status-box">
     <b>Data Mode:</b> Live pitchers, stadium weather, and SQLite history<br>
-    Probable pitchers and game-time forecasts refresh every 15 minutes.
+    Browser refresh loads the latest probable pitchers and game-time forecasts.
     Completed-game matchup and pitcher history comes from the local database.
 </div>
 """
@@ -1963,7 +1969,7 @@ schedule_team_ids = tuple(
 injury_report = load_injuries(
     schedule_team_ids,
     selected_date,
-    live_refresh_count,
+    data_snapshot_id,
 )
 bvp_matchups = add_injury_columns(
     bvp_matchups,
@@ -2193,6 +2199,7 @@ with info_tab:
         | **Proj IP** | Projected Innings Pitched |
         | **Proj PC** | Projected Pitch Count |
         | **Proj K** | Projected Strikeouts |
+        | **Proj H** | Projected Hits Allowed |
         | **K Score** | Strikeout Matchup Score |
         | **RHP** | Right-Handed Pitcher |
         | **LHP** | Left-Handed Pitcher |

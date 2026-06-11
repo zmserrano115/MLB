@@ -1,7 +1,10 @@
 import unittest
 
+import pandas as pd
+
 from src.matchup_grading import grade_hitter_matchup
 from src.matchups import weather_adjusted_hitter_grade
+from src.scoring import score_pitcher_k_matchup
 
 
 class MatchupWeatherTests(unittest.TestCase):
@@ -55,6 +58,34 @@ class HitterMatchupGradingTests(unittest.TestCase):
         self.assertEqual(grade_hitter_matchup(12, 0.325), "Good Matchup")
         self.assertEqual(grade_hitter_matchup(30, 0.275), "Good Matchup")
         self.assertEqual(grade_hitter_matchup(12, 0.240), "Neutral")
+
+
+class PitcherProjectionTests(unittest.TestCase):
+    def test_projected_hits_uses_pitcher_rate_and_opponent_average(self):
+        pitcher = pd.Series(
+            {
+                "player_id": 20,
+                "Name": "Test Pitcher",
+                "Team": "BOS",
+                "IP": 60.0,
+                "GS": 10,
+                "Pitches": 900,
+                "H": 50,
+                "K%": 25.0,
+                "K/9": 9.0,
+            }
+        )
+        opposing_batters = pd.DataFrame(
+            {
+                "K%": [22.0, 22.0],
+                "AVG": [0.294, 0.294],
+            }
+        )
+
+        result = score_pitcher_k_matchup(pitcher, opposing_batters)
+
+        self.assertAlmostEqual(result["Projected IP"], 6.0)
+        self.assertAlmostEqual(result["Projected Hits"], 6.0)
 
 
 if __name__ == "__main__":
