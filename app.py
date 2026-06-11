@@ -21,7 +21,6 @@ from src.matchups import (
     build_batter_vs_pitcher_matchups,
     build_batter_vs_hand_matchups,
     build_pitcher_k_matchups,
-    player_perspective_game,
 )
 from src.injuries import add_injury_columns, fetch_injury_report
 from src.recent_form import build_recent_bar_chart_html
@@ -956,6 +955,17 @@ def research_game_html(game):
         f'alt="{escape(second_team, quote=True)}" title="{escape(second_team, quote=True)}">'
         "</span>"
     )
+
+
+def player_perspective_game(game, player_team):
+    game_text = str(game or "").strip()
+    if " @ " not in game_text:
+        return game_text
+
+    away_team, home_team = game_text.split(" @ ", 1)
+    if str(player_team or "").strip() == home_team:
+        return f"{home_team} vs {away_team}"
+    return f"{away_team} @ {home_team}"
 
 
 def research_log_payload(row, log_type):
