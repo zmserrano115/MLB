@@ -52,6 +52,17 @@ HITTER_GRADE_ORDER = (
 )
 
 
+def player_perspective_game(game, player_team):
+    game_text = str(game or "").strip()
+    if " @ " not in game_text:
+        return game_text
+
+    away_team, home_team = game_text.split(" @ ", 1)
+    if str(player_team or "").strip() == home_team:
+        return f"{home_team} vs {away_team}"
+    return f"{away_team} @ {home_team}"
+
+
 def game_weather_context(game):
     return {
         column: game.get(column)

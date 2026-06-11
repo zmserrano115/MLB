@@ -3,7 +3,7 @@ import unittest
 import pandas as pd
 
 from src.matchup_grading import grade_hitter_matchup
-from src.matchups import weather_adjusted_hitter_grade
+from src.matchups import player_perspective_game, weather_adjusted_hitter_grade
 from src.scoring import score_pitcher_k_matchup
 
 
@@ -58,6 +58,26 @@ class HitterMatchupGradingTests(unittest.TestCase):
         self.assertEqual(grade_hitter_matchup(12, 0.325), "Good Matchup")
         self.assertEqual(grade_hitter_matchup(30, 0.275), "Good Matchup")
         self.assertEqual(grade_hitter_matchup(12, 0.240), "Neutral")
+
+
+class PlayerPerspectiveGameTests(unittest.TestCase):
+    def test_home_player_uses_home_vs_away(self):
+        self.assertEqual(
+            player_perspective_game(
+                "New York Yankees @ Boston Red Sox",
+                "Boston Red Sox",
+            ),
+            "Boston Red Sox vs New York Yankees",
+        )
+
+    def test_away_player_uses_away_at_home(self):
+        self.assertEqual(
+            player_perspective_game(
+                "New York Yankees @ Boston Red Sox",
+                "New York Yankees",
+            ),
+            "New York Yankees @ Boston Red Sox",
+        )
 
 
 class PitcherProjectionTests(unittest.TestCase):

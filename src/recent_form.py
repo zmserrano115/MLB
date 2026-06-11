@@ -3,29 +3,13 @@ from html import escape
 import pandas as pd
 
 
-def short_team_name(value):
-    team_name = str(value or "").strip()
-    if not team_name:
-        return ""
-
-    multiword_names = {
-        "Boston Red Sox": "Red Sox",
-        "Chicago White Sox": "White Sox",
-        "Toronto Blue Jays": "Blue Jays",
-    }
-    return multiword_names.get(team_name, team_name.split()[-1])
-
-
 def recent_game_values(game_log_df, value_column, limit=5):
     if game_log_df is None or game_log_df.empty or value_column not in game_log_df:
         return []
 
     columns = ["game_date", value_column]
-    columns.extend(
-        column
-        for column in ("home_away", "team", "opponent")
-        if column in game_log_df.columns
-    )
+    if "home_away" in game_log_df.columns:
+        columns.append("home_away")
     recent = game_log_df[columns].copy()
     recent["parsed_date"] = pd.to_datetime(recent["game_date"], errors="coerce")
     recent["value"] = pd.to_numeric(recent[value_column], errors="coerce").fillna(0)
@@ -40,18 +24,12 @@ def recent_game_values(game_log_df, value_column, limit=5):
             if pd.notna(parsed_date)
             else str(row["game_date"])
         )
-        team = short_team_name(row.get("team"))
-        opponent = short_team_name(row.get("opponent"))
         home_away = str(row.get("home_away") or "").strip().lower()
-        matchup = ""
-        if team and opponent and home_away == "home":
-            matchup = f"{team} vs {opponent}"
-        elif team and opponent and home_away == "away":
-            matchup = f"{team} @ {opponent}"
+        if home_away in {"home", "away"}:
+            label = f"{label} ({home_away[0].upper()})"
         values.append(
             {
                 "date": label,
-                "matchup": matchup,
                 "value": float(row["value"]),
             }
         )
@@ -77,14 +55,8 @@ def build_recent_bar_chart_html(
         height = 4 if value <= 0 else max(10, round((value / scale_max) * 100))
         display_value = f"{value:.0f}" if value.is_integer() else f"{value:.1f}"
         aria_label = escape(
-            f"{item['date']} {item['matchup']}: "
-            f"{display_value} {value_column}",
+            f"{item['date']}: {display_value} {value_column}",
             quote=True,
-        )
-        matchup_html = (
-            f'<span>{escape(item["matchup"])}</span>'
-            if item["matchup"]
-            else ""
         )
         bars.append(
             '<div class="recent-bar-item" '
@@ -93,8 +65,7 @@ def build_recent_bar_chart_html(
             '<div class="recent-bar-track">'
             f'<div class="recent-bar-fill" style="height:{height}%"></div>'
             "</div>"
-            f'<div class="recent-bar-date">{escape(item["date"])}'
-            f"{matchup_html}</div>"
+            f'<div class="recent-bar-date">{escape(item["date"])}</div>'
             "</div>"
         )
 
@@ -129,11 +100,11 @@ def build_recent_bar_chart_html(
         grid-template-columns: repeat(5, minmax(38px, 1fr));
         align-items: end;
         gap: clamp(8px, 2.5vw, 18px);
-        height: 106px;
+        height: 92px;
       }}
       .recent-bar-item {{
         display: grid;
-        grid-template-rows: 18px 56px 30px;
+        grid-template-rows: 18px 56px 16px;
         align-items: end;
         min-width: 0;
         text-align: center;
@@ -163,12 +134,6 @@ def build_recent_bar_chart_html(
         color: #647184;
         font-size: 10px;
         line-height: 1.2;
-      }}
-      .recent-bar-date span {{
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
       }}
       @media (max-width: 680px) {{
         .recent-form-card {{

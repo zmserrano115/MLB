@@ -21,6 +21,7 @@ from src.matchups import (
     build_batter_vs_pitcher_matchups,
     build_batter_vs_hand_matchups,
     build_pitcher_k_matchups,
+    player_perspective_game,
 )
 from src.injuries import add_injury_columns, fetch_injury_report
 from src.recent_form import build_recent_bar_chart_html
@@ -935,19 +936,24 @@ def research_cell_value(column, value):
 
 def research_game_html(game):
     game_text = str(game or "")
-    if " @ " in game_text:
-        away_team, home_team = game_text.split(" @ ", 1)
+    if " vs " in game_text:
+        first_team, second_team = game_text.split(" vs ", 1)
+        separator = "vs"
+    elif " @ " in game_text:
+        first_team, second_team = game_text.split(" @ ", 1)
+        separator = "@"
     else:
-        away_team, home_team = game_text, ""
-    away_logo = team_logo_url(away_team)
-    home_logo = team_logo_url(home_team)
+        first_team, second_team = game_text, ""
+        separator = "@"
+    first_logo = team_logo_url(first_team)
+    second_logo = team_logo_url(second_team)
     return (
         '<span class="research-game">'
-        f'<img src="{escape(away_logo, quote=True)}" '
-        f'alt="{escape(away_team, quote=True)}" title="{escape(away_team, quote=True)}">'
-        '<span class="research-at">@</span>'
-        f'<img src="{escape(home_logo, quote=True)}" '
-        f'alt="{escape(home_team, quote=True)}" title="{escape(home_team, quote=True)}">'
+        f'<img src="{escape(first_logo, quote=True)}" '
+        f'alt="{escape(first_team, quote=True)}" title="{escape(first_team, quote=True)}">'
+        f'<span class="research-at">{separator}</span>'
+        f'<img src="{escape(second_logo, quote=True)}" '
+        f'alt="{escape(second_team, quote=True)}" title="{escape(second_team, quote=True)}">'
         "</span>"
     )
 
@@ -1059,6 +1065,15 @@ def render_research_table(df, columns, player_column, log_type, table_key):
     body_rows = []
     for _, row in df.iterrows():
         player_name = str(row.get(player_column) or "Unknown")
+        player_team_column = (
+            "pitcher_team"
+            if player_column == "pitcher"
+            else "team"
+        )
+        display_game = player_perspective_game(
+            row.get("game"),
+            row.get(player_team_column),
+        )
         player_payload = json.dumps(
             research_log_payload(row, log_type),
             separators=(",", ":"),
@@ -1068,7 +1083,7 @@ def render_research_table(df, columns, player_column, log_type, table_key):
             player_column,
         )
         cells = [
-            f'<td class="sticky-game">{research_game_html(row.get("game"))}</td>',
+            f'<td class="sticky-game">{research_game_html(display_game)}</td>',
             '<td class="sticky-player" '
             f'data-sort-value="{escape(player_sort_value, quote=True)}" '
             f'data-sort-kind="{player_sort_kind}">'
