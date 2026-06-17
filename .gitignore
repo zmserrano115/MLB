@@ -11,6 +11,18 @@ env/
 # Streamlit local secrets
 .streamlit/secrets.toml
 
+# Local environment and cloud credentials
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+*.p12
+
+# Elastic Beanstalk CLI local state
+.elasticbeanstalk/
+
 # OS files
 .DS_Store
 Thumbs.db

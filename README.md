@@ -37,6 +37,10 @@ database job remains limited to completed-game history.
 python -m pip install -r requirements.txt
 ```
 
+The runtime dependencies in `requirements.txt` cover every third-party import
+used by the app and refresh scripts. Python 3.12 is used by both Streamlit
+Cloud and the Docker image.
+
 ## Historical Backfill
 
 The default command imports regular-season history from 2005 through 2025:
@@ -97,6 +101,115 @@ MLB_DB_URL = "https://github.com/OWNER/REPO/releases/download/mlb-data/mlb.db"
 On a clean deployment, the app downloads the database once before opening
 SQLite. The nightly GitHub Action downloads the same release asset, updates
 completed games, and replaces the asset.
+
+`MLB_DB_PATH` controls the local SQLite location. It defaults to
+`data/mlb.db`; the Elastic Beanstalk container sets it to
+`/app/data/mlb.db`. `MLB_DB_URL` controls the bootstrap download URL.
+
+## AWS Elastic Beanstalk
+
+The repository includes a single-container Docker deployment for Elastic
+Beanstalk. It builds the image directly from `Dockerfile`, so ECR is not
+required. The container runs as a non-root user, listens on `0.0.0.0:8080`,
+keeps Streamlit CORS and XSRF protection enabled, and exposes
+`/_stcore/health` for health checks.
+
+The local SQLite file is intentionally excluded from Docker and Elastic
+Beanstalk bundles. Each new instance downloads the published release asset on
+first start. Because that file is instance-local and ephemeral, the included
+Elastic Beanstalk configuration holds the environment at one instance. Move
+to shared durable storage before increasing `MaxSize`.
+
+### Prerequisites
+
+- Docker for local image testing.
+- AWS CLI and the Elastic Beanstalk CLI (`eb`) installed locally.
+- An authenticated AWS CLI profile or AWS IAM Identity Center session.
+- A deployment IAM user or role with least-privilege access to Elastic
+  Beanstalk and its CloudFormation, EC2, Auto Scaling, Elastic Load Balancing,
+  S3, and CloudWatch Logs resources, plus `iam:PassRole` for the two roles
+  below. ECR permissions are needed only if the deployment is later changed
+  to pull a registry image.
+- An Elastic Beanstalk service role, normally
+  `aws-elasticbeanstalk-service-role`, with
+  `AWSElasticBeanstalkEnhancedHealth` and
+  `AWSElasticBeanstalkManagedUpdatesCustomerRolePolicy`.
+- An EC2 instance profile, normally `aws-elasticbeanstalk-ec2-role`, with
+  `AWSElasticBeanstalkWebTier` and only the additional permissions the app
+  needs for Secrets Manager or Parameter Store.
+
+Do not commit or paste AWS access keys, API keys, `.env` files,
+`.streamlit/secrets.toml`, or downloaded credential files. Prefer temporary
+credentials from an IAM role or IAM Identity Center. Store future application
+secrets in AWS Secrets Manager or SSM Parameter Store and expose them through
+Elastic Beanstalk environment secrets. For a future GitHub Actions deployment,
+prefer GitHub OIDC; if long-lived credentials are unavoidable, store them only
+in GitHub Secrets.
+
+### Test The Container
+
+```powershell
+docker build -t all-rise-analytics .
+docker run --rm -p 8080:8080 `
+  -e MLB_DB_PATH=/app/data/mlb.db `
+  -e MLB_DB_URL=https://github.com/zmserrano115/MLB/releases/download/mlb-data/mlb.db `
+  all-rise-analytics
+```
+
+Open `http://localhost:8080` and verify the health endpoint:
+
+```powershell
+Invoke-WebRequest http://localhost:8080/_stcore/health
+```
+
+### First Deployment
+
+The examples use `us-west-2`, the selected region for this deployment. Change
+it before `eb init` if another region is required.
+
+```powershell
+aws sts get-caller-identity
+aws configure get region
+eb --version
+
+eb init all-rise-analytics --platform docker --region us-west-2
+eb create all-rise-analytics-prod `
+  --elb-type application `
+  --service-role aws-elasticbeanstalk-service-role `
+  --instance_profile aws-elasticbeanstalk-ec2-role
+
+eb setenv `
+  APP_TIMEZONE=America/Denver `
+  MLB_DB_PATH=/app/data/mlb.db `
+  MLB_DB_URL=https://github.com/zmserrano115/MLB/releases/download/mlb-data/mlb.db
+
+eb deploy --process
+eb status
+eb health
+eb logs --cloudwatch-logs enable
+eb open
+```
+
+The first start can take several minutes while the SQLite release asset
+downloads. The Docker health check allows a five-minute startup period.
+
+In the Elastic Beanstalk console, enable an Application Load Balancer HTTPS
+listener with an ACM certificate, redirect HTTP to HTTPS, and restrict the
+EC2 security group so application instances accept traffic only from the load
+balancer security group. Keep CloudWatch log streaming enabled and create
+alarms for environment health and HTTP 5xx responses.
+
+For later deployments:
+
+```powershell
+eb deploy --process
+eb health
+```
+
+Do not remove or disable the existing Streamlit Cloud deployment during this
+migration. Verify the AWS URL, HTTPS, health checks, logs, database bootstrap,
+and live application behavior first. Keep Streamlit Cloud available as the
+rollback target until AWS production traffic has been confirmed successful.
 
 ## Verification
 
