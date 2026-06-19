@@ -242,6 +242,12 @@ st.markdown(
         font-family: var(--font-body);
     }
 
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-display) !important;
+        font-weight: 400 !important;
+        letter-spacing: 0.035em;
+    }
+
     header[data-testid="stHeader"] {
         background: var(--nav);
         border-bottom: 1px solid rgba(255,255,255,0.12);
@@ -326,8 +332,9 @@ st.markdown(
     .section-label,
     .metric-label {
         color: var(--muted-2);
+        font-family: var(--font-display) !important;
         font-size: 11px;
-        font-weight: 500;
+        font-weight: 400;
         text-transform: uppercase;
         letter-spacing: 0.09em;
         margin-bottom: 4px;
@@ -335,12 +342,38 @@ st.markdown(
 
     .section-title {
         color: var(--text);
-        font-family: var(--font-body) !important;
-        font-size: 22px;
+        font-family: var(--font-display) !important;
+        font-size: 26px;
         line-height: 1.15;
-        font-weight: 500;
-        letter-spacing: 0.01em;
+        font-weight: 400;
+        letter-spacing: 0.035em;
         margin-bottom: 0;
+    }
+
+    .section-title .title-date {
+        font-family: var(--font-display) !important;
+    }
+
+    [data-testid="stSelectbox"] [data-baseweb="select"] *,
+    [data-testid="stMultiSelect"] [data-baseweb="select"] *,
+    [data-testid="stTextInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stDateInput"] input,
+    [data-testid="stSelectbox"] [data-testid="stWidgetLabel"] *,
+    [data-testid="stMultiSelect"] [data-testid="stWidgetLabel"] *,
+    [data-testid="stTextInput"] [data-testid="stWidgetLabel"] *,
+    [data-testid="stNumberInput"] [data-testid="stWidgetLabel"] *,
+    [data-testid="stDateInput"] [data-testid="stWidgetLabel"] * {
+        font-family: var(--font-display) !important;
+        font-weight: 400 !important;
+        letter-spacing: 0.035em;
+    }
+
+    [data-baseweb="popover"] [role="option"],
+    [data-baseweb="popover"] [role="option"] * {
+        font-family: var(--font-display) !important;
+        font-weight: 400 !important;
+        letter-spacing: 0.035em;
     }
 
     .stSegmentedControl [data-baseweb="button-group"] {
