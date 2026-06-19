@@ -435,6 +435,7 @@
     const root = document.getElementById("root");
     let activeSort = null;
     let requestedFrameHeight = 542;
+    let useFullMobileHeight = false;
 
     function sendMessage(type, payload = {}) {
       window.parent.postMessage(
@@ -448,7 +449,7 @@
     }
 
     function setFrameHeight(requestedHeight) {
-      const frameHeight = window.innerWidth <= 680
+      const frameHeight = window.innerWidth <= 680 && !useFullMobileHeight
         ? Math.min(502, requestedHeight)
         : requestedHeight;
       sendMessage("streamlit:setFrameHeight", { height: frameHeight });
@@ -559,6 +560,9 @@
 
     function render(args) {
       root.innerHTML = args.table_html || "";
+      useFullMobileHeight = Boolean(
+        root.querySelector(".schedule-weather-table"),
+      );
       requestedFrameHeight = Math.max(
         args.table_height || 542,
         root.scrollHeight || 0,

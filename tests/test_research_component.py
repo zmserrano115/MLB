@@ -19,4 +19,6 @@ def test_research_table_component_supports_in_place_interactions():
     assert "data-tooltip" in source
     assert "game-log-table-shell" in source
     assert "Math.min(502, requestedHeight)" in source
+    assert 'root.querySelector(".schedule-weather-table")' in source
+    assert "window.innerWidth <= 680 && !useFullMobileHeight" in source
     assert "window.location" not in source
