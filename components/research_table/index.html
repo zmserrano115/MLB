@@ -90,8 +90,8 @@
       position: sticky;
       left: 92px;
       z-index: 5;
-      width: 150px;
-      min-width: 150px;
+      width: 198px;
+      min-width: 198px;
       text-align: left;
       box-shadow: 1px 0 0 #dfe5ec;
     }
@@ -191,6 +191,20 @@
       object-fit: contain;
     }
 
+    .stats-identity-img {
+      width: 24px;
+      height: 24px;
+      flex: 0 0 auto;
+      object-fit: contain;
+    }
+
+    .stats-headshot {
+      border: 1px solid #d8dee6;
+      border-radius: 50%;
+      background: #f3f5f7;
+      object-fit: cover;
+    }
+
     .game-log-table-shell {
       max-height: 540px;
     }
@@ -213,10 +227,36 @@
       background: transparent;
       color: #245f96;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      max-width: calc(100% - 24px);
       font: inherit;
       font-weight: 700;
       text-align: left;
       text-decoration: none;
+    }
+
+    .research-player-identity {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .research-player-identity span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .research-headshot {
+      width: 28px;
+      height: 28px;
+      flex: 0 0 auto;
+      border: 1px solid #d8dee6;
+      border-radius: 50%;
+      background: #f3f5f7;
+      object-fit: cover;
     }
 
     .research-player-link:hover,
@@ -332,7 +372,8 @@
 
     @media (max-width: 680px) {
       .research-table-shell {
-        max-height: 500px;
+        max-height: 460px;
+        scrollbar-gutter: auto;
       }
 
       .research-table {
@@ -345,14 +386,30 @@
       }
 
       .research-table .sticky-game {
-        width: 82px;
-        min-width: 82px;
+        width: 72px;
+        min-width: 72px;
       }
 
       .research-table .sticky-player {
-        left: 82px;
-        width: 132px;
-        min-width: 132px;
+        left: 72px;
+        width: 145px;
+        min-width: 145px;
+      }
+
+      .research-table .sticky-grade {
+        right: auto;
+        min-width: 96px;
+        box-shadow: none;
+      }
+
+      .research-table td.sticky-grade {
+        position: static;
+      }
+
+      .research-table th.sticky-grade {
+        position: sticky;
+        top: 0;
+        z-index: 8;
       }
 
       .research-injury-badge::after {
@@ -391,10 +448,10 @@
     }
 
     function setFrameHeight(requestedHeight) {
-      const mobileHeight = window.innerWidth <= 680
+      const frameHeight = window.innerWidth <= 680
         ? Math.min(502, requestedHeight)
         : requestedHeight;
-      sendMessage("streamlit:setFrameHeight", { height: mobileHeight });
+      sendMessage("streamlit:setFrameHeight", { height: frameHeight });
     }
 
     function compareRows(rowA, rowB, columnIndex, direction) {
@@ -452,6 +509,20 @@
         );
       }
       if (remember) activeSort = { columnIndex, direction };
+      updateRankCells();
+    }
+
+    function updateRankCells() {
+      const table = root.querySelector(".research-table");
+      const body = table?.tBodies[0];
+      if (!body) return;
+
+      Array.from(body.rows).forEach((row, index) => {
+        row.querySelectorAll("[data-rank-cell]").forEach((cell) => {
+          cell.textContent = String(index + 1);
+          cell.dataset.sortValue = String(index + 1);
+        });
+      });
     }
 
     function wireInteractions() {
@@ -469,6 +540,11 @@
       root.querySelectorAll("[data-research-event]").forEach((button) => {
         button.addEventListener("click", () => {
           const payload = JSON.parse(button.dataset.researchEvent);
+          if (payload.view || payload.state_key) {
+            button.closest(".app-tabs")?.querySelectorAll(".app-tab").forEach((tab) => {
+              tab.classList.toggle("active", tab === button);
+            });
+          }
           sendMessage("streamlit:setComponentValue", {
             dataType: "json",
             value: {
@@ -483,7 +559,10 @@
 
     function render(args) {
       root.innerHTML = args.table_html || "";
-      requestedFrameHeight = args.table_height || 542;
+      requestedFrameHeight = Math.max(
+        args.table_height || 542,
+        root.scrollHeight || 0,
+      );
       wireInteractions();
       if (activeSort) {
         applySort(
@@ -492,6 +571,7 @@
           false,
         );
       }
+      updateRankCells();
       setFrameHeight(requestedFrameHeight);
     }
 

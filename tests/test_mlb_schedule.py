@@ -16,6 +16,16 @@ class ScheduleTests(unittest.TestCase):
                         {
                             "gamePk": 1,
                             "gameDate": "2026-06-01T23:10:00Z",
+                            "status": {
+                                "detailedState": "In Progress",
+                                "abstractGameState": "Live",
+                            },
+                            "linescore": {
+                                "currentInning": 6,
+                                "currentInningOrdinal": "6th",
+                                "inningState": "Top",
+                                "inningHalf": "Top",
+                            },
                             "venue": {
                                 "id": 99,
                                 "name": "Test Park",
@@ -32,14 +42,24 @@ class ScheduleTests(unittest.TestCase):
                             },
                             "teams": {
                                 "away": {
-                                    "team": {"id": 10, "name": "Away"},
+                                    "team": {
+                                        "id": 10,
+                                        "name": "Away",
+                                        "abbreviation": "AWY",
+                                    },
+                                    "score": 4,
                                     "probablePitcher": {
                                         "id": 100,
                                         "fullName": "Away Pitcher",
                                     },
                                 },
                                 "home": {
-                                    "team": {"id": 20, "name": "Home"},
+                                    "team": {
+                                        "id": 20,
+                                        "name": "Home",
+                                        "abbreviation": "HOM",
+                                    },
+                                    "score": 2,
                                     "probablePitcher": {
                                         "id": 200,
                                         "fullName": "Home Pitcher",
@@ -70,6 +90,12 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(schedule.iloc[0]["venue_latitude"], 39.756)
         self.assertEqual(schedule.iloc[0]["field_azimuth"], 20.0)
         self.assertEqual(schedule.iloc[0]["roof_type"], "Open")
+        self.assertEqual(schedule.iloc[0]["away_team_abbr"], "AWY")
+        self.assertEqual(schedule.iloc[0]["home_team_abbr"], "HOM")
+        self.assertEqual(schedule.iloc[0]["away_score"], 4)
+        self.assertEqual(schedule.iloc[0]["home_score"], 2)
+        self.assertEqual(schedule.iloc[0]["abstract_game_state"], "Live")
+        self.assertEqual(schedule.iloc[0]["current_inning_ordinal"], "6th")
 
 
 if __name__ == "__main__":

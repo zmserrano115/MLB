@@ -49,7 +49,7 @@ def get_daily_schedule(game_date):
     params = {
         "sportId": 1,
         "date": game_date,
-        "hydrate": "probablePitcher(note),team,venue(location,fieldInfo)",
+        "hydrate": "probablePitcher(note),team,venue(location,fieldInfo),linescore",
     }
 
     response = requests.get(SCHEDULE_URL, params=params, timeout=20)
@@ -68,6 +68,8 @@ def get_daily_schedule(game_date):
 
             away_team_id = away_team_data["id"]
             home_team_id = home_team_data["id"]
+            away_team_abbr = away_team_data.get("abbreviation")
+            home_team_abbr = home_team_data.get("abbreviation")
 
             away_pitcher = game["teams"]["away"].get("probablePitcher", {})
             home_pitcher = game["teams"]["home"].get("probablePitcher", {})
@@ -78,6 +80,8 @@ def get_daily_schedule(game_date):
             location = venue.get("location", {})
             coordinates = location.get("defaultCoordinates", {})
             field_info = venue.get("fieldInfo", {})
+            status = game.get("status", {})
+            linescore = game.get("linescore", {})
 
             rows.append({
                 "game_date": game_date,
@@ -86,9 +90,20 @@ def get_daily_schedule(game_date):
 
                 "away_team": away_team,
                 "away_team_id": away_team_id,
+                "away_team_abbr": away_team_abbr,
 
                 "home_team": home_team,
                 "home_team_id": home_team_id,
+                "home_team_abbr": home_team_abbr,
+
+                "away_score": game["teams"]["away"].get("score"),
+                "home_score": game["teams"]["home"].get("score"),
+                "game_status": status.get("detailedState"),
+                "abstract_game_state": status.get("abstractGameState"),
+                "current_inning": linescore.get("currentInning"),
+                "current_inning_ordinal": linescore.get("currentInningOrdinal"),
+                "inning_state": linescore.get("inningState"),
+                "inning_half": linescore.get("inningHalf"),
 
                 "away_probable_pitcher": away_pitcher.get("fullName"),
                 "away_probable_pitcher_id": away_pitcher_id,

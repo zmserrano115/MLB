@@ -20,6 +20,8 @@ Thumbs.db
 
 # Local logs and obsolete CSV/cache outputs
 data/nightly_refresh_log.txt
+streamlit.err.log
+streamlit.out.log
 data/batters_*.csv
 data/pitchers_*.csv
 data/matchup_cache.json

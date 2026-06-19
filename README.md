@@ -37,6 +37,12 @@ database job remains limited to completed-game history.
 python -m pip install -r requirements.txt
 ```
 
+For development and tests:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+```
+
 ## Historical Backfill
 
 The default command imports regular-season history from 2005 through 2025:
@@ -76,33 +82,36 @@ current-season games; scheduled nightly runs use the three-day lookback.
 ## Cloud Database
 
 A full 2005-2025 SQLite file is too large for GitHub's normal file limit.
-Publish it as the `mlb.db` asset on a release tagged `mlb-data`:
+Create a compressed copy and publish both assets on a release tagged
+`mlb-data`:
 
 ```powershell
-gh release create mlb-data data/mlb.db --title "MLB data" --notes "SQLite data"
+python -c "import gzip, shutil; shutil.copyfileobj(open('data/mlb.db','rb'), gzip.open('data/mlb.db.gz','wb'))"
+gh release create mlb-data data/mlb.db data/mlb.db.gz --title "MLB data" --notes "SQLite data"
 ```
 
 For later manual replacements:
 
 ```powershell
-gh release upload mlb-data data/mlb.db --clobber
+python -c "import gzip, shutil; shutil.copyfileobj(open('data/mlb.db','rb'), gzip.open('data/mlb.db.gz','wb'))"
+gh release upload mlb-data data/mlb.db data/mlb.db.gz --clobber
 ```
 
 Set this Streamlit secret to the public release asset URL:
 
 ```toml
-MLB_DB_URL = "https://github.com/OWNER/REPO/releases/download/mlb-data/mlb.db"
+MLB_DB_URL = "https://github.com/OWNER/REPO/releases/download/mlb-data/mlb.db.gz"
 ```
 
-On a clean deployment, the app downloads the database once before opening
-SQLite. The nightly GitHub Action downloads the same release asset, updates
-completed games, and replaces the asset.
+On a clean deployment, the app downloads and transparently expands the
+compressed database before opening SQLite. Raw `.db` URLs remain supported.
+The nightly GitHub Action publishes both raw and compressed release assets.
 
 ## Verification
 
 ```powershell
 python -m compileall -q app.py refresh_database.py refresh_nightly.py backfill_database.py src tests
-python -m unittest discover -s tests -v
+python -m pytest -q
 python backfill_database.py --help
 python refresh_nightly.py --help
 ```
