@@ -10,6 +10,7 @@ from src.scoring import (
 )
 from src.stat_data import (
     get_hitter_vs_pitcher_stats,
+    get_hitter_vs_pitcher_stats_batch,
     get_hitter_vs_hand_stats
 )
 
@@ -124,7 +125,7 @@ def apply_pitcher_weather_adjustment(score_row, game):
     return score_row
 
 
-def get_team_batters(batters_df, team_id, min_pa=100):
+def get_team_batters(batters_df, team_id, min_pa=100, include_player_names=None):
     """
     Gets batters for one MLB team using team_id.
     """
@@ -138,14 +139,37 @@ def get_team_batters(batters_df, team_id, min_pa=100):
 
     team_batters = df[df["team_id"] == team_id].copy()
 
+    include_player_names = {
+        str(name).strip().casefold()
+        for name in (include_player_names or [])
+        if str(name).strip()
+    }
+
     if "PA" in team_batters.columns:
         team_batters["PA"] = pd.to_numeric(team_batters["PA"], errors="coerce")
-        team_batters = team_batters[team_batters["PA"] >= min_pa].copy()
+        pa_mask = team_batters["PA"] >= min_pa
+        if include_player_names and "Name" in team_batters.columns:
+            include_mask = (
+                team_batters["Name"]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .str.casefold()
+                .isin(include_player_names)
+            )
+            pa_mask = pa_mask | include_mask
+        team_batters = team_batters[pa_mask].copy()
 
     return team_batters
 
 
-def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100):
+def build_batter_vs_pitcher_matchups(
+    schedule_df,
+    batters_df,
+    season,
+    min_pa=100,
+    include_batter_names=None,
+):
     """
     Builds hitter rows based on direct batter-vs-opposing-pitcher history.
     """
@@ -175,18 +199,13 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
         home_batters = get_team_batters(
             batters_df=batters_df,
             team_id=home_team_id,
-            min_pa=min_pa
+            min_pa=min_pa,
+            include_player_names=include_batter_names,
         )
 
         for _, batter in home_batters.iterrows():
             batter_id = batter.get("player_id")
             
-            stats = get_hitter_vs_pitcher_stats(
-                batter_id=batter_id,
-                pitcher_id=away_pitcher_id,
-                season=season
-            )
-
             row = {
                 "game": game_name,
                 "team": home_team,
@@ -198,7 +217,6 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
                 "split": "Batter vs Pitcher"
             }
 
-            row.update(stats)
             row.update(game_weather_context(game))
             rows.append(row)
 
@@ -206,17 +224,12 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
         away_batters = get_team_batters(
             batters_df=batters_df,
             team_id=away_team_id,
-            min_pa=min_pa
+            min_pa=min_pa,
+            include_player_names=include_batter_names,
         )
 
         for _, batter in away_batters.iterrows():
             batter_id = batter.get("player_id")
-
-            stats = get_hitter_vs_pitcher_stats(
-                batter_id=batter_id,
-                pitcher_id=home_pitcher_id,
-                season=season
-            )
 
             row = {
                 "game": game_name,
@@ -229,9 +242,26 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
                 "split": "Batter vs Pitcher"
             }
 
-            row.update(stats)
             row.update(game_weather_context(game))
             rows.append(row)
+
+    stats_by_pair = get_hitter_vs_pitcher_stats_batch(
+        [
+            (row.get("batter_id"), row.get("opposing_pitcher_id"))
+            for row in rows
+        ],
+        season=season,
+    )
+    for row in rows:
+        pair = (row.get("batter_id"), row.get("opposing_pitcher_id"))
+        stats = stats_by_pair.get(pair)
+        if stats is None:
+            stats = get_hitter_vs_pitcher_stats(
+                batter_id=row.get("batter_id"),
+                pitcher_id=row.get("opposing_pitcher_id"),
+                season=season,
+            )
+        row.update(stats)
 
     result_df = pd.DataFrame(rows)
 
@@ -255,7 +285,13 @@ def build_batter_vs_pitcher_matchups(schedule_df, batters_df, season, min_pa=100
     return result_df
 
 
-def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=100):
+def build_batter_vs_hand_matchups(
+    schedule_df,
+    batters_df,
+    season,
+    min_pa=100,
+    include_batter_names=None,
+):
     """
     Builds hitter rows based on splits against the opposing pitcher's throwing hand.
     """
@@ -285,7 +321,8 @@ def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=100):
         home_batters = get_team_batters(
             batters_df=batters_df,
             team_id=home_team_id,
-            min_pa=min_pa
+            min_pa=min_pa,
+            include_player_names=include_batter_names,
         )
 
         for _, batter in home_batters.iterrows():
@@ -316,7 +353,8 @@ def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=100):
         away_batters = get_team_batters(
             batters_df=batters_df,
             team_id=away_team_id,
-            min_pa=min_pa
+            min_pa=min_pa,
+            include_player_names=include_batter_names,
         )
 
         for _, batter in away_batters.iterrows():
@@ -365,7 +403,13 @@ def build_batter_vs_hand_matchups(schedule_df, batters_df, season, min_pa=100):
     return result_df
 
 
-def build_pitcher_k_matchups(schedule_df, batters_df, pitchers_df, min_pa=100):
+def build_pitcher_k_matchups(
+    schedule_df,
+    batters_df,
+    pitchers_df,
+    min_pa=100,
+    include_batter_names=None,
+):
     """
     Builds strikeout matchup rows for today's probable pitchers.
 
@@ -401,7 +445,8 @@ def build_pitcher_k_matchups(schedule_df, batters_df, pitchers_df, min_pa=100):
         home_batters = get_team_batters(
             batters_df=batters_df,
             team_id=home_team_id,
-            min_pa=min_pa
+            min_pa=min_pa,
+            include_player_names=include_batter_names,
         )
 
         if away_pitcher_row is not None and not home_batters.empty:
@@ -429,7 +474,8 @@ def build_pitcher_k_matchups(schedule_df, batters_df, pitchers_df, min_pa=100):
         away_batters = get_team_batters(
             batters_df=batters_df,
             team_id=away_team_id,
-            min_pa=min_pa
+            min_pa=min_pa,
+            include_player_names=include_batter_names,
         )
 
         if home_pitcher_row is not None and not away_batters.empty:

@@ -1,11 +1,13 @@
 from contextlib import contextmanager
 from datetime import datetime
+import gzip
 import os
 from pathlib import Path
 import sqlite3
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 
 from src.matchup_grading import grade_hitter_matchup
 
@@ -13,6 +15,10 @@ from src.matchup_grading import grade_hitter_matchup
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "mlb.db"
 DEFAULT_DB_URL = (
+    "https://github.com/zmserrano115/MLB/"
+    "releases/download/mlb-data/mlb.db.gz"
+)
+FALLBACK_DB_URL = (
     "https://github.com/zmserrano115/MLB/"
     "releases/download/mlb-data/mlb.db"
 )
@@ -23,6 +29,29 @@ _INITIALIZED_PATH = None
 
 def now_text():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _download_database(database_url, temporary_path):
+    request = urllib.request.Request(
+        database_url,
+        headers={"User-Agent": "all-rise-analytics/1.0"},
+    )
+    with urllib.request.urlopen(request, timeout=600) as response:
+        source = (
+            gzip.GzipFile(fileobj=response)
+            if urlparse(database_url).path.lower().endswith(".gz")
+            else response
+        )
+        try:
+            with temporary_path.open("wb") as handle:
+                while True:
+                    chunk = source.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    handle.write(chunk)
+        finally:
+            if source is not response:
+                source.close()
 
 
 def bootstrap_database():
@@ -37,43 +66,45 @@ def bootstrap_database():
     if DB_PATH.exists():
         return
 
-    database_url = os.environ.get("MLB_DB_URL")
-    automatic_url = False
-    if not database_url and DB_PATH.resolve() == DEFAULT_DB_PATH.resolve():
-        database_url = DEFAULT_DB_URL
-        automatic_url = True
-    if not database_url:
+    configured_url = os.environ.get("MLB_DB_URL")
+    configured_urls = []
+    if configured_url:
+        if urlparse(configured_url).path.lower().endswith(".db"):
+            configured_urls.append(f"{configured_url}.gz")
+        configured_urls.append(configured_url)
+    automatic_urls = (
+        [DEFAULT_DB_URL, FALLBACK_DB_URL]
+        if not configured_url and DB_PATH.resolve() == DEFAULT_DB_PATH.resolve()
+        else []
+    )
+    database_urls = configured_urls or automatic_urls
+    if not database_urls:
         return
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = DB_PATH.with_suffix(DB_PATH.suffix + ".download")
-    request = urllib.request.Request(
-        database_url,
-        headers={"User-Agent": "all-rise-analytics/1.0"},
-    )
-    attempts = 80 if automatic_url else 1
+    attempts = 80 if automatic_urls else 1
     for attempt in range(attempts):
-        try:
-            with urllib.request.urlopen(request, timeout=600) as response:
-                with temporary_path.open("wb") as handle:
-                    while True:
-                        chunk = response.read(1024 * 1024)
-                        if not chunk:
-                            break
-                        handle.write(chunk)
+        for database_url in database_urls:
+            try:
+                _download_database(database_url, temporary_path)
+                with temporary_path.open("rb") as handle:
+                    if handle.read(16) != b"SQLite format 3\x00":
+                        raise ValueError(
+                            "MLB_DB_URL did not return a SQLite database."
+                        )
+                temporary_path.replace(DB_PATH)
+                return
+            except urllib.error.HTTPError as error:
+                if error.code != 404:
+                    raise
+            finally:
+                if temporary_path.exists():
+                    temporary_path.unlink()
 
-            with temporary_path.open("rb") as handle:
-                if handle.read(16) != b"SQLite format 3\x00":
-                    raise ValueError("MLB_DB_URL did not return a SQLite database.")
-            temporary_path.replace(DB_PATH)
-            return
-        except urllib.error.HTTPError as error:
-            if error.code != 404 or attempt == attempts - 1:
-                raise
-            time.sleep(15)
-        finally:
-            if temporary_path.exists():
-                temporary_path.unlink()
+        if attempt == attempts - 1:
+            break
+        time.sleep(15)
 
 
 def get_connection():
@@ -360,12 +391,16 @@ def init_database():
                 ON batter_pitcher_game_logs(batter_id, pitcher_id);
             CREATE INDEX IF NOT EXISTS idx_game_logs_game_date
                 ON batter_pitcher_game_logs(game_date);
+            CREATE INDEX IF NOT EXISTS idx_batter_streak_logs
+                ON batter_pitcher_game_logs(season, batter_id, game_date, game_pk);
             CREATE INDEX IF NOT EXISTS idx_bvp_stats_batter_pitcher
                 ON batter_pitcher_stats(batter_id, pitcher_id);
             CREATE INDEX IF NOT EXISTS idx_pitcher_logs_pitcher
                 ON pitcher_game_logs(pitcher_id);
             CREATE INDEX IF NOT EXISTS idx_pitcher_logs_opponent
                 ON pitcher_game_logs(opponent);
+            CREATE INDEX IF NOT EXISTS idx_pitcher_streak_logs
+                ON pitcher_game_logs(season, pitcher_id, game_date);
             CREATE INDEX IF NOT EXISTS idx_pitcher_stats_pitcher_season
                 ON pitcher_stats(pitcher_id, season);
             DROP TABLE IF EXISTS plate_appearances;
@@ -942,6 +977,66 @@ def get_batter_vs_pitcher_stats_from_db(batter_id, pitcher_id):
     }
 
 
+def get_batter_vs_pitcher_stats_batch_from_db(matchup_pairs):
+    ensure_database()
+    clean_pairs = []
+    for batter_id, pitcher_id in matchup_pairs:
+        if batter_id is None or pitcher_id is None:
+            continue
+        try:
+            pair = (int(batter_id), int(pitcher_id))
+        except (TypeError, ValueError):
+            continue
+        if pair not in clean_pairs:
+            clean_pairs.append(pair)
+
+    results = {
+        pair: empty_bvp_result("No History")
+        for pair in clean_pairs
+    }
+    if not clean_pairs:
+        return results
+
+    with read_connection() as conn:
+        for offset in range(0, len(clean_pairs), 400):
+            chunk = clean_pairs[offset : offset + 400]
+            placeholders = ",".join("(?, ?)" for _ in chunk)
+            params = [
+                value
+                for pair in chunk
+                for value in pair
+            ]
+            rows = conn.execute(
+                f"""
+                SELECT *
+                FROM batter_pitcher_stats
+                WHERE (batter_id, pitcher_id) IN ({placeholders})
+                """,
+                params,
+            ).fetchall()
+            for row in rows:
+                results[(row["batter_id"], row["pitcher_id"])] = {
+                    "PA": row["PA"],
+                    "AB": row["AB"],
+                    "H": row["H"],
+                    "2B": row["doubles"],
+                    "3B": row["triples"],
+                    "BB": row["BB"],
+                    "HBP": row["HBP"],
+                    "SO": row["SO"],
+                    "HR": row["HR"],
+                    "RBI": row["RBI"],
+                    "AVG": row["AVG"],
+                    "OBP": row["OBP"],
+                    "SLG": row["SLG"],
+                    "OPS": row["OPS"],
+                    "K%": row["K_pct"],
+                    "BB%": row["BB_pct"],
+                    "matchup_grade": grade_bvp(row["AB"], row["AVG"]),
+                }
+    return results
+
+
 def get_batter_vs_pitcher_game_logs_from_db(batter_id, pitcher_id):
     ensure_database()
     with read_connection() as conn:
@@ -986,6 +1081,109 @@ def get_batter_vs_pitcher_game_logs_from_db(batter_id, pitcher_id):
     return [dict(row) for row in rows]
 
 
+def get_batter_season_game_logs_from_db(batter_id, season):
+    ensure_database()
+    with read_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                gl.game_pk,
+                gl.game_date,
+                gl.batting_team AS team,
+                CASE
+                    WHEN gl.batting_team = g.home_team THEN g.away_team
+                    WHEN gl.batting_team = g.away_team THEN g.home_team
+                    ELSE MAX(gl.pitching_team)
+                END AS opponent,
+                CASE
+                    WHEN gl.batting_team = g.home_team THEN 'Home'
+                    WHEN gl.batting_team = g.away_team THEN 'Away'
+                    ELSE NULL
+                END AS home_away,
+                SUM(gl.PA) AS PA,
+                SUM(gl.AB) AS AB,
+                SUM(gl.H) AS H,
+                SUM(gl.TB) AS TB,
+                SUM(gl.BB) AS BB,
+                SUM(gl.HBP) AS HBP,
+                SUM(gl.SO) AS SO,
+                SUM(gl.HR) AS HR,
+                SUM(gl.RBI) AS RBI,
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.H) * 1.0 / SUM(gl.AB), 3) END AS AVG,
+                CASE WHEN SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF) > 0
+                    THEN ROUND(
+                        (SUM(gl.H) + SUM(gl.BB) + SUM(gl.HBP)) * 1.0 /
+                        (SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF)),
+                        3
+                    )
+                END AS OBP,
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.TB) * 1.0 / SUM(gl.AB), 3) END AS SLG,
+                CASE WHEN SUM(gl.AB) > 0
+                    AND SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF) > 0
+                    THEN ROUND(
+                        (SUM(gl.H) + SUM(gl.BB) + SUM(gl.HBP)) * 1.0 /
+                        (SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF)) +
+                        SUM(gl.TB) * 1.0 / SUM(gl.AB),
+                        3
+                    )
+                END AS OPS,
+                CASE WHEN SUM(gl.PA) > 0
+                    THEN ROUND(SUM(gl.SO) * 100.0 / SUM(gl.PA), 2) END AS "K%",
+                CASE WHEN SUM(gl.PA) > 0
+                    THEN ROUND(SUM(gl.BB) * 100.0 / SUM(gl.PA), 2) END AS "BB%"
+            FROM batter_pitcher_game_logs gl
+            LEFT JOIN games g ON gl.game_pk = g.game_pk
+            WHERE gl.batter_id = ? AND gl.season = ?
+            GROUP BY
+                gl.game_pk,
+                gl.game_date,
+                gl.batting_team,
+                g.home_team,
+                g.away_team
+            ORDER BY gl.game_date DESC, gl.game_pk DESC
+            """,
+            (int(batter_id), int(season)),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_pitcher_season_game_logs_from_db(pitcher_id, season):
+    ensure_database()
+    with read_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                gl.game_pk,
+                gl.game_date,
+                gl.team,
+                gl.opponent,
+                CASE
+                    WHEN gl.team = g.home_team THEN 'Home'
+                    WHEN gl.team = g.away_team THEN 'Away'
+                    ELSE NULL
+                END AS home_away,
+                gl.IP,
+                gl.pitch_count AS "Pitch Count",
+                gl.BF,
+                gl.H,
+                gl.BB,
+                gl.HBP,
+                gl.SO,
+                gl.HR,
+                gl.R,
+                gl.ER
+            FROM pitcher_game_logs gl
+            LEFT JOIN games g ON gl.game_pk = g.game_pk
+            WHERE gl.pitcher_id = ? AND gl.season = ?
+            ORDER BY gl.game_date DESC, gl.game_pk DESC
+            """,
+            (int(pitcher_id), int(season)),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def get_pitcher_stats_from_db(season, pitcher_id):
     if pitcher_id is None:
         return None
@@ -996,6 +1194,117 @@ def get_pitcher_stats_from_db(season, pitcher_id):
             (int(season), int(pitcher_id)),
         ).fetchone()
     return dict(row) if row else None
+
+
+def get_batter_season_stats_from_db(season):
+    ensure_database()
+    with read_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                gl.batter_id AS player_id,
+                MAX(bp.player_name) AS Name,
+                MAX(gl.batting_team) AS team_name,
+                MAX(gl.batting_team) AS Team,
+                COUNT(DISTINCT gl.game_pk) AS G,
+                SUM(gl.PA) AS PA,
+                SUM(gl.AB) AS AB,
+                SUM(gl.H) AS H,
+                0 AS R,
+                SUM(gl.BB) AS BB,
+                SUM(gl.HBP) AS HBP,
+                SUM(gl.SO) AS SO,
+                SUM(gl.HR) AS HR,
+                SUM(gl.RBI) AS RBI,
+                0 AS SB,
+                SUM(gl.TB) AS TB,
+                SUM(gl.SF) AS SF,
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.H) * 1.0 / SUM(gl.AB), 3) ELSE 0 END AS AVG,
+                CASE WHEN SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF) > 0
+                    THEN ROUND(
+                        (SUM(gl.H) + SUM(gl.BB) + SUM(gl.HBP)) * 1.0 /
+                        (SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF)),
+                        3
+                    ) ELSE 0 END AS OBP,
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.TB) * 1.0 / SUM(gl.AB), 3) ELSE 0 END AS SLG,
+                CASE WHEN SUM(gl.AB) > 0
+                    AND SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF) > 0
+                    THEN ROUND(
+                        (SUM(gl.H) + SUM(gl.BB) + SUM(gl.HBP)) * 1.0 /
+                        (SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF)) +
+                        SUM(gl.TB) * 1.0 / SUM(gl.AB),
+                        3
+                    ) ELSE 0 END AS OPS,
+                CASE WHEN SUM(gl.PA) > 0
+                    THEN ROUND(SUM(gl.SO) * 100.0 / SUM(gl.PA), 2) ELSE 0 END AS "K%",
+                CASE WHEN SUM(gl.PA) > 0
+                    THEN ROUND(SUM(gl.BB) * 100.0 / SUM(gl.PA), 2) ELSE 0 END AS "BB%"
+            FROM batter_pitcher_game_logs gl
+            LEFT JOIN players bp ON gl.batter_id = bp.player_id
+            WHERE gl.season = ?
+            GROUP BY gl.batter_id
+            HAVING Name IS NOT NULL
+            """,
+            (int(season),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_pitcher_season_stats_from_db(season):
+    ensure_database()
+    with read_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                ps.pitcher_id AS player_id,
+                ps.pitcher_name AS Name,
+                COALESCE(latest.team, '') AS team_name,
+                COALESCE(latest.team, '') AS Team,
+                ps.games AS G,
+                ps.starts AS GS,
+                ps.IP,
+                CASE
+                    WHEN ps.avg_pitch_count_per_start IS NOT NULL
+                        AND ps.starts IS NOT NULL
+                    THEN ROUND(ps.avg_pitch_count_per_start * ps.starts, 0)
+                    ELSE NULL
+                END AS Pitches,
+                ps.H,
+                ps.ERA,
+                ps.WHIP,
+                ps.K9 AS "K/9",
+                CASE WHEN ps.IP_outs > 0
+                    THEN ROUND(ps.BB * 27.0 / ps.IP_outs, 2) ELSE 0 END AS "BB/9",
+                ps.SO,
+                ps.BB,
+                ps.HR,
+                ps.BF,
+                ps.K_pct AS "K%",
+                CASE WHEN ps.BF > 0
+                    THEN ROUND(ps.BB * 100.0 / ps.BF, 2) ELSE 0 END AS "BB%",
+                NULL AS "SwStr%"
+            FROM pitcher_stats ps
+            LEFT JOIN (
+                SELECT pgl.pitcher_id, pgl.team
+                FROM pitcher_game_logs pgl
+                INNER JOIN (
+                    SELECT pitcher_id, MAX(game_date) AS latest_game_date
+                    FROM pitcher_game_logs
+                    WHERE season = ?
+                    GROUP BY pitcher_id
+                ) recent
+                    ON recent.pitcher_id = pgl.pitcher_id
+                    AND recent.latest_game_date = pgl.game_date
+                WHERE pgl.season = ?
+                GROUP BY pgl.pitcher_id
+            ) latest ON latest.pitcher_id = ps.pitcher_id
+            WHERE ps.season = ?
+            """,
+            (int(season), int(season), int(season)),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def get_pitcher_vs_team_game_logs_from_db(pitcher_id, opponent):
@@ -1021,6 +1330,80 @@ def get_pitcher_vs_team_game_logs_from_db(pitcher_id, opponent):
             ORDER BY gl.game_date DESC
             """,
             (int(pitcher_id), opponent),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_batter_streak_game_logs_from_db(batter_ids, season=None):
+    ensure_database()
+    batter_ids = [
+        int(player_id)
+        for player_id in batter_ids
+        if player_id is not None
+    ]
+    if not batter_ids:
+        return []
+
+    placeholders = ",".join("?" for _ in batter_ids)
+    params = list(batter_ids)
+    season_filter = ""
+    if season is not None:
+        season_filter = " AND gl.season = ?"
+        params.append(int(season))
+
+    with read_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT
+                gl.batter_id AS player_id,
+                gl.game_pk,
+                gl.game_date,
+                gl.batting_team AS team,
+                SUM(gl.H) AS H,
+                SUM(gl.HR) AS HR,
+                SUM(gl.RBI) AS RBI,
+                SUM(gl.SO) AS SO
+            FROM batter_pitcher_game_logs gl
+            WHERE gl.batter_id IN ({placeholders}){season_filter}
+            GROUP BY gl.batter_id, gl.game_pk, gl.game_date, gl.batting_team
+            ORDER BY gl.game_date DESC
+            """,
+            params,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_pitcher_streak_game_logs_from_db(pitcher_ids, season=None):
+    ensure_database()
+    pitcher_ids = [
+        int(player_id)
+        for player_id in pitcher_ids
+        if player_id is not None
+    ]
+    if not pitcher_ids:
+        return []
+
+    placeholders = ",".join("?" for _ in pitcher_ids)
+    params = list(pitcher_ids)
+    season_filter = ""
+    if season is not None:
+        season_filter = " AND season = ?"
+        params.append(int(season))
+
+    with read_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT
+                pitcher_id AS player_id,
+                game_pk,
+                game_date,
+                team,
+                SO
+            FROM pitcher_game_logs
+            WHERE pitcher_id IN ({placeholders}){season_filter}
+            ORDER BY game_date DESC
+            """,
+            params,
         ).fetchall()
     return [dict(row) for row in rows]
 

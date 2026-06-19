@@ -5,6 +5,7 @@ import requests
 
 from src.database import (
     get_batter_vs_pitcher_game_logs_from_db,
+    get_batter_vs_pitcher_stats_batch_from_db,
     get_batter_vs_pitcher_stats_from_db,
     get_pitcher_vs_team_game_logs_from_db,
 )
@@ -96,7 +97,8 @@ def get_mlb_stats(season, group):
         "playerPool": "ALL",
         "season": season,
         "sportIds": 1,
-        "limit": 5000
+        "limit": 5000,
+        "hydrate": "team",
     }
 
     response = requests.get(STATS_URL, params=params, timeout=30)
@@ -138,7 +140,17 @@ def get_batter_stats(season, force_refresh=False):
         return pd.DataFrame()
 
     rename_cols = {
+        "gamesPlayed": "G",
         "plateAppearances": "PA",
+        "atBats": "AB",
+        "hits": "H",
+        "runs": "R",
+        "homeRuns": "HR",
+        "rbi": "RBI",
+        "stolenBases": "SB",
+        "totalBases": "TB",
+        "hitByPitch": "HBP",
+        "sacFlies": "SF",
         "avg": "AVG",
         "obp": "OBP",
         "slg": "SLG",
@@ -155,7 +167,17 @@ def get_batter_stats(season, force_refresh=False):
         "team_id",
         "team_name",
         "Team",
+        "G",
         "PA",
+        "AB",
+        "H",
+        "R",
+        "HR",
+        "RBI",
+        "SB",
+        "TB",
+        "HBP",
+        "SF",
         "AVG",
         "OBP",
         "SLG",
@@ -170,7 +192,17 @@ def get_batter_stats(season, force_refresh=False):
     numeric_cols = [
         "player_id",
         "team_id",
+        "G",
         "PA",
+        "AB",
+        "H",
+        "R",
+        "HR",
+        "RBI",
+        "SB",
+        "TB",
+        "HBP",
+        "SF",
         "AVG",
         "OBP",
         "SLG",
@@ -205,6 +237,7 @@ def get_pitcher_stats(season, force_refresh=False):
 
     rename_cols = {
         "inningsPitched": "IP",
+        "gamesPlayed": "G",
         "hits": "H",
         "era": "ERA",
         "whip": "WHIP",
@@ -212,6 +245,7 @@ def get_pitcher_stats(season, force_refresh=False):
         "walksPer9Inn": "BB/9",
         "strikeOuts": "SO",
         "baseOnBalls": "BB",
+        "homeRuns": "HR",
         "battersFaced": "BF",
         "gamesStarted": "GS",
         "numberOfPitches": "Pitches"
@@ -231,6 +265,7 @@ def get_pitcher_stats(season, force_refresh=False):
         "team_id",
         "team_name",
         "Team",
+        "G",
         "IP",
         "GS",
         "Pitches",
@@ -241,6 +276,7 @@ def get_pitcher_stats(season, force_refresh=False):
         "BB/9",
         "SO",
         "BB",
+        "HR",
         "BF"
     ]
 
@@ -250,6 +286,7 @@ def get_pitcher_stats(season, force_refresh=False):
     numeric_cols = [
         "player_id",
         "team_id",
+        "G",
         "GS",
         "Pitches",
         "H",
@@ -259,6 +296,7 @@ def get_pitcher_stats(season, force_refresh=False):
         "BB/9",
         "SO",
         "BB",
+        "HR",
         "BF"
     ]
 
@@ -343,6 +381,52 @@ def get_hitter_vs_pitcher_stats(batter_id, pitcher_id, season):
     return get_batter_vs_pitcher_stats_from_db(batter_id, pitcher_id)
 
 
+def get_hitter_vs_pitcher_stats_batch(matchup_pairs, season=None):
+    """
+    Loads all requested career batter-vs-pitcher summaries in one SQLite read.
+    """
+    return get_batter_vs_pitcher_stats_batch_from_db(matchup_pairs)
+
+
+def preload_hitter_hand_splits(season):
+    """
+    Loads both handedness split tables in one request for instant tab changes.
+    """
+    season = int(season)
+    cache_keys = [(season, "R"), (season, "L")]
+    if all(HAND_SPLIT_CACHE.get(cache_key) for cache_key in cache_keys):
+        return
+
+    response = requests.get(
+        STATS_URL,
+        params={
+            "stats": "statSplits",
+            "group": "hitting",
+            "sitCodes": "vr,vl",
+            "sportIds": 1,
+            "season": season,
+            "playerPool": "ALL",
+            "limit": 5000,
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+
+    split_cache = {"R": {}, "L": {}}
+    for split in response.json().get("stats", [{}])[0].get("splits", []):
+        player_id = split.get("player", {}).get("id")
+        split_code = split.get("split", {}).get("code")
+        pitcher_hand = "R" if split_code == "vr" else "L" if split_code == "vl" else None
+        if player_id is None or pitcher_hand is None:
+            continue
+        split_cache[pitcher_hand][int(player_id)] = clean_stat_result(
+            split.get("stat", {})
+        )
+
+    for pitcher_hand, records in split_cache.items():
+        HAND_SPLIT_CACHE[(season, pitcher_hand)] = records
+
+
 def get_hitter_vs_hand_stats(batter_id, pitcher_hand, season):
     """
     Pulls hitter split against the opposing pitcher's throwing hand.
@@ -374,15 +458,7 @@ def get_hitter_vs_hand_stats(batter_id, pitcher_hand, season):
 
     try:
         if not HAND_SPLIT_CACHE[cache_key]:
-            response = requests.get(STATS_URL, params=params, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            splits = data.get("stats", [{}])[0].get("splits", [])
-            HAND_SPLIT_CACHE[cache_key] = {
-                int(split["player"]["id"]): clean_stat_result(split.get("stat", {}))
-                for split in splits
-                if split.get("player", {}).get("id") is not None
-            }
+            preload_hitter_hand_splits(season)
     except Exception:
         return clean_stat_result({})
 
