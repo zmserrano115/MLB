@@ -139,6 +139,29 @@ class LiveStreakTests(unittest.TestCase):
         self.assertEqual(result["streak"], 0)
         self.assertEqual(result["status"], "Ended")
 
+    def test_final_game_with_threshold_extends_streak(self):
+        logs = pd.DataFrame(
+            [
+                {"game_date": "2026-06-17", "SO": 8},
+                {"game_date": "2026-06-16", "SO": 7},
+                {"game_date": "2026-06-15", "SO": 4},
+            ]
+        )
+
+        result = calculate_live_streak(
+            logs,
+            "SO",
+            7,
+            current_value=7,
+            current_game_state="Final",
+            selected_date="2026-06-18",
+            live_played=True,
+        )
+
+        self.assertEqual(result["streak"], 3)
+        self.assertEqual(result["today_value"], 7)
+        self.assertEqual(result["status"], "Final +1")
+
 
 class PlayerGameLogTests(unittest.TestCase):
     def test_parse_hitter_game_log_includes_complete_display_stats(self):

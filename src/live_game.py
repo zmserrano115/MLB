@@ -333,7 +333,11 @@ def calculate_live_streak(
         return {
             "streak": base_streak + 1,
             "today_value": float(current_value),
-            "status": "Live +1",
+            "status": (
+                "Final +1"
+                if is_final_state(current_game_state, detailed_state)
+                else "Live +1"
+            ),
         }
 
     if live_played and is_final_state(current_game_state, detailed_state):
