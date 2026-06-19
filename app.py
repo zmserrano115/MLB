@@ -589,6 +589,24 @@ st.markdown(
         font-size: 11px;
     }
 
+    .streak-injury-badge {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 6px;
+        padding: 1px 5px;
+        border: 1px solid #e2b8b8;
+        border-radius: 3px;
+        background: #fff0f0;
+        color: #b43b3b;
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        line-height: 1.4;
+        text-transform: uppercase;
+        vertical-align: middle;
+        cursor: help;
+    }
+
     .leaderboard-bar-track {
         height: 8px;
         background: #edf1f5;
@@ -2202,7 +2220,7 @@ PITCHER_STREAK_METRICS = [
 ]
 
 
-def streak_candidates_from_stats(stats_df, player_type, schedule, limit):
+def streak_candidates_from_stats(stats_df, player_type, schedule, limit=None):
     if stats_df.empty or "player_id" not in stats_df.columns:
         return pd.DataFrame()
 
@@ -2231,32 +2249,10 @@ def streak_candidates_from_stats(stats_df, player_type, schedule, limit):
         ["sort_value", "Player"],
         ascending=[False, True],
     )
-    return candidates[["player_id", "Player", "Team"]].head(limit).reset_index(drop=True)
-
-
-def pitcher_streak_candidates_from_schedule(schedule):
-    if schedule.empty:
-        return pd.DataFrame()
-
-    rows = []
-    for _, game in schedule.iterrows():
-        for side in ("away", "home"):
-            player_id = game.get(f"{side}_probable_pitcher_id")
-            player_name = game.get(f"{side}_probable_pitcher")
-            team_name = game.get(f"{side}_team")
-            if is_missing_value(player_id) or is_missing_value(player_name):
-                continue
-            rows.append(
-                {
-                    "player_id": int(pd.to_numeric(player_id, errors="coerce")),
-                    "Player": player_name,
-                    "Team": team_name,
-                }
-            )
-
-    if not rows:
-        return pd.DataFrame()
-    return pd.DataFrame(rows).drop_duplicates("player_id").reset_index(drop=True)
+    candidates = candidates[["player_id", "Player", "Team"]]
+    if limit is not None:
+        candidates = candidates.head(limit)
+    return candidates.reset_index(drop=True)
 
 
 def live_streak_game_rows(schedule):
@@ -2265,7 +2261,9 @@ def live_streak_game_rows(schedule):
         game_pk = row.get("game_pk")
         if is_missing_value(game_pk):
             continue
-        if str(row.get("abstract_game_state") or "").lower() != "live":
+        game_state = str(row.get("abstract_game_state") or "").lower()
+        game_status = row.get("game_status")
+        if game_state != "live" and not is_final_state(game_state, game_status):
             continue
         rows.append(
             (
@@ -2324,6 +2322,7 @@ def collect_live_stats_from_games(game_rows):
 def start_live_streak_monitor(game_rows):
     state = {
         "lock": Lock(),
+        "ready": Event(),
         "batting": pd.DataFrame(),
         "pitching": pd.DataFrame(),
         "updated_at": None,
@@ -2334,11 +2333,16 @@ def start_live_streak_monitor(game_rows):
 
     def refresh_forever():
         while True:
-            batting, pitching = collect_live_stats_from_games(game_rows)
-            with state["lock"]:
-                state["batting"] = batting
-                state["pitching"] = pitching
-                state["updated_at"] = time.time()
+            try:
+                batting, pitching = collect_live_stats_from_games(game_rows)
+                with state["lock"]:
+                    state["batting"] = batting
+                    state["pitching"] = pitching
+                    state["updated_at"] = time.time()
+            except Exception:
+                pass
+            finally:
+                state["ready"].set()
             time.sleep(30)
 
     Thread(target=refresh_forever, daemon=True).start()
@@ -2346,7 +2350,10 @@ def start_live_streak_monitor(game_rows):
 
 
 def monitored_live_streak_stats(schedule):
-    state = start_live_streak_monitor(live_streak_game_rows(schedule))
+    game_rows = live_streak_game_rows(schedule)
+    state = start_live_streak_monitor(game_rows)
+    if game_rows and state["batting"].empty and state["pitching"].empty:
+        state["ready"].wait(timeout=5)
     with state["lock"]:
         return state["batting"].copy(), state["pitching"].copy()
 
@@ -2494,13 +2501,16 @@ def build_fast_live_streak_rows(
         if pd.notna(current_value):
             result.at[index, "Today"] = float(current_value)
 
-        if pd.notna(current_value) and float(current_value) >= metric["threshold"]:
-            result.at[index, "Streak"] = int(streak_row["Streak"]) + 1
-            result.at[index, "Status"] = "Live +1"
-        elif played and is_final_state(
+        current_is_final = is_final_state(
             current.get("abstract_game_state"),
             current.get("game_status"),
-        ):
+        )
+        if pd.notna(current_value) and float(current_value) >= metric["threshold"]:
+            result.at[index, "Streak"] = int(streak_row["Streak"]) + 1
+            result.at[index, "Status"] = (
+                "Final +1" if current_is_final else "Live +1"
+            )
+        elif played and current_is_final:
             result.at[index, "Streak"] = 0
             result.at[index, "Status"] = "Ended"
         elif played:
@@ -2530,7 +2540,7 @@ def render_streak_leaderboard(streak_df, metric_label, key):
     metric_df = metric_df.sort_values(
         ["Streak", "Today", "Player"],
         ascending=[False, False, True],
-    ).head(20)
+    )
     max_streak = max(1, int(metric_df["Streak"].max()))
 
     rows = []
@@ -2538,7 +2548,13 @@ def render_streak_leaderboard(streak_df, metric_label, key):
         streak = int(row.get("Streak") or 0)
         width = max(3, round((streak / max_streak) * 100, 1)) if streak else 3
         status = str(row.get("Status") or "Pending")
-        status_class = "hot" if status == "Live +1" else "ended" if status == "Ended" else ""
+        status_class = (
+            "hot"
+            if status in {"Live +1", "Final +1"}
+            else "ended"
+            if status == "Ended"
+            else ""
+        )
         today_value = row.get("Today")
         today_text = "-" if pd.isna(today_value) else f"{float(today_value):.0f}"
         headshot = image_html(
@@ -2546,13 +2562,20 @@ def render_streak_leaderboard(streak_df, metric_label, key):
             f"{row.get('Player') or 'Player'} headshot",
             class_name="leaderboard-headshot",
         )
+        injury_tooltip = row.get("injury_tooltip")
+        injury_badge = (
+            '<span class="streak-injury-badge" '
+            f'title="{escape(str(injury_tooltip), quote=True)}">inj</span>'
+            if not is_missing_value(injury_tooltip)
+            else ""
+        )
         rows.append(
             f"""
             <div class="leaderboard-row">
                 <div class="leaderboard-rank">{rank}</div>
                 {headshot}
                 <div class="leaderboard-name">
-                    <strong>{escape(str(row.get("Player") or "Unknown"))}</strong>
+                    <strong>{escape(str(row.get("Player") or "Unknown"))}{injury_badge}</strong>
                     <span>{escape(str(row.get("Team") or ""))} | Today: {escape(today_text)}</span>
                 </div>
                 <div class="leaderboard-bar-track">
@@ -2585,6 +2608,24 @@ def render_streaks_tab(
 ):
     live_batting, live_pitching = monitored_live_streak_stats(schedule)
     season_value = pd.to_datetime(selected_date_value).year
+    if selected_game_value == "All Games":
+        injury_team_ids = set()
+        for stats_df in (batter_stats_df, pitcher_stats_df):
+            if stats_df.empty or "team_id" not in stats_df.columns:
+                continue
+            injury_team_ids.update(
+                int(team_id)
+                for team_id in pd.to_numeric(
+                    stats_df["team_id"],
+                    errors="coerce",
+                ).dropna()
+            )
+    else:
+        injury_team_ids = schedule_team_ids(schedule)
+    injury_report = monitored_injury_report(
+        sorted(injury_team_ids),
+        selected_date_value,
+    )
 
     st.markdown(
         f"""
@@ -2615,7 +2656,16 @@ def render_streaks_tab(
         active_metric = [
             metric for metric in metrics if metric["label"] == active_metric_label
         ]
-        pitcher_candidates = pitcher_streak_candidates_from_schedule(schedule)
+        candidate_schedule = (
+            pd.DataFrame()
+            if selected_game_value == "All Games"
+            else schedule
+        )
+        pitcher_candidates = streak_candidates_from_stats(
+            pitcher_stats_df,
+            "pitcher",
+            candidate_schedule,
+        )
         pitcher_ids = (
             tuple(pitcher_candidates["player_id"].tolist())
             if "player_id" in pitcher_candidates.columns
@@ -2626,10 +2676,17 @@ def render_streaks_tab(
             pitcher_ids,
             season_value,
         )
-        if pitcher_logs.empty:
-            pitcher_logs = load_pitcher_streak_logs(
-                pitcher_ids,
-                season_value,
+        missing_pitcher_ids = missing_streak_player_ids(
+            pitcher_logs,
+            pitcher_ids,
+        )
+        if missing_pitcher_ids:
+            pitcher_logs = merge_streak_history(
+                pitcher_logs,
+                load_pitcher_streak_logs(
+                    tuple(sorted(missing_pitcher_ids)),
+                    season_value,
+                ),
             )
         pitcher_streaks = build_fast_live_streak_rows(
             pitcher_candidates,
@@ -2638,6 +2695,11 @@ def render_streaks_tab(
             "pitching",
             live_pitching,
             selected_date_value,
+        )
+        pitcher_streaks = add_injury_columns(
+            pitcher_streaks,
+            "player_id",
+            injury_report,
         )
         render_streak_leaderboard(
             pitcher_streaks,
@@ -2657,12 +2719,14 @@ def render_streaks_tab(
     active_metric = [
         metric for metric in metrics if metric["label"] == active_metric_label
     ]
-    batter_limit = 500 if selected_game_value == "All Games" else 60
     batter_candidates = streak_candidates_from_stats(
         batter_stats_df,
         "batter",
-        schedule,
-        batter_limit,
+        (
+            pd.DataFrame()
+            if selected_game_value == "All Games"
+            else schedule
+        ),
     )
     batter_ids = (
         tuple(batter_candidates["player_id"].tolist())
@@ -2674,10 +2738,17 @@ def render_streaks_tab(
         (),
         season_value,
     )
-    if batter_logs.empty:
-        batter_logs = load_batter_streak_logs(
-            batter_ids,
-            season_value,
+    missing_batter_ids = missing_streak_player_ids(
+        batter_logs,
+        batter_ids,
+    )
+    if missing_batter_ids:
+        batter_logs = merge_streak_history(
+            batter_logs,
+            load_batter_streak_logs(
+                tuple(sorted(missing_batter_ids)),
+                season_value,
+            ),
         )
     batter_streaks = build_fast_live_streak_rows(
         batter_candidates,
@@ -2686,6 +2757,11 @@ def render_streaks_tab(
         "batting",
         live_batting,
         selected_date_value,
+    )
+    batter_streaks = add_injury_columns(
+        batter_streaks,
+        "player_id",
+        injury_report,
     )
     render_streak_leaderboard(
         batter_streaks,
@@ -4840,6 +4916,31 @@ def start_streak_history_monitor(batter_ids, pitcher_ids, season):
         except Exception:
             return pd.DataFrame()
 
+    def merge_history(cached, refreshed):
+        if refreshed is None or refreshed.empty:
+            return cached
+        if cached is None or cached.empty:
+            return refreshed
+
+        combined = pd.concat([cached, refreshed], ignore_index=True)
+        duplicate_keys = [
+            column
+            for column in ("player_id", "game_pk")
+            if column in combined.columns
+        ]
+        if len(duplicate_keys) < 2:
+            duplicate_keys = [
+                column
+                for column in ("player_id", "game_date")
+                if column in combined.columns
+            ]
+        if len(duplicate_keys) == 2:
+            combined = combined.drop_duplicates(
+                duplicate_keys,
+                keep="last",
+            )
+        return combined.reset_index(drop=True)
+
     state = {
         "lock": Lock(),
         "ready": Event(),
@@ -4872,15 +4973,24 @@ def start_streak_history_monitor(batter_ids, pitcher_ids, season):
                         if pitcher_ids
                         else None
                     )
-                    batting = (
+                    refreshed_batting = (
                         batter_future.result()
                         if batter_future is not None
-                        else state["batting"]
+                        else pd.DataFrame()
                     )
-                    pitching = (
+                    refreshed_pitching = (
                         pitcher_future.result()
                         if pitcher_future is not None
-                        else state["pitching"]
+                        else pd.DataFrame()
+                    )
+                with state["lock"]:
+                    batting = merge_history(
+                        state["batting"],
+                        refreshed_batting,
+                    )
+                    pitching = merge_history(
+                        state["pitching"],
+                        refreshed_pitching,
                     )
 
                 for group, player_ids, frame in (
@@ -4906,6 +5016,50 @@ def start_streak_history_monitor(batter_ids, pitcher_ids, season):
     return state
 
 
+def missing_streak_player_ids(history, player_ids):
+    player_ids = {
+        int(player_id)
+        for player_id in player_ids
+    }
+    if not player_ids:
+        return set()
+    if history is None or history.empty or "player_id" not in history.columns:
+        return player_ids
+    cached_ids = {
+        int(player_id)
+        for player_id in pd.to_numeric(
+            history["player_id"],
+            errors="coerce",
+        ).dropna()
+    }
+    return player_ids - cached_ids
+
+
+def merge_streak_history(history, fallback):
+    if fallback is None or fallback.empty:
+        return history
+    if history is None or history.empty:
+        return fallback
+    combined = pd.concat([history, fallback], ignore_index=True)
+    duplicate_keys = [
+        column
+        for column in ("player_id", "game_pk")
+        if column in combined.columns
+    ]
+    if len(duplicate_keys) < 2:
+        duplicate_keys = [
+            column
+            for column in ("player_id", "game_date")
+            if column in combined.columns
+        ]
+    if len(duplicate_keys) == 2:
+        combined = combined.drop_duplicates(
+            duplicate_keys,
+            keep="last",
+        )
+    return combined.reset_index(drop=True)
+
+
 def monitored_streak_history(batter_ids, pitcher_ids, season):
     batter_ids = tuple(batter_ids)
     pitcher_ids = tuple(pitcher_ids)
@@ -4914,13 +5068,15 @@ def monitored_streak_history(batter_ids, pitcher_ids, season):
         pitcher_ids,
         int(season),
     )
-    needs_requested_history = (
-        bool(batter_ids) and state["batting"].empty
-    ) or (
-        bool(pitcher_ids) and state["pitching"].empty
-    )
+    needs_requested_history = bool(missing_streak_player_ids(
+        state["batting"],
+        batter_ids,
+    )) or bool(missing_streak_player_ids(
+        state["pitching"],
+        pitcher_ids,
+    ))
     if needs_requested_history:
-        state["ready"].wait(timeout=2)
+        state["ready"].wait(timeout=6)
     with state["lock"]:
         return state["batting"].copy(), state["pitching"].copy()
 
