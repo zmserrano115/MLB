@@ -1003,8 +1003,61 @@ def format_display_date(value):
         return str(value)
 
 
+def is_missing_value(value):
+    if value is None:
+        return True
+
+    try:
+        missing = pd.isna(value)
+        if isinstance(missing, bool):
+            return missing
+        if bool(missing):
+            return True
+    except (TypeError, ValueError):
+        pass
+    except Exception:
+        pass
+
+    try:
+        text = str(value).strip()
+    except Exception:
+        return True
+
+    return text == "" or text.lower() in {"nan", "nat", "none", "<na>"}
+
+
+def safe_value(value, default=""):
+    return default if is_missing_value(value) else value
+
+
+def safe_text(value, default=""):
+    return str(safe_value(value, default))
+
+
+def row_value(row, *columns, default=""):
+    for column in columns:
+        try:
+            value = row.get(column)
+        except AttributeError:
+            try:
+                value = row[column]
+            except Exception:
+                value = None
+        except Exception:
+            value = None
+
+        if not is_missing_value(value):
+            return value
+
+    return default
+
+
+def row_text(row, *columns, default=""):
+    return safe_text(row_value(row, *columns, default=default), default=default)
+
+
 def team_logo_url(team_value):
-    if team_value is None or pd.isna(team_value):
+    if is_missing_value(team_value):
         return ""
 
     team_value = str(team_value).strip()
@@ -1020,7 +1073,7 @@ def team_logo_url(team_value):
 
 
 def team_logo_fallback_url(team_value):
-    if team_value is None or pd.isna(team_value):
+    if is_missing_value(team_value):
         return ""
 
     team_value = str(team_value).strip()
@@ -1041,7 +1094,7 @@ def team_logo_fallback_url(team_value):
 
 
 def team_id_for_value(team_value):
-    if team_value is None or pd.isna(team_value):
+    if is_missing_value(team_value):
         return None
 
     text = str(team_value).strip()
@@ -1091,7 +1144,7 @@ def ensure_probable_pitcher_rows(pitchers_df, schedule_df):
                 continue
             team_name = game.get(f"{side}_team")
             team_id = game.get(f"{side}_team_id")
-            team_code = game.get(f"{side}_team_abbr") or team_name
+            team_code = row_value(game, f"{side}_team_abbr", default=team_name)
             rows.append(
                 {
                     "player_id": player_id,
@@ -1241,6 +1294,11 @@ def local_pitcher_season_stats(season):
 
 
 def image_html(src, alt, class_name="", fallback_src="", title="", lazy=True):
+    src = safe_text(src)
+    fallback_src = safe_text(fallback_src)
+    alt = safe_text(alt)
+    title = safe_text(title)
+
     if not src and fallback_src:
         src = fallback_src
         fallback_src = ""
@@ -1264,7 +1322,11 @@ def image_html(src, alt, class_name="", fallback_src="", title="", lazy=True):
 
 
 def team_logo_img_html(team_value, alt=None, class_name="stats-identity-img"):
-    label = str(alt or team_value or "Team")
+    label = safe_text(alt, default="")
+    if not label:
+        label = safe_text(team_value, default="Team")
+    if not label:
+        label = "Team"
     return image_html(
         team_logo_url(team_value),
         label,
@@ -1283,7 +1345,7 @@ def display_team_code(row, side):
     if not is_missing_value(value):
         return str(value)
 
-    team_name = str(row.get(f"{side}_team") or "")
+    team_name = row_text(row, f"{side}_team")
     if not team_name:
         return side.title()
     return "".join(word[0] for word in team_name.split()[-2:]).upper()
@@ -1297,19 +1359,19 @@ def score_value(value):
 
 
 def game_status_text(row):
-    status = str(row.get("game_status") or "Scheduled")
-    abstract_state = str(row.get("abstract_game_state") or "")
-    inning = row.get("current_inning_ordinal") or row.get("current_inning")
-    inning_state = row.get("inning_state") or row.get("inning_half")
+    status = row_text(row, "game_status", default="Scheduled")
+    abstract_state = row_text(row, "abstract_game_state").lower()
+    inning = row_text(row, "current_inning_ordinal", "current_inning")
+    inning_state = row_text(row, "inning_state", "inning_half", default="Live")
 
-    if abstract_state.lower() == "live" and inning:
-        return f"{inning_state or 'Live'} {inning}"
+    if abstract_state == "live" and inning:
+        return f"{inning_state} {inning}"
     return status
 
 
 def game_button_label(row):
-    away_team = str(row.get("away_team") or "Away")
-    home_team = str(row.get("home_team") or "Home")
+    away_team = row_text(row, "away_team", default="Away")
+    home_team = row_text(row, "home_team", default="Home")
     return f"{away_team} @ {home_team}"
 
 
@@ -1495,7 +1557,7 @@ def weather_icon_svg(icon_name, size=18, padding=0):
         ),
     }
 
-    icon_paths = paths.get(str(icon_name or "unknown"), paths["unknown"])
+    icon_paths = paths.get(safe_text(icon_name, default="unknown"), paths["unknown"])
     viewbox_size = 24 + (padding * 2)
 
     return (
@@ -1704,29 +1766,13 @@ def filter_by_players(df, selected_batter=None, selected_pitcher=None):
     return result.copy()
 
 
-def is_missing_value(value):
-    if value is None:
-        return True
-
-    try:
-        if pd.isna(value):
-            return True
-    except Exception:
-        pass
-
-    if str(value).strip() == "":
-        return True
-
-    return False
-
-
 def compact_weather_html(row):
-    weather_icon_name = str(row.get("weather_icon") or "unknown")
+    weather_icon_name = row_text(row, "weather_icon", default="unknown")
     weather_svg = weather_icon_svg(weather_icon_name, size=20)
-    weather_display = str(row.get("weather_display") or "?")
-    weather_edge = str(row.get("weather_edge") or "Neutral")
+    weather_display = row_text(row, "weather_display", default="?")
+    weather_edge = row_text(row, "weather_edge", default="Neutral")
     weather_tooltip = escape(
-        str(row.get("weather_tooltip") or "Forecast unavailable."),
+        row_text(row, "weather_tooltip", default="Forecast unavailable."),
         quote=True,
     )
     return (
@@ -1738,11 +1784,11 @@ def compact_weather_html(row):
 
 
 def compact_wind_html(row):
-    wind_arrow = str(row.get("wind_arrow") or "\u00b7")
+    wind_arrow = row_text(row, "wind_arrow", default="\u00b7")
     wind_speed = pd.to_numeric(row.get("wind_speed_mph"), errors="coerce")
     wind_speed_text = f"{float(wind_speed):.0f} mph" if pd.notna(wind_speed) else "N/A"
     wind_tooltip = escape(
-        str(row.get("wind_tooltip") or "Wind forecast unavailable."),
+        row_text(row, "wind_tooltip", default="Wind forecast unavailable."),
         quote=True,
     )
     return (
@@ -1754,10 +1800,10 @@ def compact_wind_html(row):
 
 
 def pitcher_pair_html(row):
-    away_pitcher = str(row.get("away_probable_pitcher") or "TBD")
-    home_pitcher = str(row.get("home_probable_pitcher") or "TBD")
-    away_hand = str(row.get("away_pitcher_hand") or "")
-    home_hand = str(row.get("home_pitcher_hand") or "")
+    away_pitcher = row_text(row, "away_probable_pitcher", default="TBD")
+    home_pitcher = row_text(row, "home_probable_pitcher", default="TBD")
+    away_hand = row_text(row, "away_pitcher_hand")
+    home_hand = row_text(row, "home_pitcher_hand")
 
     away_text = escape(away_pitcher)
     if away_hand:
@@ -1769,8 +1815,8 @@ def pitcher_pair_html(row):
 
 
 def venue_html(row):
-    venue = str(row.get("venue_name") or "Venue TBD")
-    roof = str(row.get("roof_type") or "Roof unknown")
+    venue = row_text(row, "venue_name", default="Venue TBD")
+    roof = row_text(row, "roof_type", default="Roof unknown")
     return f'<div class="schedule-venue">{escape(venue)}<span>{escape(roof)}</span></div>'
 
 
@@ -1779,7 +1825,7 @@ def selected_game_from_schedule_event(table_key, event):
     if not isinstance(event, dict) or event.get("type") != "select_player":
         return
 
-    event_id = str(event.get("event_id") or "")
+    event_id = safe_text(event.get("event_id"))
     payload = event.get("payload")
     if (
         not event_id
@@ -1807,8 +1853,8 @@ def render_live_schedule_table(df):
         if is_missing_value(game_pk):
             continue
 
-        away_team = str(row.get("away_team") or "")
-        home_team = str(row.get("home_team") or "")
+        away_team = row_text(row, "away_team")
+        home_team = row_text(row, "home_team")
         away_logo = team_logo_img_html(
             away_team,
             alt=away_team,
@@ -2045,7 +2091,7 @@ def render_live_schedule_table(df):
 def boxscore_team_options(row):
     options = []
     for side, label in (("Home", "home"), ("Away", "away")):
-        team_name = str(row.get(f"{label}_team") or side)
+        team_name = row_text(row, f"{label}_team", default=side)
         team_code = display_team_code(row, label)
         display = f"{team_name} ({team_code})" if team_code else team_name
         options.append({"label": display, "side": side})
@@ -2079,9 +2125,9 @@ def render_boxscore_dataframe(df, stat_columns, key):
 
     body_rows = []
     for _, row in df.reset_index(drop=True).iterrows():
-        player = str(row.get("Player") or "Unknown")
+        player = row_text(row, "Player", default="Unknown")
         player_id = row.get("player_id")
-        team = str(row.get("Team") or "")
+        team = row_text(row, "Team")
         headshot = image_html(
             player_image_url(player_id, width=72),
             f"{player} headshot",
@@ -2128,8 +2174,8 @@ def render_selected_game_boxscore(schedule_df):
     if row is None:
         return
 
-    away_team = str(row.get("away_team") or "Away")
-    home_team = str(row.get("home_team") or "Home")
+    away_team = row_text(row, "away_team", default="Away")
+    home_team = row_text(row, "home_team", default="Home")
     away_code = display_team_code(row, "away")
     home_code = display_team_code(row, "home")
     heading_columns = st.columns([8, 1], vertical_alignment="center")
@@ -2322,7 +2368,7 @@ def live_streak_game_rows(schedule):
         game_pk = row.get("game_pk")
         if is_missing_value(game_pk):
             continue
-        game_state = str(row.get("abstract_game_state") or "").lower()
+        game_state = row_text(row, "abstract_game_state").lower()
         game_status = row.get("game_status")
         if game_state != "live" and not is_final_state(game_state, game_status):
             continue
@@ -2426,7 +2472,7 @@ def live_played(row, group):
         pitch_count = pd.to_numeric(row.get("Pitch Count"), errors="coerce")
         if pd.notna(pitch_count) and pitch_count > 0:
             return True
-        return str(row.get("IP") or "0.0") not in {"", "0.0", "0"}
+        return row_text(row, "IP", default="0.0") not in {"", "0.0", "0"}
 
     plate_appearances = pd.to_numeric(row.get("PA"), errors="coerce")
     return pd.notna(plate_appearances) and plate_appearances > 0
@@ -2606,9 +2652,9 @@ def render_streak_leaderboard(streak_df, metric_label, key):
 
     rows = []
     for rank, (_, row) in enumerate(metric_df.iterrows(), start=1):
-        streak = int(row.get("Streak") or 0)
+        streak = int(row_value(row, "Streak", default=0))
         width = max(3, round((streak / max_streak) * 100, 1)) if streak else 3
-        status = str(row.get("Status") or "Pending")
+        status = row_text(row, "Status", default="Pending")
         status_class = (
             "hot"
             if status in {"Live +1", "Final +1"}
@@ -2619,8 +2665,8 @@ def render_streak_leaderboard(streak_df, metric_label, key):
         today_value = row.get("Today")
         today_text = "-" if pd.isna(today_value) else f"{float(today_value):.0f}"
         headshot = image_html(
-            str(row.get("Headshot") or ""),
-            f"{row.get('Player') or 'Player'} headshot",
+            row_text(row, "Headshot"),
+            f"{row_text(row, 'Player', default='Player')} headshot",
             class_name="leaderboard-headshot",
         )
         injury_tooltip = row.get("injury_tooltip")
@@ -2636,8 +2682,8 @@ def render_streak_leaderboard(streak_df, metric_label, key):
                 <div class="leaderboard-rank">{rank}</div>
                 {headshot}
                 <div class="leaderboard-name">
-                    <strong>{escape(str(row.get("Player") or "Unknown"))}{injury_badge}</strong>
-                    <span>{escape(str(row.get("Team") or ""))} | Today: {escape(today_text)}</span>
+                    <strong>{escape(row_text(row, "Player", default="Unknown"))}{injury_badge}</strong>
+                    <span>{escape(row_text(row, "Team"))} | Today: {escape(today_text)}</span>
                 </div>
                 <div class="leaderboard-bar-track">
                     <span class="leaderboard-bar-fill" style="width:{width}%"></span>
@@ -3164,7 +3210,7 @@ def stats_cell_value(column, value, mode="Total"):
 
 def stats_sort_metadata(row, column):
     if column == "Team":
-        value = row.get("Name") or row.get("team_name") or row.get("Team")
+        value = row_value(row, "Name", "team_name", "Team")
     else:
         value = row.get(column)
     if is_missing_value(value):
@@ -3177,11 +3223,11 @@ def stats_sort_metadata(row, column):
 
 def stats_identity_html(row, column, event_payload=None):
     if column == "Team":
-        team_code = str(row.get("Team") or "")
-        team_name = str(row.get("Name") or row.get("team_name") or team_code)
-        display_name = team_code if row.get("Player") else team_name
+        team_code = row_text(row, "Team")
+        team_name = row_text(row, "Name", "team_name", default=team_code)
+        display_name = team_code if not is_missing_value(row.get("Player")) else team_name
         logo = team_logo_img_html(
-            team_code or team_name,
+            team_code if team_code else team_name,
             alt=team_name,
             class_name="stats-identity-img",
         )
@@ -3192,9 +3238,9 @@ def stats_identity_html(row, column, event_payload=None):
             "</span>"
         )
 
-    player = str(row.get("Player") or "Unknown")
+    player = row_text(row, "Player", default="Unknown")
     player_id = row.get("player_id")
-    team_code = str(row.get("Team") or "")
+    team_code = row_text(row, "Team")
     logo = image_html(
         player_image_url(player_id, width=64),
         f"{player} headshot",
@@ -3385,7 +3431,7 @@ def player_leader_options(df):
 
 
 def filter_player_leaders_for_search(df, selected_player):
-    selected_player = str(selected_player or "").strip()
+    selected_player = safe_text(selected_player).strip()
     if df.empty:
         return df
 
@@ -3473,7 +3519,7 @@ def render_player_stats_tab(batter_stats_df, pitcher_stats_df, season):
 
 
 def matchup_grade_class(grade):
-    value = str(grade or "").lower()
+    value = safe_text(grade).lower()
     if "strong" in value or "good" in value or "elite" in value:
         return "good"
     if "neutral" in value:
@@ -3601,7 +3647,7 @@ def research_cell_value(column, value):
 
 
 def research_game_html(game):
-    game_text = str(game or "")
+    game_text = safe_text(game)
     if " vs " in game_text:
         first_team, second_team = game_text.split(" vs ", 1)
         separator = "vs"
@@ -3623,12 +3669,12 @@ def research_game_html(game):
 
 
 def player_perspective_game(game, player_team):
-    game_text = str(game or "").strip()
+    game_text = safe_text(game).strip()
     if " @ " not in game_text:
         return game_text
 
     away_team, home_team = game_text.split(" @ ", 1)
-    if str(player_team or "").strip() == home_team:
+    if safe_text(player_team).strip() == home_team:
         return f"{home_team} vs {away_team}"
     return f"{away_team} @ {home_team}"
 
@@ -3674,7 +3720,7 @@ def research_injury_badge_html(row):
 
 
 def research_edge_class(value):
-    edge = str(value or "").lower()
+    edge = safe_text(value).lower()
     if "hitter boost" in edge:
         return "hitter"
     if "pitcher boost" in edge:
@@ -3739,7 +3785,7 @@ def render_research_table(df, columns, player_column, log_type, table_key):
 
     body_rows = []
     for _, row in df.iterrows():
-        player_name = str(row.get(player_column) or "Unknown")
+        player_name = row_text(row, player_column, default="Unknown")
         player_id_column = f"{player_column}_id"
         player_id = row.get(player_id_column)
         headshot_html = image_html(
@@ -3800,7 +3846,7 @@ def render_research_table(df, columns, player_column, log_type, table_key):
             if column == "weather_condition":
                 icon = weather_icon_svg(row.get("weather_icon"), size=17)
                 tooltip = escape(
-                    str(row.get("weather_tooltip") or ""),
+                    row_text(row, "weather_tooltip"),
                     quote=True,
                 )
                 content = (
@@ -3815,7 +3861,7 @@ def render_research_table(df, columns, player_column, log_type, table_key):
                 "wind_out_mph",
             }:
                 tooltip = escape(
-                    str(row.get("wind_tooltip") or ""),
+                    row_text(row, "wind_tooltip"),
                     quote=True,
                 )
                 content = (
@@ -3865,10 +3911,10 @@ def game_log_date_display(value):
 
 
 def game_log_matchup_html(row, log_type):
-    team = str(row.get("team") or "")
-    opponent = str(row.get("opponent") or "")
+    team = row_text(row, "team")
+    opponent = row_text(row, "opponent")
     if team and opponent:
-        if str(row.get("home_away") or "").lower() == "home":
+        if row_text(row, "home_away").lower() == "home":
             game = f"{opponent} @ {team}"
         else:
             game = f"{team} @ {opponent}"
@@ -3989,9 +4035,9 @@ def render_selected_player_season_log(table_key, selected_log):
         st.warning("Player ID was not found for this row.")
         return
 
-    group = selected_log.get("group") or "batting"
-    season_value = int(selected_log.get("season") or season)
-    player_name = str(selected_log.get("player") or "Player")
+    group = safe_text(selected_log.get("group"), default="batting")
+    season_value = int(safe_value(selected_log.get("season"), season))
+    player_name = safe_text(selected_log.get("player"), default="Player")
     game_log_df = load_database_player_game_log(
         int(player_id),
         group,
@@ -4107,7 +4153,7 @@ def selected_log_from_event(table_key, event):
     selected_key = f"{table_key}_selected_log"
     event_key = f"{table_key}_processed_event"
     if isinstance(event, dict) and event.get("type") == "select_player":
-        event_id = str(event.get("event_id") or "")
+        event_id = safe_text(event.get("event_id"))
         payload = event.get("payload")
         if (
             event_id
