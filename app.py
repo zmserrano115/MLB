@@ -1395,7 +1395,9 @@ def weather_schedule_frame(schedule_df):
 
 def merge_live_schedule_columns(schedule_df, live_schedule_df):
     if (
-        schedule_df.empty
+        schedule_df is None
+        or live_schedule_df is None
+        or schedule_df.empty
         or live_schedule_df.empty
         or "game_pk" not in schedule_df.columns
         or "game_pk" not in live_schedule_df.columns
@@ -1407,19 +1409,45 @@ def merge_live_schedule_columns(schedule_df, live_schedule_df):
         for column in LIVE_SCHEDULE_COLUMNS
         if column in live_schedule_df.columns
     ]
+
     if not live_columns:
         return schedule_df
 
     result = schedule_df.copy()
-    live_by_game = live_schedule_df.drop_duplicates("game_pk").set_index("game_pk")
-    for index, row in result.iterrows():
-        game_pk = row.get("game_pk")
-        if game_pk not in live_by_game.index:
+
+    live = live_schedule_df.copy()
+
+    # Remove duplicate column names if Streamlit/live data accidentally creates them
+    live = live.loc[:, ~live.columns.duplicated()].copy()
+    result = result.loc[:, ~result.columns.duplicated()].copy()
+
+    # Normalize game_pk so int/string mismatches do not break the merge
+    result["_merge_game_pk"] = pd.to_numeric(result["game_pk"], errors="coerce")
+    live["_merge_game_pk"] = pd.to_numeric(live["game_pk"], errors="coerce")
+
+    live = live.dropna(subset=["_merge_game_pk"]).copy()
+    result["_merge_game_pk"] = result["_merge_game_pk"].astype("Int64")
+
+    if live.empty:
+        return result.drop(columns=["_merge_game_pk"], errors="ignore")
+
+    live["_merge_game_pk"] = live["_merge_game_pk"].astype("Int64")
+
+    # Keep one live row per game so map() always returns one scalar value
+    live = live.drop_duplicates("_merge_game_pk", keep="last")
+    live = live.set_index("_merge_game_pk")
+
+    for column in live_columns:
+        if column not in live.columns:
             continue
-        live_row = live_by_game.loc[game_pk]
-        for column in live_columns:
-            result.at[index, column] = live_row.get(column)
-    return result
+
+        if column not in result.columns:
+            result[column] = pd.NA
+
+        mapped_values = result["_merge_game_pk"].map(live[column])
+        result[column] = mapped_values.combine_first(result[column])
+
+    return result.drop(columns=["_merge_game_pk"], errors="ignore")
 
 
 def weather_icon_svg(icon_name, size=18, padding=0):
