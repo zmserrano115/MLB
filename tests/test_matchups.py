@@ -3,7 +3,10 @@ import unittest
 import pandas as pd
 
 from src.matchup_grading import grade_hitter_matchup
-from src.matchups import weather_adjusted_hitter_grade
+from src.matchups import (
+    filter_prebuilt_matchup_rows,
+    weather_adjusted_hitter_grade,
+)
 from src.scoring import score_pitcher_k_matchup
 
 
@@ -86,6 +89,56 @@ class PitcherProjectionTests(unittest.TestCase):
 
         self.assertAlmostEqual(result["Projected IP"], 6.0)
         self.assertAlmostEqual(result["Projected Hits"], 6.0)
+
+
+class PrebuiltMatchupFilterTests(unittest.TestCase):
+    def test_filters_full_slate_rows_without_rebuilding(self):
+        full_slate = pd.DataFrame(
+            [
+                {
+                    "game": "ARI @ STL",
+                    "batter": "Corbin Carroll",
+                    "opposing_pitcher": "Pitcher A",
+                },
+                {
+                    "game": "ARI @ STL",
+                    "batter": "Other Batter",
+                    "opposing_pitcher": "Pitcher A",
+                },
+                {
+                    "game": "BOS @ COL",
+                    "batter": "Corbin Carroll",
+                    "opposing_pitcher": "Pitcher B",
+                },
+            ]
+        )
+
+        result = filter_prebuilt_matchup_rows(
+            full_slate,
+            {"ARI @ STL"},
+            selected_batter="Corbin Carroll",
+            selected_pitcher="Pitcher A",
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result.iloc[0]["game"], "ARI @ STL")
+        self.assertEqual(len(full_slate), 3)
+
+    def test_batter_selection_can_narrow_pitcher_table_by_allowed_game(self):
+        pitcher_slate = pd.DataFrame(
+            [
+                {"game": "ARI @ STL", "pitcher": "Pitcher A"},
+                {"game": "BOS @ COL", "pitcher": "Pitcher B"},
+            ]
+        )
+
+        result = filter_prebuilt_matchup_rows(
+            pitcher_slate,
+            {"ARI @ STL"},
+            selected_batter="Corbin Carroll",
+        )
+
+        self.assertEqual(result["pitcher"].tolist(), ["Pitcher A"])
 
 
 if __name__ == "__main__":

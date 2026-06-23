@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from threading import Event, Lock, Thread
 import time
-import uuid
 
 import pandas as pd
 import streamlit as st
@@ -32,6 +31,7 @@ from src.matchups import (
     build_batter_vs_pitcher_matchups,
     build_batter_vs_hand_matchups,
     build_pitcher_k_matchups,
+    filter_prebuilt_matchup_rows,
 )
 from src.injuries import add_injury_columns, fetch_injury_report
 from src.recent_form import build_recent_bar_chart_html
@@ -559,11 +559,13 @@ st.markdown(
         object-fit: contain;
     }
 
-    .st-key-matchup_toolbar {
+    .st-key-matchup_toolbar,
+    .st-key-matchup_filter_toolbar {
         margin: 0 0 6px;
     }
 
-    .st-key-matchup_toolbar [data-testid="stSelectbox"] {
+    .st-key-matchup_toolbar [data-testid="stSelectbox"],
+    .st-key-matchup_filter_toolbar [data-testid="stSelectbox"] {
         min-width: 0;
     }
 
@@ -1746,24 +1748,40 @@ def matchup_batter_pool(
     return result.drop(columns=["PA_numeric", "OPS_numeric"], errors="ignore")
 
 
-def filter_by_players(df, selected_batter=None, selected_pitcher=None):
-    if df.empty:
-        return df
+def filter_prebuilt_matchups(
+    matchup_df,
+    schedule_df,
+    batters_df,
+    selected_game="All Games",
+    selected_batter=None,
+    selected_pitcher=None,
+):
+    """Filter a prebuilt full-slate table without rebuilding matchup data."""
+    if matchup_df.empty:
+        return matchup_df
 
-    result = df
-    if selected_batter and "batter" in result.columns:
-        result = result[result["batter"] == selected_batter]
+    allowed_schedule = filter_by_game(schedule_df, selected_game)
+    allowed_schedule = filter_schedule_for_batter(
+        allowed_schedule,
+        batters_df,
+        selected_batter,
+    )
+    allowed_schedule = filter_schedule_for_pitcher(
+        allowed_schedule,
+        selected_pitcher,
+    )
+    allowed_schedule = add_game_column(allowed_schedule)
 
-    if selected_pitcher:
-        pitcher_column = None
-        if "opposing_pitcher" in result.columns:
-            pitcher_column = "opposing_pitcher"
-        elif "pitcher" in result.columns:
-            pitcher_column = "pitcher"
-        if pitcher_column:
-            result = result[result[pitcher_column] == selected_pitcher]
+    if allowed_schedule.empty or "game" not in allowed_schedule.columns:
+        return matchup_df.iloc[0:0].copy()
 
-    return result.copy()
+    allowed_games = set(allowed_schedule["game"].dropna().astype(str))
+    return filter_prebuilt_matchup_rows(
+        matchup_df,
+        allowed_games,
+        selected_batter=selected_batter,
+        selected_pitcher=selected_pitcher,
+    )
 
 
 def compact_weather_html(row):
@@ -4348,7 +4366,6 @@ def default_matchup_display(df, grade_column, selected_batter=None, selected_pit
     return display_df.head(limit).reset_index(drop=True)
 
 
-@st.fragment
 def render_bvp_table_fragment(
     filtered_bvp_matchups,
     selected_batter=None,
@@ -4430,7 +4447,6 @@ def render_bvp_table_fragment(
     )
 
 
-@st.fragment
 def render_hand_table_fragment(
     filtered_hand_matchups,
     selected_batter=None,
@@ -4523,7 +4539,6 @@ def render_hand_table_fragment(
     )
 
 
-@st.fragment
 def render_pitcher_table_fragment(
     filtered_pitcher_k_matchups,
     selected_pitcher=None,
@@ -4607,6 +4622,118 @@ def render_pitcher_table_fragment(
     )
 
 
+@st.fragment
+def render_matchup_filter_fragment(
+    schedule_df,
+    batters_df,
+    active_matchup_table,
+    bvp_matchups,
+    hand_matchups,
+    pitcher_k_matchups,
+):
+    """Keep common matchup filters on a fragment-only rerun path."""
+    game_options = get_game_options(schedule_df)
+    if st.session_state.get("selected_game") not in game_options:
+        st.session_state.selected_game = "All Games"
+
+    with st.container(key="matchup_filter_toolbar"):
+        batter_column, game_column, pitcher_column = st.columns(
+            [1.8, 2.25, 1.8],
+            gap="small",
+            vertical_alignment="bottom",
+        )
+        with game_column:
+            selected_game = st.selectbox(
+                "Game",
+                game_options,
+                key="selected_game",
+                label_visibility="collapsed",
+            )
+
+        matchup_schedule_df = filter_by_game(schedule_df, selected_game)
+        batter_options = scheduled_batter_options(
+            batters_df,
+            matchup_schedule_df,
+        )
+        pitcher_options = scheduled_pitcher_options(matchup_schedule_df)
+
+        if st.session_state.get("selected_batter") not in [
+            None,
+            *batter_options,
+        ]:
+            st.session_state.selected_batter = None
+        if st.session_state.get("selected_pitcher") not in [
+            None,
+            *pitcher_options,
+        ]:
+            st.session_state.selected_pitcher = None
+
+        with batter_column:
+            selected_batter = st.selectbox(
+                "Batter",
+                batter_options,
+                index=None,
+                placeholder="Batter...",
+                key="selected_batter",
+                label_visibility="collapsed",
+            )
+        with pitcher_column:
+            selected_pitcher = st.selectbox(
+                "Pitcher",
+                pitcher_options,
+                index=None,
+                placeholder="Pitcher...",
+                key="selected_pitcher",
+                label_visibility="collapsed",
+            )
+
+    if active_matchup_table == "Hitter vs Pitcher":
+        render_bvp_table_fragment(
+            filter_prebuilt_matchups(
+                bvp_matchups,
+                schedule_df,
+                batters_df,
+                selected_game,
+                selected_batter,
+                selected_pitcher,
+            ),
+            selected_batter=selected_batter,
+            selected_pitcher=selected_pitcher,
+        )
+    elif active_matchup_table == "Hitter vs Throwing Hand":
+        render_hand_table_fragment(
+            filter_prebuilt_matchups(
+                hand_matchups,
+                schedule_df,
+                batters_df,
+                selected_game,
+                selected_batter,
+                selected_pitcher,
+            ),
+            selected_batter=selected_batter,
+            selected_pitcher=selected_pitcher,
+        )
+    elif active_matchup_table == "Pitcher vs Opponent":
+        render_pitcher_table_fragment(
+            filter_prebuilt_matchups(
+                pitcher_k_matchups,
+                schedule_df,
+                batters_df,
+                selected_game,
+                selected_batter,
+                selected_pitcher,
+            ),
+            selected_pitcher=selected_pitcher,
+        )
+
+
+@st.fragment(run_every="1s")
+def render_hand_split_loading(preload_future):
+    if preload_future is None or preload_future.done():
+        st.rerun(scope="app")
+    st.info("Preparing throwing-hand splits in the background...")
+
+
 @st.cache_resource
 def start_hand_split_preload(season):
     preload = getattr(
@@ -4631,8 +4758,6 @@ except Exception:
 
 if "selected_game_date" not in st.session_state:
     st.session_state.selected_game_date = app_today
-if "data_snapshot_id" not in st.session_state:
-    st.session_state.data_snapshot_id = uuid.uuid4().hex
 
 
 def shift_selected_date(days):
@@ -4670,40 +4795,25 @@ if active_view not in {"Games", "Details"}:
 needs_schedule = active_view in {"Games", "Matchups", "Streaks"}
 needs_weather = active_view in {"Games", "Matchups"}
 hand_split_preload_future = None
-if (
-    active_view == "Matchups"
-    and st.session_state.get(
-        "active_matchup_table",
-        "Hitter vs Pitcher",
-    )
-    == "Hitter vs Throwing Hand"
-):
+if active_view == "Matchups":
     _, hand_split_preload_future = start_hand_split_preload(
         st.session_state.selected_game_date.year
     )
 
-batter_filter_slot = None
 game_filter_slot = None
-pitcher_filter_slot = None
 selected_date = st.session_state.selected_game_date
 
 if needs_schedule:
     with st.container(key="matchup_toolbar"):
         if active_view == "Matchups":
             toolbar_columns = st.columns(
-                [1.8, 2.25, 1.8, 0.38, 1.45, 0.38],
+                [5.85, 0.38, 1.45, 0.38],
                 gap="small",
                 vertical_alignment="bottom",
             )
-            with toolbar_columns[0]:
-                batter_filter_slot = st.empty()
-            with toolbar_columns[1]:
-                game_filter_slot = st.empty()
-            with toolbar_columns[2]:
-                pitcher_filter_slot = st.empty()
-            previous_column = toolbar_columns[3]
-            date_column = toolbar_columns[4]
-            next_column = toolbar_columns[5]
+            previous_column = toolbar_columns[1]
+            date_column = toolbar_columns[2]
+            next_column = toolbar_columns[3]
         else:
             toolbar_columns = st.columns(
                 [2.7, 0.38, 1.45, 0.38, 3.25],
@@ -4742,11 +4852,10 @@ if needs_schedule:
             )
 
 season = selected_date.year
-data_snapshot_id = st.session_state.data_snapshot_id
 
 
 @st.cache_data(show_spinner=False, ttl=30)
-def load_schedule(game_date, snapshot_id):
+def load_schedule(game_date):
     return get_daily_schedule(str(game_date))
 
 
@@ -4806,7 +4915,7 @@ def monitored_injury_report(team_ids, game_date):
 
 
 @st.cache_data(show_spinner=False, ttl=600)
-def load_published_weather(cache_version, snapshot_id):
+def load_published_weather(cache_version):
     fetcher = getattr(
         weather_service,
         "fetch_published_weather_cache",
@@ -4815,7 +4924,7 @@ def load_published_weather(cache_version, snapshot_id):
     if not fetcher:
         return pd.DataFrame()
     return fetcher(
-        cache_bust=f"{app_today.isoformat()}-{cache_version}-{snapshot_id}",
+        cache_bust=f"{app_today.isoformat()}-{cache_version}",
     )
 
 
@@ -5192,7 +5301,7 @@ if active_view in {"Matchups", "Streaks", "Team Stats", "Player Stats"}:
     start_live_stat_monitor(season)
 
 if needs_schedule:
-    live_schedule_df = load_schedule(selected_date, data_snapshot_id)
+    live_schedule_df = load_schedule(selected_date)
 
     if live_schedule_df.empty:
         view_loading.empty()
@@ -5201,10 +5310,7 @@ if needs_schedule:
 
     if needs_weather:
         schedule_df = weather_schedule_frame(live_schedule_df)
-        published_weather = load_published_weather(
-            cache_version=3,
-            snapshot_id=data_snapshot_id,
-        )
+        published_weather = load_published_weather(cache_version=3)
         schedule_df = merge_published_weather(
             schedule_df,
             published_weather,
@@ -5275,17 +5381,15 @@ pitchers_df = pd.DataFrame()
 bvp_matchups = pd.DataFrame()
 hand_matchups = pd.DataFrame()
 pitcher_k_matchups = pd.DataFrame()
-batter_options = []
-pitcher_options = []
+hand_splits_loading = False
 
 if needs_stats:
     batters_df, pitchers_df = monitored_live_stat_tables(season)
     pitchers_df = ensure_probable_pitcher_rows(pitchers_df, schedule_df)
 
-if st.session_state.get("selected_game") not in game_options:
-    st.session_state.selected_game = "All Games"
-
-if needs_schedule:
+if needs_schedule and not needs_matchups:
+    if st.session_state.get("selected_game") not in game_options:
+        st.session_state.selected_game = "All Games"
     selected_game = game_filter_slot.selectbox(
         "Game",
         game_options,
@@ -5295,90 +5399,48 @@ if needs_schedule:
 else:
     selected_game = "All Games"
 
-matchup_schedule_df = filter_by_game(schedule_df, selected_game)
-selected_batter = None
-selected_pitcher = None
 if needs_matchups:
-    batter_options = scheduled_batter_options(batters_df, matchup_schedule_df)
-    pitcher_options = scheduled_pitcher_options(matchup_schedule_df)
-
-    if st.session_state.get("selected_batter") not in [None, *batter_options]:
-        st.session_state.selected_batter = None
-    if st.session_state.get("selected_pitcher") not in [None, *pitcher_options]:
-        st.session_state.selected_pitcher = None
-
-    selected_batter = batter_filter_slot.selectbox(
-        "Batter",
-        batter_options,
-        index=None,
-        placeholder="Batter...",
-        key="selected_batter",
-        label_visibility="collapsed",
-    )
-    selected_pitcher = pitcher_filter_slot.selectbox(
-        "Pitcher",
-        pitcher_options,
-        index=None,
-        placeholder="Pitcher...",
-        key="selected_pitcher",
-        label_visibility="collapsed",
-    )
-else:
-    if batter_filter_slot is not None:
-        batter_filter_slot.empty()
-    if pitcher_filter_slot is not None:
-        pitcher_filter_slot.empty()
-
-if needs_matchups:
-    build_schedule_df = filter_schedule_for_batter(
-        matchup_schedule_df,
-        batters_df,
-        selected_batter,
-    )
-    build_schedule_df = filter_schedule_for_pitcher(
-        build_schedule_df,
-        selected_pitcher,
-    )
+    # Build each table from the full slate. Game/player controls below only
+    # filter these cached results, so changing a filter does not rebuild stats.
     hitter_pool = matchup_batter_pool(
         batters_df,
-        build_schedule_df,
-        selected_batter=selected_batter,
-        max_per_team=7 if selected_game == "All Games" else 10,
-        min_pa=50,
+        schedule_df,
+        max_per_team=max(1, len(batters_df)),
+        min_pa=0,
     )
     pitcher_pool = matchup_batter_pool(
         batters_df,
-        build_schedule_df,
+        schedule_df,
         max_per_team=7,
         min_pa=100,
     )
 
     if active_matchup_table == "Hitter vs Pitcher":
         bvp_matchups = load_bvp_matchups(
-            build_schedule_df,
+            schedule_df,
             hitter_pool,
             season,
         )
     elif active_matchup_table == "Hitter vs Throwing Hand":
-        if hand_split_preload_future is not None:
-            try:
-                hand_split_preload_future.result(timeout=15)
-            except Exception:
-                pass
-        hand_matchups = load_hand_matchups(
-            build_schedule_df,
-            hitter_pool,
-            season,
+        hand_splits_loading = (
+            hand_split_preload_future is not None
+            and not hand_split_preload_future.done()
         )
+        if not hand_splits_loading:
+            hand_matchups = load_hand_matchups(
+                schedule_df,
+                hitter_pool,
+                season,
+            )
     elif active_matchup_table == "Pitcher vs Opponent":
         pitcher_k_matchups = load_pitcher_matchups(
-            build_schedule_df,
+            schedule_df,
             pitcher_pool,
             pitchers_df,
         )
 
     injury_report = monitored_injury_report(
-        sorted(schedule_team_ids(build_schedule_df)),
+        sorted(schedule_team_ids(schedule_df)),
         selected_date,
     )
     if not bvp_matchups.empty:
@@ -5401,21 +5463,9 @@ if needs_matchups:
         )
 
 filtered_schedule_df = filter_by_game(schedule_df, selected_game)
-filtered_bvp_matchups = filter_by_players(
-    bvp_matchups,
-    selected_batter,
-    selected_pitcher,
-)
-filtered_hand_matchups = filter_by_players(
-    hand_matchups,
-    selected_batter,
-    selected_pitcher,
-)
-filtered_pitcher_k_matchups = filter_by_players(
-    pitcher_k_matchups,
-    selected_batter,
-    selected_pitcher,
-)
+filtered_bvp_matchups = bvp_matchups
+filtered_hand_matchups = hand_matchups
+filtered_pitcher_k_matchups = pitcher_k_matchups
 
 
 if active_view == "Games":
@@ -5434,22 +5484,16 @@ elif active_view == "Matchups":
         matchup_table_options[0],
     )
 
-    if active_matchup_table == "Hitter vs Pitcher":
-        render_bvp_table_fragment(
+    if hand_splits_loading:
+        render_hand_split_loading(hand_split_preload_future)
+    else:
+        render_matchup_filter_fragment(
+            schedule_df,
+            batters_df,
+            active_matchup_table,
             filtered_bvp_matchups,
-            selected_batter=selected_batter,
-            selected_pitcher=selected_pitcher,
-        )
-    elif active_matchup_table == "Hitter vs Throwing Hand":
-        render_hand_table_fragment(
             filtered_hand_matchups,
-            selected_batter=selected_batter,
-            selected_pitcher=selected_pitcher,
-        )
-    elif active_matchup_table == "Pitcher vs Opponent":
-        render_pitcher_table_fragment(
             filtered_pitcher_k_matchups,
-            selected_pitcher=selected_pitcher,
         )
 
 elif active_view == "Streaks":

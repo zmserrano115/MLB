@@ -53,6 +53,36 @@ HITTER_GRADE_ORDER = (
 )
 
 
+def filter_prebuilt_matchup_rows(
+    matchup_df,
+    allowed_games,
+    selected_batter=None,
+    selected_pitcher=None,
+):
+    """Filter already-built rows using only cheap in-memory comparisons."""
+    if matchup_df.empty:
+        return matchup_df
+
+    result = matchup_df
+    if "game" in result.columns:
+        allowed_games = {str(game) for game in allowed_games}
+        result = result[result["game"].astype(str).isin(allowed_games)]
+
+    if selected_batter and "batter" in result.columns:
+        result = result[result["batter"] == selected_batter]
+
+    if selected_pitcher:
+        pitcher_column = None
+        if "opposing_pitcher" in result.columns:
+            pitcher_column = "opposing_pitcher"
+        elif "pitcher" in result.columns:
+            pitcher_column = "pitcher"
+        if pitcher_column:
+            result = result[result[pitcher_column] == selected_pitcher]
+
+    return result.copy()
+
+
 def game_weather_context(game):
     return {
         column: game.get(column)

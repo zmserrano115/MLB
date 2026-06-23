@@ -4,6 +4,7 @@ import gzip
 import os
 from pathlib import Path
 import sqlite3
+from threading import Lock
 import time
 import urllib.error
 import urllib.request
@@ -25,6 +26,8 @@ FALLBACK_DB_URL = (
 DB_PATH = Path(os.environ.get("MLB_DB_PATH", DEFAULT_DB_PATH))
 SCHEMA_VERSION = 2
 _INITIALIZED_PATH = None
+_BOOTSTRAP_LOCK = Lock()
+_INITIALIZE_LOCK = Lock()
 
 
 def now_text():
@@ -54,7 +57,7 @@ def _download_database(database_url, temporary_path):
                 source.close()
 
 
-def bootstrap_database():
+def _bootstrap_database():
     """Download a published SQLite file when running in a clean cloud image."""
     if os.environ.get("MLB_DB_SKIP_BOOTSTRAP", "").strip().lower() in {
         "1",
@@ -105,6 +108,20 @@ def bootstrap_database():
         if attempt == attempts - 1:
             break
         time.sleep(15)
+
+
+def bootstrap_database():
+    if os.environ.get("MLB_DB_SKIP_BOOTSTRAP", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return
+    if DB_PATH.exists():
+        return
+
+    with _BOOTSTRAP_LOCK:
+        _bootstrap_database()
 
 
 def get_connection():
@@ -412,7 +429,9 @@ def init_database():
 
 def ensure_database():
     if _INITIALIZED_PATH != str(DB_PATH.resolve()):
-        init_database()
+        with _INITIALIZE_LOCK:
+            if _INITIALIZED_PATH != str(DB_PATH.resolve()):
+                init_database()
 
 
 def _game_identity(game):
