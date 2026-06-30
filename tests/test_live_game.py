@@ -3,7 +3,6 @@ import unittest
 import pandas as pd
 
 from src.live_game import (
-    build_live_game_demo_feed,
     calculate_team_record_vs_pitcher,
     calculate_team_win_streak,
     calculate_live_streak,
@@ -106,28 +105,6 @@ class LiveGameBoxscoreTests(unittest.TestCase):
 
 
 class LiveGameFeedTests(unittest.TestCase):
-    def test_demo_feed_cycles_through_live_ui_states(self):
-        count_state = build_live_game_demo_feed(2)
-        batter_change_state = build_live_game_demo_feed(3)
-        scoring_state = build_live_game_demo_feed(4)
-
-        self.assertEqual(count_state["strikes"], 2)
-        self.assertEqual(count_state["fouls"], 1)
-        self.assertNotEqual(
-            count_state["current_batter"]["player_id"],
-            batter_change_state["current_batter"]["player_id"],
-        )
-        self.assertEqual(
-            batter_change_state["bases"]["first"]["name"],
-            "Demo Runner",
-        )
-        self.assertEqual(scoring_state["away_score"], 4)
-        self.assertEqual(
-            scoring_state["latest_completed_play"]["result_type"],
-            "home_run",
-        )
-        self.assertIsNone(scoring_state["bases"]["first"])
-
     def test_parse_live_feed_includes_count_bases_and_next_hitters(self):
         data = {
             "gameData": {

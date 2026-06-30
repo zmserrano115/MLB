@@ -1774,10 +1774,48 @@ st.markdown(
     }
 
     .momentum-hover-zone {
-        fill: transparent;
+        fill: #ffffff;
+        opacity: 0.001;
         stroke: transparent;
         cursor: help;
+        pointer-events: all;
         vector-effect: non-scaling-stroke;
+    }
+
+    .momentum-hover-dot {
+        fill: #10243b;
+        stroke: #ffffff;
+        stroke-width: 1.5;
+        opacity: 0.86;
+        pointer-events: none;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .momentum-tooltip {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s ease;
+    }
+
+    .momentum-tooltip-bg {
+        fill: #10243b;
+        stroke: #d8dee6;
+        stroke-width: 1;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .momentum-tooltip text {
+        fill: #ffffff;
+        font-size: 6.8px;
+        font-weight: 700;
+    }
+
+    .momentum-tooltip .muted {
+        fill: #cbd5e1;
+        font-size: 6.4px;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
     }
 
     @keyframes fieldTrajectory {
@@ -3067,22 +3105,6 @@ def safe_hex_color(value, default="#173f67"):
 def team_primary_color(team_value, default="#173f67"):
     team_id = team_id_for_value(team_value)
     return safe_hex_color(TEAM_PRIMARY_COLOR_BY_ID.get(team_id), default)
-
-
-def team_abbr_for_name(team_value):
-    team_id = team_id_for_value(team_value)
-    if team_id is not None:
-        for abbr, mapped_team_id in TEAM_ID_BY_ABBR.items():
-            if mapped_team_id == team_id:
-                return abbr
-
-    text = safe_text(team_value).strip()
-    if not text:
-        return "TEAM"
-    words = [word for word in text.replace("-", " ").split() if word]
-    if len(words) >= 2:
-        return "".join(word[0] for word in words[-2:]).upper()[:3]
-    return text[:3].upper()
 
 
 def add_team_ids_from_names(df):
@@ -5195,6 +5217,13 @@ def momentum_path_segment(start, end):
     )
 
 
+def svg_tooltip_line(text, max_length=42):
+    text = safe_text(text)
+    if len(text) <= max_length:
+        return text
+    return f"{text[: max_length - 3].rstrip()}..."
+
+
 def LiveMomentumGraph(live_feed):
     plays = live_feed.get("contact_plays") or []
     away_team = safe_text(live_feed.get("away_team"), default="Away")
@@ -5247,11 +5276,17 @@ def LiveMomentumGraph(live_feed):
             )
             if text
         ]
+        run_text = f"+{runs} run{'s' if runs != 1 else ''}" if runs else "No runs"
+        tooltip_lines = [
+            svg_tooltip_line(f"{inning_text} - {team_name}", 24),
+            svg_tooltip_line(f"{result_label} - {run_text}", 24),
+        ]
         hover_targets.append(
             {
                 "x": x,
                 "y": y,
                 "title": " | ".join(title_parts),
+                "lines": tooltip_lines,
             }
         )
 
@@ -5269,11 +5304,41 @@ def LiveMomentumGraph(live_feed):
             'stroke="#94a3b8"/>'
         )
     hover_markers = []
-    for target in hover_targets:
+    tooltip_markers = []
+    tooltip_rules = []
+    for target_index, target in enumerate(hover_targets):
+        tooltip_x = target["x"] + 12
+        if tooltip_x > 458:
+            tooltip_x = target["x"] - 128
+        tooltip_x = max(8, min(458, tooltip_x))
+        tooltip_y = target["y"] - 31
+        if tooltip_y < 7:
+            tooltip_y = target["y"] + 16
+        tooltip_y = max(7, min(112, tooltip_y))
+        text_lines = "".join(
+            f'<text x="{tooltip_x + 7:.1f}" y="{tooltip_y + 12 + (line_index * 10):.1f}" '
+            f'class="{"muted" if line_index == 0 else ""}">{escape(line)}</text>'
+            for line_index, line in enumerate(target["lines"])
+        )
+        target_class = f"momentum-hover-point-{target_index}"
+        tooltip_class = f"momentum-tooltip-{target_index}"
+        tooltip_rules.append(
+            f".{target_class}:hover ~ .{tooltip_class},"
+            f".{target_class}:focus ~ .{tooltip_class}{{opacity:1;}}"
+        )
         hover_markers.append(
+            f'<g class="momentum-hover-group {target_class}" tabindex="0" '
+            f'aria-label="{escape(target["title"], quote=True)}">'
             f'<circle class="momentum-hover-zone" cx="{target["x"]:.1f}" '
-            f'cy="{target["y"]:.1f}" r="12">'
-            f'<title>{escape(target["title"])}</title></circle>'
+            f'cy="{target["y"]:.1f}" r="14"/>'
+            f'<circle class="momentum-hover-dot" cx="{target["x"]:.1f}" '
+            f'cy="{target["y"]:.1f}" r="3.2"/></g>'
+        )
+        tooltip_markers.append(
+            f'<g class="momentum-tooltip {tooltip_class}">'
+            f'<rect class="momentum-tooltip-bg" x="{tooltip_x:.1f}" y="{tooltip_y:.1f}" '
+            'width="120" height="28" rx="0"/>'
+            f"{text_lines}</g>"
         )
     inning_ticks = []
     for inning in range(1, 10):
@@ -5296,7 +5361,9 @@ def LiveMomentumGraph(live_feed):
         f'{"".join(inning_ticks)}'
         '<line class="momentum-midline" x1="24" y1="78" x2="584" y2="78"/>'
         f'{"".join(segments)}'
+        f'<style>{"".join(tooltip_rules)}</style>'
         f'{"".join(hover_markers)}'
+        f'{"".join(tooltip_markers)}'
         "</svg></div></div>"
     )
 
@@ -5358,10 +5425,6 @@ def AbsChallengeTrackerView(live_feed):
         "<strong>ABS Challenges</strong></div>"
         f'{team_status("away")}{team_status("home")}</div>'
     )
-
-
-def live_base_tracker_html(live_feed):
-    return BaseRunnerDiamondView(live_feed)
 
 
 def _live_player_profile_href(player, group, game_pk=None):
@@ -5641,13 +5704,26 @@ def _contact_play_key(play):
 def _merge_contact_play_history(game_pk, live_feed):
     live_feed = live_feed if isinstance(live_feed, dict) else {}
     history_key = f"live_game_contact_history_{int(game_pk)}"
-    persisted_contacts = database.load_live_game_contacts(game_pk)
+    persisted_loaded_key = f"live_game_contact_history_loaded_{int(game_pk)}"
+    if st.session_state.get(persisted_loaded_key):
+        persisted_contacts = []
+    else:
+        persisted_contacts = database.load_live_game_contacts(game_pk)
+        st.session_state[persisted_loaded_key] = True
     current_contacts = [
         play
         for play in (live_feed.get("contact_plays") or [])
         if isinstance(play, dict) and play.get("hit_data")
     ]
     history = st.session_state.get(history_key, [])
+    existing_keys = {
+        _contact_play_key(play)
+        for play in [*persisted_contacts, *history]
+    }
+    has_new_contact = any(
+        _contact_play_key(play) not in existing_keys
+        for play in current_contacts
+    )
     merged = []
     seen = set()
     for play in [*persisted_contacts, *history, *current_contacts]:
@@ -5659,7 +5735,7 @@ def _merge_contact_play_history(game_pk, live_feed):
     merged = merged[-120:]
     st.session_state[history_key] = merged
     live_feed["contact_plays"] = merged
-    if merged:
+    if has_new_contact and merged:
         database.save_live_game_contacts(game_pk, merged)
     if current_contacts:
         live_feed["_latest_contact_play_key"] = _contact_play_key(current_contacts[-1])
@@ -5694,8 +5770,8 @@ def dismiss_live_game_dialog():
     if game_pk is not None:
         st.session_state.pop(f"live_game_previous_state_{int(game_pk)}", None)
         st.session_state.pop(f"live_game_home_run_until_{int(game_pk)}", None)
-        st.session_state.pop(f"live_game_demo_started_at_{int(game_pk)}", None)
         st.session_state.pop(f"live_game_contact_history_{int(game_pk)}", None)
+        st.session_state.pop(f"live_game_contact_history_loaded_{int(game_pk)}", None)
     st.session_state.selected_boxscore_game_pk = None
 
 
@@ -8412,136 +8488,6 @@ def render_game_log_table(game_log_df, columns, log_type, table_key):
         key=table_key,
         default=None,
     )
-
-
-def render_selected_player_season_log(table_key, selected_log):
-    if selected_log is None:
-        return
-
-    if st.button(
-        "\u00d7 Close log",
-        key=f"{table_key}_close_player_log",
-        type="tertiary",
-    ):
-        st.session_state[f"{table_key}_selected_log"] = None
-        return
-
-    player_id = pd.to_numeric(selected_log.get("player_id"), errors="coerce")
-    if pd.isna(player_id):
-        st.warning("Player ID was not found for this row.")
-        return
-
-    group = safe_text(selected_log.get("group"), default="batting")
-    season_value = int(safe_value(selected_log.get("season"), season))
-    player_name = safe_text(selected_log.get("player"), default="Player")
-    game_log_df = load_database_player_game_log(
-        int(player_id),
-        group,
-        season_value,
-    )
-
-    st.markdown(
-        f"""
-        <div class="section-shell game-log-heading">
-            <div class="section-title">
-                {escape(player_name)} - {season_value}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    if game_log_df.empty:
-        st.warning("No completed-game history was found for this season.")
-        return
-
-    game_log_df = game_log_df.copy()
-    if "game_date" in game_log_df.columns:
-        game_log_df["_game_date_sort"] = pd.to_datetime(
-            game_log_df["game_date"],
-            errors="coerce",
-        )
-        game_log_df = (
-            game_log_df.sort_values(
-                "_game_date_sort",
-                ascending=False,
-                na_position="last",
-            )
-            .drop(columns="_game_date_sort")
-            .reset_index(drop=True)
-        )
-
-    if group == "pitching":
-        game_log_cols = [
-            "game_date",
-            "team",
-            "opponent",
-            "home_away",
-            "IP",
-            "Pitch Count",
-            "BF",
-            "H",
-            "BB",
-            "HBP",
-            "SO",
-            "HR",
-            "R",
-            "ER",
-        ]
-    else:
-        game_log_cols = [
-            "game_date",
-            "team",
-            "opponent",
-            "home_away",
-            "PA",
-            "AB",
-            "H",
-            "TB",
-            "BB",
-            "HBP",
-            "SO",
-            "HR",
-            "RBI",
-            "AVG",
-            "OBP",
-            "SLG",
-            "OPS",
-            "K%",
-            "BB%",
-        ]
-
-    game_log_cols = [
-        column
-        for column in game_log_cols
-        if column in game_log_df.columns
-    ]
-    render_game_log_table(
-        game_log_df[game_log_cols],
-        game_log_cols,
-        log_type=group,
-        table_key=f"{table_key}-{int(player_id)}-{season_value}-game-log",
-    )
-    if group == "pitching":
-        chart_html = build_recent_bar_chart_html(
-            game_log_df,
-            value_column="SO",
-            title="Strikeouts - Last 5 Games",
-            subtitle=player_name,
-            scale_floor=10,
-            accent="#173f67",
-        )
-    else:
-        chart_html = build_recent_bar_chart_html(
-            game_log_df,
-            value_column="TB",
-            title="Total Bases - Last 5 Games",
-            subtitle=player_name,
-            scale_floor=4,
-            accent="#245f96",
-        )
-    if chart_html:
-        st.html(chart_html)
 
 
 def selected_log_from_event(table_key, event):
