@@ -23,7 +23,6 @@ from src.stat_data import (
 )
 from src import stat_data as stat_data_service
 from src.live_game import (
-    build_live_game_demo_feed,
     calculate_team_record_vs_pitcher,
     calculate_team_win_streak,
     get_active_team_rosters,
@@ -5639,21 +5638,10 @@ def _contact_play_key(play):
         safe_text(hit_data.get("location")),
     )
 
-
-def _live_demo_enabled():
-    return (
-        os.getenv("ALL_RISE_LIVE_DEMO") == "1"
-        and os.getenv("ALL_RISE_ALLOW_LIVE_DEMO") == "1"
-    )
-
-
 def _merge_contact_play_history(game_pk, live_feed):
     live_feed = live_feed if isinstance(live_feed, dict) else {}
     history_key = f"live_game_contact_history_{int(game_pk)}"
-    use_persisted_contacts = not _live_demo_enabled()
-    persisted_contacts = (
-        database.load_live_game_contacts(game_pk) if use_persisted_contacts else []
-    )
+    persisted_contacts = database.load_live_game_contacts(game_pk)
     current_contacts = [
         play
         for play in (live_feed.get("contact_plays") or [])
@@ -5671,7 +5659,7 @@ def _merge_contact_play_history(game_pk, live_feed):
     merged = merged[-120:]
     st.session_state[history_key] = merged
     live_feed["contact_plays"] = merged
-    if use_persisted_contacts and merged:
+    if merged:
         database.save_live_game_contacts(game_pk, merged)
     if current_contacts:
         live_feed["_latest_contact_play_key"] = _contact_play_key(current_contacts[-1])
@@ -5682,26 +5670,6 @@ def _live_game_feed_state(game_pk):
     feed_key = f"live_game_latest_feed_{int(game_pk)}"
     final_key = f"live_game_final_{int(game_pk)}"
     updated_key = f"live_game_updated_at_{int(game_pk)}"
-
-    if _live_demo_enabled():
-        demo_started_key = f"live_game_demo_started_at_{int(game_pk)}"
-        now = time.time()
-        demo_started_at = st.session_state.get(demo_started_key)
-        if demo_started_at is None:
-            demo_started_at = now
-            st.session_state[demo_started_key] = demo_started_at
-        demo_seconds = pd.to_numeric(
-            os.getenv("ALL_RISE_LIVE_DEMO_SECONDS", "4"),
-            errors="coerce",
-        )
-        if pd.isna(demo_seconds) or float(demo_seconds) <= 0:
-            demo_seconds = 4.0
-        demo_tick = int((now - float(demo_started_at)) // float(demo_seconds))
-        feed = build_live_game_demo_feed(demo_tick)
-        feed = _merge_contact_play_history(game_pk, feed)
-        st.session_state[feed_key] = feed
-        st.session_state[updated_key] = time.time()
-        return feed, False
 
     if st.session_state.get(final_key) and st.session_state.get(feed_key):
         return st.session_state[feed_key], False
