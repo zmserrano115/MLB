@@ -370,6 +370,180 @@
       background: #f2f4f7;
     }
 
+    .leaderboard-shell {
+      max-height: 540px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      background: #ffffff;
+    }
+
+    .leaderboard-row {
+      display: grid;
+      grid-template-columns: 42px 44px minmax(145px, 1fr) minmax(100px, 1.2fr) 74px 88px;
+      align-items: center;
+      gap: 10px;
+      min-height: 58px;
+      padding: 9px 12px;
+      border-bottom: 1px solid #edf0f4;
+    }
+
+    .leaderboard-row:last-child {
+      border-bottom: 0;
+    }
+
+    .leaderboard-rank {
+      color: var(--muted-2);
+      font-size: 12px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .leaderboard-headshot {
+      width: 36px;
+      height: 36px;
+      border: 1px solid #d8dee6;
+      border-radius: 50%;
+      background: #f3f5f7;
+      object-fit: cover;
+    }
+
+    .leaderboard-name {
+      min-width: 0;
+    }
+
+    .leaderboard-name strong,
+    .leaderboard-name span {
+      display: block;
+    }
+
+    .leaderboard-name strong {
+      overflow: hidden;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .leaderboard-name span {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .leaderboard-bar-track {
+      height: 8px;
+      background: #edf1f5;
+      overflow: hidden;
+    }
+
+    .leaderboard-bar-fill {
+      display: block;
+      height: 8px;
+      background: #245f96;
+    }
+
+    .leaderboard-count {
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 800;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .live-chip {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 2px 6px;
+      border: 1px solid #d2dae4;
+      background: #f7fafc;
+      color: #526171;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .live-chip.hot {
+      border-color: #a5d6b7;
+      background: #edf8f2;
+      color: #247a4d;
+    }
+
+    .live-chip.ended {
+      border-color: #e2b8b8;
+      background: #fff0f0;
+      color: #b43b3b;
+    }
+
+    .player-card-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .roster-player-card-grid {
+      max-height: 720px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .player-card {
+      width: 100%;
+      min-height: 210px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .player-card:hover,
+    .player-card:focus-visible {
+      border-color: #8fb4d6;
+      background: #f7fafc;
+      outline: none;
+    }
+
+    .player-card img {
+      display: block;
+      width: 88px;
+      height: 88px;
+      margin: 0 auto 10px;
+      border: 1px solid #d8dee6;
+      border-radius: 50%;
+      background: #f3f5f7;
+      object-fit: cover;
+    }
+
+    .player-card-rank,
+    .player-card-name,
+    .player-card-team {
+      display: block;
+    }
+
+    .player-card-rank {
+      color: var(--muted-2);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .player-card-name {
+      margin-top: 4px;
+      color: #06172b;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .player-card-team {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
     @media (max-width: 680px) {
       .research-table-shell {
         max-height: 460px;
@@ -415,6 +589,19 @@
       .research-injury-badge::after {
         right: -2px;
         width: 205px;
+      }
+
+      .leaderboard-row {
+        grid-template-columns: 34px 40px minmax(0, 1fr) 58px;
+      }
+
+      .leaderboard-row .leaderboard-bar-track,
+      .leaderboard-row .live-chip {
+        display: none;
+      }
+
+      .player-card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .research-game img {
@@ -526,6 +713,54 @@
       });
     }
 
+    function localizeGameTimes() {
+      root.querySelectorAll("[data-game-time-utc]").forEach((element) => {
+        const gameTime = new Date(element.dataset.gameTimeUtc);
+        if (Number.isNaN(gameTime.getTime())) return;
+
+        element.textContent = new Intl.DateTimeFormat(undefined, {
+          hour: "numeric",
+          minute: "2-digit",
+        }).format(gameTime);
+        element.title = new Intl.DateTimeFormat(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(gameTime);
+      });
+    }
+
+    function checkOneTimeNotice(args) {
+      const storageKey = args.local_storage_key;
+      const storageValue = args.local_storage_value || "seen";
+      const eventType = args.local_storage_event_type || "one_time_notice";
+      if (!storageKey) return;
+
+      try {
+        if (window.localStorage.getItem(storageKey) === storageValue) return;
+        window.localStorage.setItem(storageKey, storageValue);
+        sendMessage("streamlit:setComponentValue", {
+          dataType: "json",
+          value: {
+            type: eventType,
+            event_id: `${Date.now()}-${Math.random()}`,
+            storage_key: storageKey,
+            storage_value: storageValue,
+          },
+        });
+      } catch (error) {
+        sendMessage("streamlit:setComponentValue", {
+          dataType: "json",
+          value: {
+            type: eventType,
+            event_id: `${Date.now()}-${Math.random()}`,
+            storage_key: storageKey,
+            storage_value: storageValue,
+            storage_unavailable: true,
+          },
+        });
+      }
+    }
+
     function wireInteractions() {
       root.querySelectorAll(".research-sort-button").forEach((button) => {
         button.addEventListener("click", () => {
@@ -560,8 +795,12 @@
 
     function render(args) {
       root.innerHTML = args.table_html || "";
+      checkOneTimeNotice(args);
+      localizeGameTimes();
       useFullMobileHeight = Boolean(
-        root.querySelector(".schedule-weather-table"),
+        root.querySelector(".schedule-weather-table")
+        || root.querySelector(".player-card-grid")
+        || root.querySelector(".leaderboard-shell"),
       );
       requestedFrameHeight = Math.max(
         args.table_height || 542,

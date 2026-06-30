@@ -1,7 +1,12 @@
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.mlb_schedule import get_daily_schedule
+import pandas as pd
+import requests
+
+from src.mlb_schedule import get_daily_schedule, write_cached_schedule
 
 
 class ScheduleTests(unittest.TestCase):
@@ -81,7 +86,11 @@ class ScheduleTests(unittest.TestCase):
         }
         mock_get.side_effect = [schedule_response, people_response]
 
-        schedule = get_daily_schedule("2026-06-01")
+        with tempfile.TemporaryDirectory() as cache_dir, patch(
+            "src.mlb_schedule.SCHEDULE_CACHE_DIR",
+            Path(cache_dir),
+        ):
+            schedule = get_daily_schedule("2026-06-01")
 
         self.assertEqual(mock_get.call_count, 2)
         self.assertEqual(schedule.iloc[0]["away_pitcher_hand"], "R")
@@ -94,8 +103,36 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(schedule.iloc[0]["home_team_abbr"], "HOM")
         self.assertEqual(schedule.iloc[0]["away_score"], 4)
         self.assertEqual(schedule.iloc[0]["home_score"], 2)
+        self.assertEqual(
+            schedule.iloc[0]["game_time_utc"],
+            "2026-06-01T23:10:00Z",
+        )
         self.assertEqual(schedule.iloc[0]["abstract_game_state"], "Live")
         self.assertEqual(schedule.iloc[0]["current_inning_ordinal"], "6th")
+
+    @patch("src.mlb_schedule.requests.get")
+    def test_schedule_uses_saved_copy_when_live_request_fails(self, mock_get):
+        mock_get.side_effect = requests.ConnectionError("temporary DNS failure")
+        saved = pd.DataFrame(
+            [
+                {
+                    "game_date": "2026-06-24",
+                    "game_pk": 123,
+                    "away_team": "Away",
+                    "home_team": "Home",
+                }
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as cache_dir, patch(
+            "src.mlb_schedule.SCHEDULE_CACHE_DIR",
+            Path(cache_dir),
+        ):
+            write_cached_schedule("2026-06-24", saved)
+            schedule = get_daily_schedule("2026-06-24")
+
+        self.assertEqual(schedule.iloc[0]["game_pk"], 123)
+        self.assertEqual(schedule.attrs["schedule_source"], "saved")
 
 
 if __name__ == "__main__":

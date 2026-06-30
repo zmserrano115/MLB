@@ -3,10 +3,42 @@
 import requests
 import pandas as pd
 from functools import lru_cache
+from pathlib import Path
 
 
 SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule"
 PEOPLE_URL = "https://statsapi.mlb.com/api/v1/people"
+SCHEDULE_CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "precomputed"
+
+
+def schedule_cache_path(game_date):
+    safe_date = str(game_date).replace("/", "-")
+    return SCHEDULE_CACHE_DIR / f"schedule-{safe_date}.json"
+
+
+def read_cached_schedule(game_date):
+    cache_path = schedule_cache_path(game_date)
+    if not cache_path.exists():
+        return pd.DataFrame()
+
+    try:
+        cached = pd.read_json(cache_path, orient="records")
+    except (OSError, ValueError):
+        return pd.DataFrame()
+
+    cached.attrs["schedule_source"] = "saved"
+    return cached
+
+
+def write_cached_schedule(game_date, schedule):
+    cache_path = schedule_cache_path(game_date)
+    temp_path = cache_path.with_suffix(".tmp")
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        schedule.to_json(temp_path, orient="records")
+        temp_path.replace(cache_path)
+    except OSError:
+        temp_path.unlink(missing_ok=True)
 
 
 @lru_cache(maxsize=256)
@@ -52,9 +84,15 @@ def get_daily_schedule(game_date):
         "hydrate": "probablePitcher(note),team,venue(location,fieldInfo),linescore",
     }
 
-    response = requests.get(SCHEDULE_URL, params=params, timeout=20)
-    response.raise_for_status()
-    data = response.json()
+    try:
+        response = requests.get(SCHEDULE_URL, params=params, timeout=20)
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException:
+        cached = read_cached_schedule(game_date)
+        if not cached.empty:
+            return cached
+        raise
 
     rows = []
 
@@ -82,6 +120,7 @@ def get_daily_schedule(game_date):
             field_info = venue.get("fieldInfo", {})
             status = game.get("status", {})
             linescore = game.get("linescore", {})
+            offense = linescore.get("offense") or {}
 
             rows.append({
                 "game_date": game_date,
@@ -104,6 +143,12 @@ def get_daily_schedule(game_date):
                 "current_inning_ordinal": linescore.get("currentInningOrdinal"),
                 "inning_state": linescore.get("inningState"),
                 "inning_half": linescore.get("inningHalf"),
+                "balls": linescore.get("balls"),
+                "strikes": linescore.get("strikes"),
+                "outs": linescore.get("outs"),
+                "runner_on_first": bool(offense.get("first")),
+                "runner_on_second": bool(offense.get("second")),
+                "runner_on_third": bool(offense.get("third")),
 
                 "away_probable_pitcher": away_pitcher.get("fullName"),
                 "away_probable_pitcher_id": away_pitcher_id,
@@ -141,4 +186,7 @@ def get_daily_schedule(game_date):
             row.get("home_probable_pitcher_id")
         )
 
-    return pd.DataFrame(rows)
+    schedule = pd.DataFrame(rows)
+    schedule.attrs["schedule_source"] = "live"
+    write_cached_schedule(game_date, schedule)
+    return schedule

@@ -38,6 +38,56 @@ class DatabaseTests(unittest.TestCase):
 
         self.assertEqual(target.read_bytes(), payload)
 
+    def test_live_game_contacts_are_persisted_and_upserted(self):
+        first_play = {
+            "play_index": 4,
+            "inning": 1,
+            "half_inning": "top",
+            "batting_side": "away",
+            "batting_team": "New York Yankees",
+            "batter": {"player_id": 10, "name": "Test Batter"},
+            "pitcher": {"player_id": 20, "name": "Test Pitcher"},
+            "result_type": "single",
+            "result_label": "Single",
+            "description": "Test Batter singles on a line drive.",
+            "runs_scored": 0,
+            "away_score": 0,
+            "home_score": 0,
+            "hit_data": {
+                "x": 92.5,
+                "y": 118.0,
+                "launch_speed": 101.2,
+                "launch_angle": 14.0,
+                "distance": 210.0,
+                "trajectory": "line_drive",
+                "hardness": "hard",
+                "location": 8,
+            },
+        }
+        second_play = {
+            **first_play,
+            "play_index": 8,
+            "result_type": "field_out",
+            "result_label": "Out",
+            "description": "Test Batter lines out.",
+            "hit_data": {**first_play["hit_data"], "x": 80.0, "y": 140.0},
+        }
+
+        saved_count = database.save_live_game_contacts(999, [first_play, second_play])
+        self.assertEqual(saved_count, 2)
+        loaded = database.load_live_game_contacts(999)
+        self.assertEqual(len(loaded), 2)
+        self.assertEqual(loaded[0]["hit_data"]["x"], 92.5)
+
+        updated_first_play = {
+            **first_play,
+            "description": "Updated single description.",
+        }
+        database.save_live_game_contacts(999, [updated_first_play])
+        loaded = database.load_live_game_contacts(999)
+        self.assertEqual(len(loaded), 2)
+        self.assertEqual(loaded[0]["description"], "Updated single description.")
+
     def test_completed_game_rebuilds_matchup_and_pitcher_summaries(self):
         game = {
             "game_pk": 123,
@@ -152,7 +202,6 @@ class DatabaseTests(unittest.TestCase):
                 )
             }
         self.assertNotIn("plate_appearances", table_names)
-
 
 if __name__ == "__main__":
     unittest.main()

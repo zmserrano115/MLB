@@ -1,11 +1,13 @@
 from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from copy import deepcopy
 from html import escape
 import json
 import os
 from pathlib import Path
 from threading import Event, Lock, Thread
 import time
+from urllib.parse import urlencode
 
 import pandas as pd
 import streamlit as st
@@ -21,9 +23,18 @@ from src.stat_data import (
 )
 from src import stat_data as stat_data_service
 from src.live_game import (
+    build_live_game_demo_feed,
+    calculate_team_record_vs_pitcher,
+    calculate_team_win_streak,
+    get_active_team_rosters,
     get_game_boxscore,
+    get_game_results,
+    get_live_game_feed,
+    get_people_career_game_logs,
     get_people_game_logs as fetch_people_game_logs,
     get_player_game_log,
+    get_player_profile,
+    get_season_team_results,
     is_final_state,
     player_headshot_url,
 )
@@ -138,6 +149,39 @@ TEAM_ID_BY_ABBR = {
     "WAS": 120,
 }
 
+TEAM_PRIMARY_COLOR_BY_ID = {
+    108: "#BA0021",
+    109: "#A71930",
+    110: "#DF4601",
+    111: "#BD3039",
+    112: "#0E3386",
+    113: "#C6011F",
+    114: "#E31937",
+    115: "#33006F",
+    116: "#0C2340",
+    117: "#002D62",
+    118: "#004687",
+    119: "#005A9C",
+    120: "#AB0003",
+    121: "#002D72",
+    133: "#003831",
+    134: "#FDB827",
+    135: "#2F241D",
+    136: "#0C2C56",
+    137: "#FD5A1E",
+    138: "#C41E3A",
+    139: "#092C5C",
+    140: "#003278",
+    141: "#134A8E",
+    142: "#002B5C",
+    143: "#E81828",
+    144: "#CE1141",
+    145: "#27251F",
+    146: "#00A3E0",
+    147: "#0C2340",
+    158: "#12284B",
+}
+
 ESPN_TEAM_CODE_BY_ABBR = {
     "ARI": "ari",
     "ANA": "laa",
@@ -214,17 +258,20 @@ st.markdown(
     }
 
     .stApp {
-        background:
-            linear-gradient(180deg, rgba(6, 23, 43, 0.035), rgba(243, 245, 247, 0) 360px),
-            repeating-linear-gradient(
-                135deg,
-                rgba(6, 23, 43, 0.018) 0px,
-                rgba(6, 23, 43, 0.018) 1px,
-                transparent 1px,
-                transparent 18px
-            ),
-            var(--bg);
+        background: var(--bg);
         color: var(--text);
+    }
+
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
     }
 
     .block-container {
@@ -286,7 +333,7 @@ st.markdown(
     }
 
     .section-shell {
-        margin: 10px 0 7px 0;
+        margin: 10px 0 4px 0;
         padding: 0;
         border: 0;
         background: transparent;
@@ -340,6 +387,10 @@ st.markdown(
         margin-bottom: 4px;
     }
 
+    .section-label {
+        display: none;
+    }
+
     .section-title {
         color: var(--text);
         font-family: var(--font-display) !important;
@@ -384,7 +435,7 @@ st.markdown(
 
     .st-key-active_view .stRadio [role="radiogroup"] {
         display: grid !important;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         width: 100%;
     }
 
@@ -559,9 +610,1873 @@ st.markdown(
         object-fit: contain;
     }
 
+    [data-testid="stDialog"] [role="dialog"] {
+        width: min(1180px, calc(100vw - 32px)) !important;
+        max-width: 1180px !important;
+        border: 1px solid #cbd5e1;
+        border-radius: 0;
+        background: #f8fafc;
+    }
+
+    [data-testid="stDialog"] [role="dialog"] > div {
+        border-radius: 0;
+    }
+
+    [class*="dialog_close"] {
+        display: flex;
+        justify-content: flex-end;
+        margin: -8px 0 -6px;
+    }
+
+    [class*="dialog_close"] .stButton {
+        width: auto;
+    }
+
+    [class*="dialog_close"] .stButton > button {
+        min-width: 36px;
+        min-height: 34px;
+        padding: 0 10px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #31445b;
+        font-size: 22px;
+        line-height: 1;
+    }
+
+    .update-notice {
+        padding: 4px 2px 0;
+        color: #10243b;
+    }
+
+    .update-notice-kicker {
+        margin-bottom: 8px;
+        color: #63748a;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .update-notice-title {
+        margin: 0 0 8px;
+        color: #06172b;
+        font-family: var(--font-display);
+        font-size: 36px;
+        letter-spacing: 0.03em;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+
+    .update-notice-copy {
+        max-width: 780px;
+        margin: 0 0 16px;
+        color: #405066;
+        font-size: 14px;
+        line-height: 1.45;
+    }
+
+    .update-notice-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin: 0 0 18px;
+    }
+
+    .update-notice-item {
+        min-height: 86px;
+        padding: 12px;
+        border: 1px solid #d8dee6;
+        border-left: 4px solid #245f96;
+        background: #ffffff;
+    }
+
+    .update-notice-item strong,
+    .update-notice-item span {
+        display: block;
+    }
+
+    .update-notice-item strong {
+        margin-bottom: 5px;
+        color: #10243b;
+        font-size: 14px;
+        font-weight: 900;
+    }
+
+    .update-notice-item span {
+        color: #526171;
+        font-size: 12px;
+        line-height: 1.35;
+    }
+
+    .st-key-dismiss_update_1_2 .stButton > button {
+        min-height: 40px;
+        border: 1px solid #173f67;
+        background: #173f67;
+        color: #ffffff;
+        font-weight: 800;
+    }
+
+    @media (max-width: 760px) {
+        .update-notice-list {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .live-game-scorebug {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: center;
+        gap: 18px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        background: #ffffff;
+    }
+
+    .live-game-team {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        color: #0b2a4a;
+    }
+
+    .live-game-team:last-child {
+        justify-content: flex-end;
+        text-align: right;
+    }
+
+    .live-game-team img {
+        width: 54px;
+        height: 54px;
+        object-fit: contain;
+    }
+
+    .live-game-team span {
+        overflow: hidden;
+        font-size: 16px;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .live-game-team strong {
+        min-width: 52px;
+        color: #06172b;
+        font-size: 38px;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .live-score-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        overflow: visible;
+    }
+
+    .live-score {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 52px;
+        min-height: 48px;
+        padding: 3px 6px;
+    }
+
+    .live-score.score-changed {
+        animation: liveScoreChanged 2.8s cubic-bezier(0.18, 0.82, 0.24, 1) both;
+    }
+
+    .live-score-wrap .live-score-delta {
+        position: relative;
+        inset: auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: auto;
+        padding: 3px 6px;
+        border: 1px solid #8fb4d6;
+        border-radius: 999px;
+        background: #edf5fb;
+        color: #245f96;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        overflow: visible;
+        animation: liveScoreDelta 2.8s cubic-bezier(0.18, 0.82, 0.24, 1) both;
+    }
+
+    .live-game-team:last-child .live-score-delta {
+        left: auto;
+        right: auto;
+    }
+
+    @keyframes liveScoreChanged {
+        0% {
+            background: #dcebf7;
+            color: #173f67;
+            box-shadow: 0 0 0 1px #7fa8cc, 0 0 0 5px rgba(36, 95, 150, 0.08);
+            transform: scale(0.92);
+        }
+        18%, 58% {
+            background: #edf5fb;
+            color: #173f67;
+            box-shadow: 0 0 0 1px #a8c4dd;
+            transform: scale(1);
+        }
+        100% {
+            background: transparent;
+            color: #06172b;
+            box-shadow: none;
+            transform: scale(1);
+        }
+    }
+
+    @keyframes liveScoreDelta {
+        0% {
+            opacity: 0;
+            transform: translateX(-8px) scale(0.7);
+        }
+        16%, 72% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: translateX(4px) scale(0.92);
+        }
+    }
+
+    .live-game-status {
+        min-width: 132px;
+        color: #526171;
+        text-align: center;
+    }
+
+    .live-game-status strong {
+        display: block;
+        color: #06172b;
+        font-family: var(--font-display);
+        font-size: 22px;
+        font-weight: 400;
+        letter-spacing: 0.045em;
+    }
+
+    .home-run-notice {
+        position: relative;
+        isolation: isolate;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 82px;
+        margin: 10px 0 12px;
+        padding: 12px 24px;
+        border: 1px solid #245f96;
+        border-top-color: #f28a27;
+        border-bottom-color: #f28a27;
+        background:
+            linear-gradient(90deg, #07192d 0%, #0b2a4a 48%, #07192d 100%);
+        color: #ffffff;
+        font-family: var(--font-display);
+        font-size: 30px;
+        letter-spacing: 0.12em;
+        text-align: center;
+        text-transform: uppercase;
+        overflow: hidden;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.08),
+            0 5px 14px rgba(7, 25, 45, 0.16);
+        animation: homeRunNotice 6.8s ease-out both;
+    }
+
+    .home-run-notice::before {
+        content: "";
+        position: absolute;
+        z-index: 0;
+        inset: 0;
+        background:
+            radial-gradient(ellipse at 50% 110%, rgba(255, 180, 46, 0.42) 0%, rgba(234, 80, 15, 0.18) 38%, transparent 70%);
+        opacity: 0;
+        animation: homeRunGlow 6.8s ease-out both;
+    }
+
+    .home-run-notice::after {
+        content: "";
+        position: absolute;
+        z-index: 1;
+        inset: 0;
+        background:
+            linear-gradient(90deg, transparent 0 8%, rgba(255, 139, 31, 0.82) 28%, transparent 62%) 0 18% / 100% 1px no-repeat,
+            linear-gradient(90deg, transparent 0 28%, rgba(255, 213, 119, 0.7) 48%, transparent 78%) 0 34% / 100% 1px no-repeat,
+            linear-gradient(90deg, transparent 0 46%, rgba(255, 112, 22, 0.74) 65%, transparent 92%) 0 68% / 100% 1px no-repeat,
+            linear-gradient(90deg, transparent 0 12%, rgba(255, 177, 63, 0.66) 34%, transparent 70%) 0 84% / 100% 1px no-repeat;
+        opacity: 0;
+        animation: homeRunStreaks 6.8s ease-out both;
+    }
+
+    .home-run-notice strong {
+        position: relative;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        color: #ffffff;
+        font-size: inherit;
+        font-weight: 400;
+        line-height: 1;
+        letter-spacing: inherit;
+        text-shadow:
+            0 2px 0 #07192d,
+            0 0 16px rgba(255, 126, 28, 0.46);
+        animation: homeRunTextSlide 6.8s cubic-bezier(0.16, 0.82, 0.23, 1) both;
+    }
+
+    .home-run-fire {
+        position: absolute;
+        z-index: 1;
+        left: -2%;
+        right: -2%;
+        bottom: -6px;
+        height: 68px;
+        pointer-events: none;
+        filter:
+            saturate(1.15)
+            drop-shadow(0 -5px 9px rgba(242, 98, 20, 0.48));
+        transform-origin: 50% 100%;
+        animation: homeRunFire 6.8s ease-out both;
+    }
+
+    .home-run-fire svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+    }
+
+    .home-run-fire .flame-back {
+        fill: #c74312;
+        opacity: 0.78;
+        transform-origin: 50% 100%;
+        animation: homeRunFlameLick 1.35s ease-in-out infinite alternate;
+    }
+
+    .home-run-fire .flame-mid {
+        fill: #f47719;
+        opacity: 0.9;
+        transform-origin: 50% 100%;
+        animation: homeRunFlameLick 1.05s ease-in-out infinite alternate-reverse;
+    }
+
+    .home-run-fire .flame-core {
+        fill: #ffd05a;
+        opacity: 0.72;
+        transform-origin: 50% 100%;
+        animation: homeRunFlameLick 0.9s ease-in-out infinite alternate;
+    }
+
+    .home-run-notice strong::before,
+    .home-run-notice strong::after {
+        content: "";
+        width: clamp(38px, 8vw, 110px);
+        height: 1px;
+        margin: 0 18px;
+        background: linear-gradient(90deg, transparent, #f39a43);
+        box-shadow: 0 4px 0 rgba(255, 255, 255, 0.35);
+    }
+
+    .home-run-notice strong::after {
+        background: linear-gradient(90deg, #f39a43, transparent);
+    }
+
+    @keyframes homeRunNotice {
+        0% {
+            opacity: 0;
+            transform: scaleX(0.8);
+        }
+        10%, 86% {
+            opacity: 1;
+            transform: scaleX(1);
+        }
+        100% {
+            opacity: 0;
+            transform: scaleX(1.02);
+        }
+    }
+
+    @keyframes homeRunTextSlide {
+        0%, 8% {
+            opacity: 0;
+            transform: translateX(-42%) skewX(-8deg);
+        }
+        24%, 82% {
+            opacity: 1;
+            transform: translateX(0) skewX(-4deg);
+        }
+        100% {
+            opacity: 0;
+            transform: translateX(28%) skewX(-4deg);
+        }
+    }
+
+    @keyframes homeRunFire {
+        0% {
+            opacity: 0;
+            transform: translateY(28px) scaleY(0.45);
+        }
+        18%, 70% {
+            opacity: 1;
+            transform: translateY(0) scaleY(1);
+        }
+        86% {
+            opacity: 0.78;
+            transform: translateY(4px) scaleY(0.86);
+        }
+        100% {
+            opacity: 0;
+            transform: translateY(18px) scaleY(0.5);
+        }
+    }
+
+    @keyframes homeRunGlow {
+        0%, 100% { opacity: 0; }
+        18%, 72% { opacity: 1; }
+    }
+
+    @keyframes homeRunStreaks {
+        0%, 10% {
+            opacity: 0;
+            transform: translateX(-18%);
+        }
+        22%, 70% {
+            opacity: 0.76;
+            transform: translateX(0);
+        }
+        100% {
+            opacity: 0;
+        transform: translateX(18%);
+        }
+    }
+
+    @keyframes homeRunFlameLick {
+        0% { transform: translateY(4px) scaleY(0.92); }
+        100% { transform: translateY(-4px) scaleY(1.08); }
+    }
+
+    .live-situation-grid {
+        display: grid;
+        grid-template-columns: 270px 230px minmax(0, 1fr);
+        gap: 12px;
+        margin: 12px 0;
+    }
+
+    .live-situation-panel,
+    .player-profile-hero,
+    .player-card,
+    .home-placeholder,
+    .matchup-rank-strip {
+        border: 1px solid var(--line);
+        background: #ffffff;
+    }
+
+    .live-situation-panel {
+        min-height: 146px;
+        padding: 12px;
+    }
+
+    .strike-zone-card {
+        display: flex;
+        min-height: 100%;
+        flex-direction: column;
+    }
+
+    .strike-zone-topline {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    .strike-zone-topline strong {
+        color: #10243b;
+        font-size: 10px;
+    }
+
+    .strike-zone-topline span,
+    .strike-zone-meta span {
+        color: #718096;
+        font-size: 8px;
+        font-weight: 900;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+    }
+
+    .strike-zone-svg {
+        display: block;
+        width: 100%;
+        min-height: 230px;
+        border: 1px solid #d8dee6;
+        background: #fbfcfe;
+    }
+
+    .strike-zone-box {
+        fill: rgba(232, 240, 247, 0.55);
+        stroke: #173f67;
+        stroke-width: 1.4;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .strike-zone-grid {
+        stroke: #cfd8e3;
+        stroke-width: 0.8;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .strike-zone-plate {
+        fill: #ffffff;
+        stroke: #9aa8b8;
+        stroke-width: 1.2;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .strike-zone-pitch {
+        stroke: #ffffff;
+        stroke-width: 1.5;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .strike-zone-pitch.ball {
+        fill: #2f9967;
+    }
+
+    .strike-zone-pitch.strike {
+        fill: #b42318;
+    }
+
+    .strike-zone-pitch.in-play {
+        fill: #245f96;
+    }
+
+    .strike-zone-pitch.unknown {
+        fill: #6b7888;
+    }
+
+    .strike-zone-pitch.latest {
+        stroke: #06172b;
+        stroke-width: 2.2;
+    }
+
+    .strike-zone-count-label {
+        fill: #ffffff;
+        font-size: 7px;
+        font-weight: 900;
+        text-anchor: middle;
+        dominant-baseline: central;
+        pointer-events: none;
+    }
+
+    .strike-zone-meta {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: baseline;
+        gap: 8px;
+        min-height: 24px;
+        padding-top: 6px;
+        color: #31445b;
+        font-size: 9px;
+    }
+
+    .strike-zone-meta strong {
+        color: #10243b;
+    }
+
+    .strike-zone-meta-detail {
+        overflow: hidden;
+        padding-left: 4px;
+        color: #526171;
+        font-size: 9px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .live-count-board {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-top: 10px;
+        padding: 8px 10px;
+        border: 1px solid #d8dee6;
+        background: #f8fafc;
+    }
+
+    .count-dot-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .count-dot-label {
+        margin-right: 2px;
+        color: #6c7886;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .count-dot {
+        width: 11px;
+        height: 11px;
+        border: 1.5px solid #aab4c0;
+        border-radius: 50%;
+        background: #ffffff;
+    }
+
+    .count-dot.ball.active {
+        border-color: #17603e;
+        background: #2f9967;
+        box-shadow: 0 0 0 2px #dcefe6;
+    }
+
+    .count-dot.strike.active,
+    .count-dot.out.active {
+        border-color: #173f67;
+        background: #173f67;
+    }
+
+    .foul-count {
+        margin-left: auto;
+        color: #31445b;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+    }
+
+    .base-diamond {
+        position: relative;
+        width: 112px;
+        height: 92px;
+        margin: 10px auto 0;
+    }
+
+    .base-diamond::before {
+        content: "";
+        position: absolute;
+        left: 29px;
+        top: 16px;
+        width: 54px;
+        height: 54px;
+        border: 1px solid #cbd5e1;
+        background: transparent;
+        transform: rotate(45deg);
+    }
+
+    .base-diamond span {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #94a3b8;
+        background: #ffffff;
+        transform: rotate(45deg);
+    }
+
+    .base-diamond .first { left: 75px; top: 43px; }
+    .base-diamond .second { left: 46px; top: 14px; }
+    .base-diamond .third { left: 17px; top: 43px; }
+    .base-diamond span.occupied {
+        border-color: #173f67;
+        background: #e8f0f7;
+        z-index: 1;
+    }
+
+    .base-diamond .base-runner-headshot {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 30px;
+        height: 30px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        background: #e8f0f7;
+        object-fit: cover;
+        transform: translate(-50%, -50%) rotate(-45deg);
+        box-shadow: 0 0 0 1px #173f67;
+    }
+
+    .base-runner-list {
+        display: grid;
+        gap: 3px;
+        margin-top: 6px;
+        color: #596777;
+        font-size: 9px;
+        text-align: center;
+    }
+
+    .base-runner-list strong {
+        color: #173f67;
+        font-weight: 800;
+    }
+
+    .live-field-card {
+        display: flex;
+        min-height: 100%;
+        flex-direction: column;
+    }
+
+    .live-field-topline {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    .live-field-topline span,
+    .abs-tracker-title span {
+        color: #718096;
+        font-size: 8px;
+        font-weight: 900;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+    }
+
+    .live-field-topline strong {
+        overflow: hidden;
+        color: #10243b;
+        font-size: 10px;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .live-field-svg {
+        display: block;
+        width: 100%;
+        min-height: 218px;
+        border: 1px solid #d7dfe8;
+        background: #f5f8fb;
+    }
+
+    .field-shape {
+        fill: #dce8d3;
+        stroke: #62758b;
+        stroke-width: 1.4;
+    }
+
+    .field-grass {
+        fill: #dbe8d0;
+    }
+
+    .field-stripe {
+        fill: #cddfc2;
+        opacity: 0.72;
+    }
+
+    .field-foul-line {
+        fill: none;
+        stroke: #7f8fa2;
+        stroke-width: 0.9;
+        stroke-opacity: 0.72;
+    }
+
+    .field-infield {
+        fill: #e8bf66;
+        fill-opacity: 0.58;
+        stroke: none;
+    }
+
+    .field-base {
+        fill: #ffffff;
+        stroke: #ffffff;
+        stroke-width: 1.8;
+        filter: drop-shadow(0 1px 1px rgba(15, 31, 48, 0.18));
+    }
+
+    .field-base.occupied {
+        fill: #dcebf7;
+        stroke: #245f96;
+        stroke-width: 1.8;
+    }
+
+    .field-home-plate {
+        fill: #ffffff;
+        stroke: #ffffff;
+        stroke-width: 1.5;
+        filter: drop-shadow(0 1px 1px rgba(15, 31, 48, 0.16));
+    }
+
+    .field-dimension {
+        fill: #526171;
+        font-size: 6.5px;
+        font-weight: 800;
+        text-anchor: middle;
+    }
+
+    .field-trajectory {
+        fill: none;
+        stroke: #64748b;
+        stroke-linecap: round;
+        stroke-width: 2.5;
+        filter: drop-shadow(0 1px 1px rgba(15, 31, 48, 0.18));
+        stroke-dasharray: 260;
+        opacity: 0;
+        animation: fieldTrajectory 4.4s ease-out both;
+    }
+
+    .field-trajectory.hit {
+        stroke: #187347;
+    }
+
+    .field-trajectory.out {
+        stroke: #b42318;
+    }
+
+    .field-trajectory.warning {
+        stroke: #b7791f;
+    }
+
+    .field-trajectory.home-run {
+        stroke: #e06a24;
+    }
+
+    .field-hit-marker {
+        fill: #ffffff;
+        stroke: #64748b;
+        stroke-width: 2.5;
+        opacity: 0;
+        animation: fieldHitMarker 4.4s ease-out both;
+    }
+
+    .field-hit-marker.hit {
+        fill: #edf8f2;
+        stroke: #187347;
+    }
+
+    .field-hit-marker.out {
+        fill: #fff1f1;
+        stroke: #b42318;
+    }
+
+    .field-hit-marker.warning {
+        fill: #fff8e8;
+        stroke: #b7791f;
+    }
+
+    .field-hit-marker.home-run {
+        fill: #fff2e8;
+        stroke: #e06a24;
+    }
+
+    .field-hit-marker.contact-latest {
+        fill: #173f67;
+        stroke: #ffffff;
+        stroke-width: 1.6;
+    }
+
+    .field-hit-marker.contact-latest.out {
+        fill: #b42318;
+    }
+
+    .field-hit-marker.contact-latest.warning {
+        fill: #b7791f;
+    }
+
+    .field-ball-flight {
+        fill: #ffffff;
+        stroke: #173f67;
+        stroke-width: 1.1;
+        filter: drop-shadow(0 1px 2px rgba(15, 31, 48, 0.22));
+        opacity: 0;
+        animation: fieldBallFlightFade 4.4s ease-out both;
+    }
+
+    .field-runner-ring {
+        fill: #ffffff;
+        stroke: #245f96;
+        stroke-width: 1.5;
+    }
+
+    .live-field-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 28px;
+        padding-top: 7px;
+        color: #667587;
+        font-size: 9px;
+    }
+
+    .live-field-footer strong {
+        overflow: hidden;
+        color: #10243b;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .live-field-footer span {
+        flex: 0 0 auto;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .field-contact-marker {
+        fill: #173f67;
+        stroke: #ffffff;
+        stroke-width: 1.4;
+        opacity: 0.94;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .field-contact-marker.hit {
+        stroke: #ffffff;
+    }
+
+    .field-contact-marker.out {
+        fill: #b42318;
+        stroke: #ffffff;
+    }
+
+    .field-contact-marker.warning {
+        fill: #b7791f;
+        stroke: #ffffff;
+    }
+
+    .contact-field-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+    }
+
+    .contact-h2h-card,
+    .contact-field-card,
+    .momentum-card {
+        border: 1px solid var(--line);
+        background: #ffffff;
+        padding: 12px;
+    }
+
+    .contact-h2h-card {
+        margin-top: 12px;
+    }
+
+    .contact-h2h-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .contact-h2h-header strong {
+        color: #10243b;
+        font-size: 12px;
+    }
+
+    .contact-h2h-header span {
+        color: #718096;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+    }
+
+    .contact-battle-head {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .contact-battle-team {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #10243b;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
+    .contact-battle-team.home {
+        justify-content: flex-end;
+    }
+
+    .contact-battle-team img {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+    }
+
+    .contact-battle-vs {
+        color: #718096;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.1em;
+    }
+
+    .contact-battle-list {
+        display: grid;
+        gap: 6px;
+    }
+
+    .contact-battle-row {
+        display: grid;
+        grid-template-columns: minmax(62px, 0.7fr) minmax(120px, 1fr) minmax(62px, 0.7fr);
+        align-items: center;
+        gap: 9px;
+        padding: 7px 8px;
+        border: 1px solid #e1e6ec;
+        background: #fbfcfe;
+    }
+
+    .contact-battle-value {
+        color: #10243b;
+        font-size: 12px;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .contact-battle-value.home {
+        text-align: right;
+    }
+
+    .contact-battle-mid {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 7px;
+    }
+
+    .contact-battle-label {
+        color: #526171;
+        font-size: 8px;
+        font-weight: 900;
+        letter-spacing: 0.07em;
+        text-align: center;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .contact-battle-line {
+        height: 3px;
+        background: #d8dee6;
+    }
+
+    .contact-battle-line.away {
+        background: var(--away-color, #245f96);
+    }
+
+    .contact-battle-line.home {
+        background: var(--home-color, #187347);
+    }
+
+    .contact-field-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .contact-field-team {
+        display: inline-flex;
+        min-width: 0;
+        align-items: center;
+        gap: 8px;
+        color: #10243b;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
+    .contact-field-team img {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+    }
+
+    .contact-field-totals {
+        display: inline-flex;
+        gap: 6px;
+        color: #526171;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .contact-field-totals span {
+        padding: 2px 5px;
+        border: 1px solid #d8dee6;
+        background: #ffffff;
+    }
+
+    .momentum-card {
+        margin-top: 12px;
+    }
+
+    .momentum-layout {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: 10px;
+        align-items: stretch;
+    }
+
+    .momentum-logo-rail {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+    }
+
+    .momentum-logo-rail img {
+        width: 34px;
+        height: 34px;
+        object-fit: contain;
+    }
+
+    .momentum-svg {
+        display: block;
+        width: 100%;
+        min-height: 150px;
+        border: 1px solid #d8dee6;
+        background: #ffffff;
+    }
+
+    .momentum-midline {
+        stroke: #b6c1ce;
+        stroke-width: 1;
+        stroke-dasharray: 3 5;
+    }
+
+    .momentum-segment {
+        fill: none;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .momentum-axis {
+        stroke: #e1e6ec;
+        stroke-width: 1;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .momentum-inning-label {
+        fill: #718096;
+        font-size: 8px;
+        font-weight: 900;
+        text-anchor: middle;
+    }
+
+    .momentum-hover-zone {
+        fill: transparent;
+        stroke: transparent;
+        cursor: help;
+        vector-effect: non-scaling-stroke;
+    }
+
+    @keyframes fieldTrajectory {
+        0% { stroke-dashoffset: 260; opacity: 0; }
+        12%, 68% { stroke-dashoffset: 0; opacity: 0.95; }
+        100% { stroke-dashoffset: 0; opacity: 0; }
+    }
+
+    @keyframes fieldHitMarker {
+        0% { opacity: 0; transform: scale(0.4); transform-origin: center; }
+        20% { opacity: 0; transform: scale(0.4); transform-origin: center; }
+        42%, 72% { opacity: 1; transform: scale(1.18); transform-origin: center; }
+        100% { opacity: 0; transform: scale(0.92); transform-origin: center; }
+    }
+
+    @keyframes fieldBallFlightFade {
+        0% { opacity: 0; }
+        10%, 46% { opacity: 1; }
+        74%, 100% { opacity: 0; }
+    }
+
+    .abs-challenge-tracker {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
+        margin-top: 10px;
+        border: 1px solid #d8dee6;
+        background: #ffffff;
+    }
+
+    .abs-tracker-title {
+        display: flex;
+        grid-column: 1 / -1;
+        justify-content: center;
+        padding: 6px 10px;
+        border-bottom: 1px solid #d8dee6;
+        background: #f4f7fa;
+    }
+
+    .abs-tracker-title strong {
+        color: #10243b;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .abs-team-status {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px 8px 10px;
+        border-right: 1px solid #e1e6ec;
+        border-top: 3px solid var(--abs-team-color, #245f96);
+    }
+
+    .abs-team-status:last-child {
+        border-right: 0;
+    }
+
+    .abs-team-copy {
+        min-width: 0;
+    }
+
+    .abs-team-copy strong,
+    .abs-team-copy span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .abs-team-copy strong {
+        color: #10243b;
+        font-size: 11px;
+    }
+
+    .abs-team-copy span {
+        margin-top: 2px;
+        color: #6d7b8a;
+        font-size: 8px;
+    }
+
+    .abs-challenge-count {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .abs-challenge-dot {
+        width: 10px;
+        height: 10px;
+        border: 1.5px solid #aab4c0;
+        border-radius: 50%;
+        background: #ffffff;
+    }
+
+    .abs-challenge-dot.active {
+        border-color: var(--abs-team-color, #245f96);
+        background: var(--abs-team-color, #245f96);
+        box-shadow: 0 0 0 2px #dcebf7;
+    }
+
+    .current-hitters {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .current-hitter-card {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 56px;
+        padding: 7px 8px;
+        border: 1px solid #d8dee6;
+        background: #f8fafc;
+    }
+
+    .live-player-link-card {
+        cursor: pointer;
+        text-align: left;
+        transition: border-color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
+    }
+
+    .live-profile-card-link {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .live-profile-card-link:hover .live-player-link-card,
+    .live-profile-card-link:focus .live-player-link-card,
+    .live-player-link-card:hover,
+    .live-player-link-card:focus {
+        border-color: #245f96;
+        background: #edf5fb;
+        box-shadow: inset 3px 0 0 #245f96;
+        outline: none;
+    }
+
+    .live-profile-card-link:focus {
+        outline: none;
+    }
+
+    .current-hitter-card img {
+        width: 38px;
+        height: 38px;
+        border: 1px solid #d8dee6;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .current-hitter-card strong,
+    .current-hitter-card span {
+        display: block;
+    }
+
+    .current-hitter-card span {
+        margin-bottom: 3px;
+        color: #7b8794;
+        font-size: 8px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .live-pitcher-strip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+        padding: 7px 8px;
+        border: 1px solid #cbd5e1;
+        border-left: 4px solid #173f67;
+        background: #eef2f6;
+    }
+
+    .live-pitcher-strip img {
+        width: 36px;
+        height: 36px;
+        border: 1px solid #cbd5e1;
+        border-radius: 50%;
+        background: #ffffff;
+        object-fit: cover;
+    }
+
+    .live-pitcher-strip span,
+    .live-pitcher-strip strong {
+        display: block;
+    }
+
+    .live-pitcher-strip span {
+        margin-bottom: 2px;
+        color: #617083;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .live-pitcher-strip strong {
+        color: #10243b;
+        font-size: 12px;
+    }
+
+    .live-pitcher-identity {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 118px;
+    }
+
+    .live-pitcher-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(42px, 1fr));
+        gap: 4px;
+        margin-left: auto;
+    }
+
+    .live-pitcher-stat {
+        min-width: 38px;
+        padding: 4px 5px;
+        border-left: 1px solid #cbd5e1;
+        text-align: center;
+    }
+
+    .live-pitcher-stat span {
+        margin: 0 0 2px;
+        color: #708094;
+        font-size: 8px;
+    }
+
+    .live-pitcher-stat strong {
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .current-hitter-card.batter-changed {
+        position: relative;
+        animation: batterChanged 2.8s ease-out both;
+    }
+
+    .batter-change-chip {
+        position: absolute;
+        right: 7px;
+        top: 6px;
+        padding: 2px 5px;
+        border: 1px solid #8fb4d6;
+        background: #edf5fb;
+        color: #245f96 !important;
+        font-size: 8px !important;
+        letter-spacing: 0.06em;
+        animation: batterChip 2.8s ease-out both;
+    }
+
+    @keyframes batterChanged {
+        0%, 42% {
+            border-color: #6e9ec7;
+            background: #edf5fb;
+            box-shadow: inset 4px 0 0 #245f96;
+        }
+        100% {
+            border-color: #d8dee6;
+            background: #f8fafc;
+            box-shadow: none;
+        }
+    }
+
+    @keyframes batterChip {
+        0%, 68% { opacity: 1; }
+        100% { opacity: 0; }
+    }
+
+    .live-play-panel {
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        background: #ffffff;
+    }
+
+    .live-play-heading {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--line);
+        color: #526171;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .live-play-row {
+        display: grid;
+        grid-template-columns: 82px minmax(190px, 0.85fr) minmax(0, 1.7fr) auto;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-bottom: 1px solid #e4e8ed;
+    }
+
+    .live-play-row:last-child {
+        border-bottom: 0;
+    }
+
+    .play-result-chip {
+        display: inline-flex;
+        justify-content: center;
+        padding: 3px 6px;
+        border: 1px solid #cbd5e1;
+        background: #f3f5f7;
+        color: #31445b;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: 0.035em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .play-result-chip.hit,
+    .play-result-chip.home-run {
+        border-color: #8fc5a6;
+        background: #edf8f2;
+        color: #187347;
+    }
+
+    .play-result-chip.out {
+        border-color: #e6aaa4;
+        background: #fff1f1;
+        color: #b42318;
+    }
+
+    .play-result-chip.reach,
+    .play-result-chip.warning {
+        border-color: #e0c287;
+        background: #fff8e8;
+        color: #8a6415;
+    }
+
+    .live-play-matchup strong,
+    .live-play-matchup span {
+        display: block;
+    }
+
+    .live-play-matchup {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+    }
+
+    .live-play-player-icons {
+        position: relative;
+        flex: 0 0 48px;
+        width: 48px;
+        height: 32px;
+    }
+
+    .live-play-player-icons img {
+        position: absolute;
+        top: 0;
+        width: 32px;
+        height: 32px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        background: #eef2f6;
+        object-fit: cover;
+        box-shadow: 0 0 0 1px #cbd5e1;
+    }
+
+    .live-play-player-icons img:first-child {
+        left: 0;
+        z-index: 2;
+    }
+
+    .live-play-player-icons img:last-child {
+        left: 17px;
+        z-index: 1;
+    }
+
+    .live-play-matchup-copy {
+        min-width: 0;
+    }
+
+    .live-play-matchup-copy strong,
+    .live-play-matchup-copy span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .live-play-matchup strong {
+        color: #10243b;
+        font-size: 11px;
+    }
+
+    .live-play-matchup span,
+    .live-play-description,
+    .live-play-meta {
+        color: #687586;
+        font-size: 10px;
+    }
+
+    .live-play-description {
+        line-height: 1.35;
+    }
+
+    .live-play-meta {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .live-score.score-changed,
+        .live-score-delta,
+        .home-run-notice,
+        .home-run-fire,
+        .current-hitter-card.batter-changed,
+        .batter-change-chip,
+        .field-trajectory,
+        .field-hit-marker,
+        .field-ball-flight {
+            animation: none;
+        }
+    }
+
+    .matchup-rank-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin: 4px 0 10px;
+    }
+
+    .matchup-rank-item {
+        padding: 10px 12px;
+        border-right: 1px solid var(--line);
+    }
+
+    .matchup-rank-item:last-child {
+        border-right: 0;
+    }
+
+    .matchup-rank-value {
+        margin-top: 3px;
+        color: #06172b;
+        font-size: 18px;
+        font-weight: 800;
+    }
+
+    .player-card-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        margin: 8px 0 14px;
+    }
+
+    .player-card {
+        width: 100%;
+        min-height: 210px;
+        padding: 14px;
+        color: #111827;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .player-card:hover,
+    .player-card:focus-visible {
+        border-color: #8fb4d6;
+        background: #f7fafc;
+        outline: none;
+    }
+
+    .player-card img {
+        display: block;
+        width: 88px;
+        height: 88px;
+        margin: 0 auto 10px;
+        border: 1px solid #d8dee6;
+        border-radius: 50%;
+        background: #f3f5f7;
+        object-fit: cover;
+    }
+
+    .player-card-rank {
+        color: #7b8794;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .player-card-name {
+        display: block;
+        margin-top: 4px;
+        color: #06172b;
+        font-size: 15px;
+        font-weight: 800;
+    }
+
+    .player-card-team {
+        display: block;
+        margin-top: 3px;
+        color: #526171;
+        font-size: 11px;
+    }
+
+    .player-profile-hero {
+        display: grid;
+        grid-template-columns: 150px minmax(0, 1fr);
+        gap: 20px;
+        align-items: center;
+        padding: 18px;
+        margin-bottom: 10px;
+    }
+
+    .player-profile-hero > img {
+        width: 132px;
+        height: 132px;
+        border: 1px solid #d8dee6;
+        border-radius: 50%;
+        background: #f3f5f7;
+        object-fit: cover;
+    }
+
+    .player-profile-title {
+        color: #06172b;
+        font-family: var(--font-display);
+        font-size: 34px;
+        letter-spacing: 0.035em;
+    }
+
+    .player-profile-meta {
+        color: #526171;
+        font-size: 14px;
+    }
+
+    .profile-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        border: 1px solid var(--line);
+        background: #ffffff;
+        margin-bottom: 12px;
+    }
+
+    .profile-stat {
+        padding: 11px 12px;
+        border-right: 1px solid var(--line);
+    }
+
+    .profile-stat:last-child {
+        border-right: 0;
+    }
+
+    .profile-stat strong {
+        display: block;
+        margin-top: 4px;
+        color: #06172b;
+        font-size: 20px;
+    }
+
+    .home-placeholder {
+        min-height: 260px;
+        padding: 48px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #647184;
+        text-align: center;
+    }
+
+    .team-streak-record {
+        display: inline-flex;
+        padding: 3px 7px;
+        border: 1px solid #d8dee6;
+        background: #f2f4f7;
+        color: #687384;
+        font-size: 10px;
+        font-weight: 800;
+    }
+
+    .team-streak-record.good {
+        border-color: #a5d6b7;
+        background: #edf8f2;
+        color: #247a4d;
+    }
+
+    .team-streak-record.bad {
+        border-color: #e2b8b8;
+        background: #fff0f0;
+        color: #b43b3b;
+    }
+
+    .team-streak-logo {
+        width: 38px;
+        height: 38px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        object-fit: contain;
+    }
+
+    .st-key-player_profile_back {
+        display: flex;
+        width: fit-content;
+        margin: 0 0 8px;
+    }
+
+    .st-key-player_profile_back .stButton > button {
+        min-height: 34px;
+        padding: 5px 12px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #173f67;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .st-key-player_profile_back .stButton > button:hover {
+        border-color: #8fb4d6;
+        background: #f4f8fc;
+    }
+
+    .st-key-streak_toolbar {
+        width: min(100%, 370px);
+        margin: -30px 0 -60px auto;
+    }
+
+    .st-key-streak_toolbar [data-testid="stHorizontalBlock"] {
+        gap: 7px;
+    }
+
+    .st-key-games_toolbar {
+        position: relative;
+        z-index: 2;
+        width: min(100%, 660px);
+        margin: -30px 0 8px auto;
+    }
+
+    .st-key-games_toolbar [data-testid="stHorizontalBlock"] {
+        gap: 8px;
+    }
+
+    .roster-player-card-grid {
+        max-height: 720px;
+        overflow: auto;
+        padding-right: 4px;
+    }
+
+    .matchup-rank-strip .research-grade {
+        display: inline-block;
+        padding: 3px 7px;
+        border-radius: 2px;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
+    .matchup-rank-strip .research-grade.good {
+        color: #247a4d;
+        background: #edf8f2;
+    }
+
+    .matchup-rank-strip .research-grade.neutral {
+        color: #9a6810;
+        background: #fff8e8;
+    }
+
+    .matchup-rank-strip .research-grade.avoid {
+        color: #b43b3b;
+        background: #fff0f0;
+    }
+
+    .matchup-rank-strip .research-grade.sample {
+        color: #3f6fa8;
+        background: #eef5ff;
+    }
+
+    .matchup-rank-strip .research-grade.none {
+        color: #687384;
+        background: #f2f4f7;
+    }
+
+    .leaderboard-name .team-streak-record {
+        display: inline-flex;
+        margin-top: 3px;
+    }
+
     .st-key-matchup_toolbar,
     .st-key-matchup_filter_toolbar {
         margin: 0 0 6px;
+    }
+
+    .st-key-matchup_toolbar {
+        position: relative;
+        z-index: 2;
+        width: min(100%, 448px);
+        margin: 8px 0 -66px auto;
+    }
+
+    .st-key-matchup_toolbar [data-testid="stHorizontalBlock"] {
+        gap: 8px;
     }
 
     .st-key-matchup_toolbar [data-testid="stSelectbox"],
@@ -790,37 +2705,8 @@ st.markdown(
         color: var(--text);
     }
 
-    .view-loading {
-        position: fixed;
-        z-index: 999998;
-        top: 64px;
-        right: 16px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 7px 10px;
-        border: 1px solid #cbd5e1;
-        background: rgba(255, 255, 255, 0.96);
-        color: #31445b;
-        font-size: 12px;
-        font-weight: 600;
-        box-shadow: 0 4px 14px rgba(15, 31, 48, 0.12);
-        pointer-events: none;
-    }
-
-    .view-loading-wheel {
-        width: 15px;
-        height: 15px;
-        border: 2px solid #cbd5e1;
-        border-top-color: #245f96;
-        border-radius: 50%;
-        animation: view-loading-spin 0.7s linear infinite;
-    }
-
-    @keyframes view-loading-spin {
-        to {
-            transform: rotate(360deg);
-        }
+    div[data-testid="stStatusWidget"] {
+        visibility: hidden;
     }
 
     @media (max-width: 680px) {
@@ -836,7 +2722,7 @@ st.markdown(
         }
 
         .st-key-active_view .stRadio [role="radiogroup"] {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
         }
 
         .st-key-active_view .stRadio [role="radiogroup"] label {
@@ -866,92 +2752,73 @@ st.markdown(
             padding: 0 14px;
         }
 
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:has(
-            > [data-testid="stColumn"]:nth-child(6)
-        ) {
-            display: grid !important;
-            grid-template-columns: 44px minmax(0, 1fr) 44px !important;
-            gap: 8px !important;
-        }
-
         .st-key-matchup_toolbar [data-testid="stColumn"] {
             width: 100% !important;
             min-width: 0 !important;
             flex: none !important;
         }
 
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:has(
-            > [data-testid="stColumn"]:nth-child(6)
-        ) > [data-testid="stColumn"]:nth-child(1),
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:has(
-            > [data-testid="stColumn"]:nth-child(6)
-        ) > [data-testid="stColumn"]:nth-child(2),
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:has(
-            > [data-testid="stColumn"]:nth-child(6)
-        ) > [data-testid="stColumn"]:nth-child(3) {
-            grid-column: 1 / -1;
+        .st-key-matchup_toolbar {
+            width: 100%;
+            margin: 8px 0;
         }
 
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:has(
-            > [data-testid="stColumn"]:nth-child(6)
-        ) > [data-testid="stColumn"]:nth-child(4) {
-            grid-column: 1;
-            grid-row: 4;
-        }
-
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:has(
-            > [data-testid="stColumn"]:nth-child(6)
-        ) > [data-testid="stColumn"]:nth-child(5) {
-            grid-column: 2;
-            grid-row: 4;
-        }
-
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:has(
-            > [data-testid="stColumn"]:nth-child(6)
-        ) > [data-testid="stColumn"]:nth-child(6) {
-            grid-column: 3;
-            grid-row: 4;
-        }
-
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:not(
-            :has(> [data-testid="stColumn"]:nth-child(6))
-        ) {
+        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"] {
             display: grid !important;
             grid-template-columns: 44px minmax(0, 1fr) 44px !important;
             gap: 8px !important;
         }
 
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:not(
-            :has(> [data-testid="stColumn"]:nth-child(6))
-        ) > [data-testid="stColumn"]:nth-child(1) {
-            grid-column: 1 / -1;
-        }
-
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:not(
-            :has(> [data-testid="stColumn"]:nth-child(6))
-        ) > [data-testid="stColumn"]:nth-child(2) {
+        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]
+        > [data-testid="stColumn"]:nth-child(1) {
             grid-column: 1;
-            grid-row: 2;
+            grid-row: 1;
         }
 
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:not(
-            :has(> [data-testid="stColumn"]:nth-child(6))
-        ) > [data-testid="stColumn"]:nth-child(3) {
+        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]
+        > [data-testid="stColumn"]:nth-child(2) {
             grid-column: 2;
-            grid-row: 2;
+            grid-row: 1;
         }
 
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:not(
-            :has(> [data-testid="stColumn"]:nth-child(6))
-        ) > [data-testid="stColumn"]:nth-child(4) {
+        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]
+        > [data-testid="stColumn"]:nth-child(3) {
             grid-column: 3;
-            grid-row: 2;
+            grid-row: 1;
+        }
+    }
+
+    @media (max-width: 1100px) {
+        .st-key-matchup_toolbar,
+        .st-key-games_toolbar,
+        .st-key-streak_toolbar {
+            width: 100%;
+            margin: 8px 0;
         }
 
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"]:not(
-            :has(> [data-testid="stColumn"]:nth-child(6))
-        ) > [data-testid="stColumn"]:nth-child(5) {
-            display: none;
+        .st-key-matchup_toolbar [data-testid="stColumn"],
+        .st-key-games_toolbar [data-testid="stColumn"],
+        .st-key-streak_toolbar [data-testid="stColumn"] {
+            width: 100% !important;
+            min-width: 0 !important;
+            flex: none !important;
+        }
+
+        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"],
+        .st-key-streak_toolbar [data-testid="stHorizontalBlock"] {
+            display: grid !important;
+            grid-template-columns: 44px minmax(0, 1fr) 44px !important;
+            gap: 8px !important;
+        }
+
+        .st-key-games_toolbar [data-testid="stHorizontalBlock"] {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1.15fr) 44px minmax(0, 1fr) !important;
+            gap: 8px !important;
+        }
+
+        .contact-field-grid {
+            grid-template-columns: 1fr;
         }
     }
 
@@ -984,6 +2851,85 @@ st.markdown(
         .leaderboard-row .leaderboard-bar-track,
         .leaderboard-row .live-chip {
             display: none;
+        }
+
+        .player-card-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .st-key-streak_toolbar {
+            width: 100%;
+            margin-left: 0;
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+
+        .st-key-games_toolbar {
+            width: 100%;
+            margin: 0 0 8px;
+        }
+
+        .profile-stat-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .profile-stat:nth-child(3) {
+            border-right: 0;
+        }
+
+        .live-game-scorebug,
+        .live-situation-grid,
+        .player-profile-hero {
+            grid-template-columns: 1fr;
+        }
+
+        .abs-challenge-tracker {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .abs-tracker-title {
+            grid-column: 1 / -1;
+            min-width: 0;
+            border-right: 0;
+            border-bottom: 1px solid #d8dee6;
+        }
+
+        .live-field-svg {
+            min-height: 250px;
+        }
+
+        .current-hitters {
+            grid-template-columns: 1fr;
+        }
+
+        .live-pitcher-strip {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .live-pitcher-stats {
+            width: 100%;
+            margin-left: 0;
+        }
+
+        .live-pitcher-stat:first-child {
+            border-left: 0;
+        }
+
+        .live-play-row {
+            grid-template-columns: 76px minmax(0, 1fr);
+        }
+
+        .live-play-description,
+        .live-play-meta {
+            grid-column: 1 / -1;
+            text-align: left;
+        }
+
+        .live-game-team,
+        .live-game-team:last-child {
+            justify-content: center;
+            text-align: center;
         }
 
         .research-table-note {
@@ -1108,6 +3054,36 @@ def team_id_for_value(team_value):
         return team_id
 
     return TEAM_ID_BY_ABBR.get(text.upper())
+
+
+def safe_hex_color(value, default="#173f67"):
+    text = safe_text(value, default=default).strip()
+    if len(text) == 7 and text.startswith("#"):
+        allowed = set("0123456789abcdefABCDEF")
+        if all(character in allowed for character in text[1:]):
+            return text
+    return default
+
+
+def team_primary_color(team_value, default="#173f67"):
+    team_id = team_id_for_value(team_value)
+    return safe_hex_color(TEAM_PRIMARY_COLOR_BY_ID.get(team_id), default)
+
+
+def team_abbr_for_name(team_value):
+    team_id = team_id_for_value(team_value)
+    if team_id is not None:
+        for abbr, mapped_team_id in TEAM_ID_BY_ABBR.items():
+            if mapped_team_id == team_id:
+                return abbr
+
+    text = safe_text(team_value).strip()
+    if not text:
+        return "TEAM"
+    words = [word for word in text.replace("-", " ").split() if word]
+    if len(words) >= 2:
+        return "".join(word[0] for word in words[-2:]).upper()[:3]
+    return text[:3].upper()
 
 
 def add_team_ids_from_names(df):
@@ -1371,6 +3347,59 @@ def game_status_text(row):
     return status
 
 
+def schedule_status_html(row):
+    status = game_status_text(row)
+    abstract_state = row_text(row, "abstract_game_state").lower()
+    game_time_utc = row_text(row, "game_time_utc")
+    is_scheduled = (
+        abstract_state in {"", "preview"}
+        and status.lower() in {"scheduled", "pre-game", "pregame"}
+        and game_time_utc
+    )
+    if not is_scheduled:
+        return f'<span class="score-status">{escape(status)}</span>'
+
+    return (
+        '<time class="score-status local-game-time" '
+        f'datetime="{escape(game_time_utc, quote=True)}" '
+        f'data-game-time-utc="{escape(game_time_utc, quote=True)}">'
+        f"{escape(status)}</time>"
+    )
+
+
+def schedule_situation_html(row):
+    outs = int(safe_value(row.get("outs"), 0))
+    base_html = []
+    for base, key in (
+        ("first", "runner_on_first"),
+        ("second", "runner_on_second"),
+        ("third", "runner_on_third"),
+    ):
+        value = row.get(key)
+        occupied_base = (
+            False
+            if is_missing_value(value)
+            else value
+            if isinstance(value, bool)
+            else safe_text(value).strip().lower() in {"1", "true", "yes"}
+        )
+        occupied = " occupied" if occupied_base else ""
+        base_html.append(f'<span class="mini-base {base}{occupied}"></span>')
+
+    def dots(kind, active, total):
+        return "".join(
+            f'<span class="mini-dot {kind}{" active" if index < active else ""}"></span>'
+            for index in range(total)
+        )
+
+    return (
+        '<span class="schedule-situation-mini" aria-label="Live game situation">'
+        f'<span class="mini-bases" title="Bases">{"".join(base_html)}</span>'
+        f'<span class="mini-outs" title="Outs">Outs {dots("out", outs, 3)}</span>'
+        "</span>"
+    )
+
+
 def game_button_label(row):
     away_team = row_text(row, "away_team", default="Away")
     home_team = row_text(row, "home_team", default="Home")
@@ -1382,6 +3411,23 @@ def current_query_value(name, default=None):
     if isinstance(value, list):
         return value[0] if value else default
     return value
+
+
+def sync_active_view_query():
+    active_view = st.session_state.get("active_view")
+    st.session_state.selected_boxscore_game_pk = None
+    for key in list(st.session_state):
+        if key.endswith("_selected_log"):
+            st.session_state[key] = None
+    if active_view:
+        st.query_params["view"] = active_view
+    if active_view != "Players":
+        st.query_params.pop("player", None)
+        st.query_params.pop("profile_group", None)
+        st.query_params.pop("return_view", None)
+        st.query_params.pop("return_game_pk", None)
+        st.session_state.selected_player_profile = None
+        st.session_state.player_profile_return = None
 
 
 def render_view_tabs(view_options):
@@ -1398,8 +3444,101 @@ def render_view_tabs(view_options):
         view_options,
         horizontal=True,
         key="active_view",
+        on_change=sync_active_view_query,
         label_visibility="collapsed",
     )
+
+
+def player_profile_payload(
+    player_id,
+    player,
+    team,
+    group,
+    season,
+):
+    player_id = pd.to_numeric(player_id, errors="coerce")
+    if pd.isna(player_id):
+        return None
+    return {
+        "action": "player_profile",
+        "player_id": int(player_id),
+        "player": safe_text(player, default="Player"),
+        "team": safe_text(team),
+        "group": "pitching" if group == "pitching" else "batting",
+        "season": int(season),
+    }
+
+
+def navigate_to_player_profile(payload, source_view, game_pk=None):
+    if not isinstance(payload, dict):
+        return
+    player_id = pd.to_numeric(payload.get("player_id"), errors="coerce")
+    if pd.isna(player_id):
+        return
+
+    profile = dict(payload)
+    profile["player_id"] = int(player_id)
+    profile["action"] = "player_profile"
+    profile["season"] = int(safe_value(profile.get("season"), app_today.year))
+    st.session_state.selected_player_profile = profile
+    st.session_state.player_profile_return = {
+        "view": source_view,
+        "game_pk": (
+            int(game_pk)
+            if game_pk is not None and not is_missing_value(game_pk)
+            else None
+        ),
+    }
+    st.session_state.pending_active_view = "Players"
+    st.query_params["view"] = "Players"
+    st.query_params["player"] = str(int(player_id))
+    st.query_params["profile_group"] = profile.get("group", "batting")
+    st.query_params["return_view"] = source_view
+    if game_pk is not None and not is_missing_value(game_pk):
+        st.query_params["return_game_pk"] = str(int(game_pk))
+    st.rerun(scope="app")
+
+
+def handle_player_profile_event(event, source_view, game_pk=None):
+    if not isinstance(event, dict) or event.get("type") != "select_player":
+        return
+    payload = event.get("payload")
+    if not isinstance(payload, dict) or payload.get("action") != "player_profile":
+        return
+    event_key = f"profile_event_{source_view}_{game_pk or 'none'}"
+    event_id = safe_text(event.get("event_id"))
+    if not event_id or event_id == st.session_state.get(event_key):
+        return
+    st.session_state[event_key] = event_id
+    navigate_to_player_profile(payload, source_view, game_pk=game_pk)
+
+
+def return_from_player_profile():
+    return_state = st.session_state.get("player_profile_return") or {}
+    return_view = safe_text(return_state.get("view"), default="Players")
+    return_game_pk = return_state.get("game_pk")
+    st.session_state.selected_player_profile = None
+    st.session_state.player_profile_return = None
+    st.session_state.players_search = None
+    st.query_params.pop("player", None)
+    st.query_params.pop("profile_group", None)
+    st.query_params.pop("return_view", None)
+    st.query_params.pop("return_game_pk", None)
+    if return_view not in {
+        "Matchups",
+        "Games",
+        "Streaks",
+        "Players",
+        "Player Stats",
+        "Team Stats",
+        "Details",
+    }:
+        return_view = "Players"
+    st.session_state.pending_active_view = return_view
+    st.query_params["view"] = return_view
+    if return_view == "Games" and not is_missing_value(return_game_pk):
+        st.session_state.selected_boxscore_game_pk = int(return_game_pk)
+    st.rerun(scope="app")
 
 
 def render_box_tabs(tab_key, options, state_key, default=None):
@@ -1443,6 +3582,12 @@ LIVE_SCHEDULE_COLUMNS = {
     "current_inning_ordinal",
     "inning_state",
     "inning_half",
+    "balls",
+    "strikes",
+    "outs",
+    "runner_on_first",
+    "runner_on_second",
+    "runner_on_third",
 }
 
 
@@ -1889,22 +4034,26 @@ def render_live_schedule_table(df):
             {"game_pk": int(game_pk)},
             separators=(",", ":"),
         )
+        situation_html = schedule_situation_html(row)
         rows.append(
             f"""
             <div class="schedule-weather-row clean-schedule-row">
                 <div>
                     <button type="button" class="schedule-game-button"
                             data-research-event="{escape(game_payload, quote=True)}">
-                        <span class="overview-score">
-                            {away_logo}
-                            <span class="overview-team">{escape(away_code)}</span>
-                            <span class="score-number">{escape(score_value(row.get("away_score")))}</span>
-                            <span class="schedule-at">@</span>
-                            {home_logo}
-                            <span class="overview-team">{escape(home_code)}</span>
-                            <span class="score-number">{escape(score_value(row.get("home_score")))}</span>
+                        <span class="schedule-game-main">
+                            <span class="overview-score">
+                                {away_logo}
+                                <span class="overview-team">{escape(away_code)}</span>
+                                <span class="score-number">{escape(score_value(row.get("away_score")))}</span>
+                                <span class="schedule-at">@</span>
+                                {home_logo}
+                                <span class="overview-team">{escape(home_code)}</span>
+                                <span class="score-number">{escape(score_value(row.get("home_score")))}</span>
+                            </span>
+                            {situation_html}
                         </span>
-                        <span class="score-status">{escape(game_status_text(row))}</span>
+                        {schedule_status_html(row)}
                     </button>
                 </div>
                 {pitcher_pair_html(row)}
@@ -1944,7 +4093,7 @@ def render_live_schedule_table(df):
                 text-transform: uppercase;
             }}
             .schedule-weather-row {{
-                min-height: 68px;
+                min-height: 78px;
                 border-bottom: 1px solid #edf0f4;
                 color: #111827;
                 font-size: 13px;
@@ -1958,17 +4107,26 @@ def render_live_schedule_table(df):
             .schedule-game-button {{
                 width: 100%;
                 margin: 0;
-                padding: 0;
-                border: 0;
-                background: transparent;
+                padding: 8px 9px;
+                border: 1px solid #d8dee6;
+                background: #f8fafc;
                 color: inherit;
                 cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
                 text-align: left;
             }}
-            .schedule-game-button:hover .score-number,
-            .schedule-game-button:focus-visible .score-number {{
+            .schedule-game-main {{
+                display: grid;
+                min-width: 0;
+                gap: 5px;
+            }}
+            .schedule-game-button:hover,
+            .schedule-game-button:focus-visible {{
                 border-color: #8fb4d6;
-                background: #eef6ff;
+                background: #f2f7fc;
             }}
             .schedule-game-button:focus-visible {{
                 outline: 2px solid #245f96;
@@ -1991,6 +4149,55 @@ def render_live_schedule_table(df):
                 font-weight: 800;
                 letter-spacing: 0.02em;
             }}
+            .schedule-situation-mini {{
+                display: inline-flex;
+                align-items: center;
+                gap: 12px;
+                width: fit-content;
+                margin-top: 4px;
+            }}
+            .mini-bases {{
+                position: relative;
+                width: 44px;
+                height: 28px;
+                flex: 0 0 44px;
+            }}
+            .mini-base {{
+                position: absolute;
+                width: 11px;
+                height: 11px;
+                border: 1.7px solid #687b91;
+                background: #ffffff;
+                transform: rotate(45deg);
+            }}
+            .mini-base.first {{ left: 30px; top: 13px; }}
+            .mini-base.second {{ left: 16px; top: 0; }}
+            .mini-base.third {{ left: 2px; top: 13px; }}
+            .mini-base.occupied {{
+                border-color: #173f67;
+                background: #245f96;
+            }}
+            .mini-outs {{
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                color: #647184;
+                font-size: 9px;
+                font-weight: 900;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+            }}
+            .mini-dot {{
+                width: 8px;
+                height: 8px;
+                border: 1px solid #aab4c0;
+                border-radius: 50%;
+                background: #ffffff;
+            }}
+            .mini-dot.out.active {{
+                border-color: #173f67;
+                background: #173f67;
+            }}
             .schedule-game-logos,
             .schedule-weather-chip,
             .schedule-wind-chip {{
@@ -2004,27 +4211,29 @@ def render_live_schedule_table(df):
                 object-fit: contain;
             }}
             .score-number {{
-                min-width: 24px;
-                padding: 2px 5px;
-                border: 1px solid #cbd5e1;
-                background: #f8fafc;
-                color: #0f172a;
+                min-width: 28px;
+                padding: 1px 4px;
+                border: 0;
+                background: transparent;
+                color: #06172b;
                 text-align: center;
+                font-size: 18px;
                 font-weight: 800;
                 font-variant-numeric: tabular-nums;
             }}
             .score-status {{
                 display: inline-flex;
-                width: fit-content;
-                margin-top: 7px;
-                padding: 2px 6px;
+                width: auto;
+                margin-top: 0;
+                padding: 4px 6px;
                 border: 1px solid #d2dae4;
-                background: #f7fafc;
+                background: #ffffff;
                 color: #526171;
                 font-size: 10px;
                 font-weight: 700;
                 text-transform: uppercase;
                 letter-spacing: 0.04em;
+                white-space: nowrap;
             }}
             .schedule-at {{
                 color: #7b8794;
@@ -2099,7 +4308,7 @@ def render_live_schedule_table(df):
             {''.join(rows)}
         </div>
         """,
-        table_height=max(150, 42 + (len(rows) * 69)),
+        table_height=max(150, 42 + (len(rows) * 79)),
         key="live-schedule-table",
         default=None,
     )
@@ -2122,10 +4331,17 @@ def filter_boxscore_team(df, selected_side):
     return df[df["Side"].astype(str).str.lower() == str(selected_side).lower()].copy()
 
 
-def render_boxscore_dataframe(df, stat_columns, key):
+def render_boxscore_dataframe(
+    df,
+    stat_columns,
+    key,
+    player_group,
+    season_value,
+    game_pk,
+):
     if df.empty:
         st.info("No box-score rows are available yet.")
-        return
+        return None
 
     columns = [
         "Player",
@@ -2156,9 +4372,22 @@ def render_boxscore_dataframe(df, stat_columns, key):
         for column in columns:
             align_class = "align-left" if column in {"Player", "Team", "Pos"} else ""
             if column == "Player":
+                profile_payload = player_profile_payload(
+                    player_id,
+                    player,
+                    team,
+                    player_group,
+                    season_value,
+                )
+                event_payload = json.dumps(
+                    profile_payload or {},
+                    separators=(",", ":"),
+                )
                 content = (
+                    '<button type="button" class="research-player-link" '
+                    f'data-research-event="{escape(event_payload, quote=True)}">'
                     '<span class="research-player-identity">'
-                    f"{headshot}<span>{escape(player)}</span></span>"
+                    f"{headshot}<span>{escape(player)}</span></span></button>"
                 )
             elif column == "Team":
                 content = (
@@ -2171,7 +4400,7 @@ def render_boxscore_dataframe(df, stat_columns, key):
             cells.append(f'<td class="{align_class}">{content}</td>')
         body_rows.append("<tr>" + "".join(cells) + "</tr>")
 
-    RESEARCH_TABLE_COMPONENT(
+    table_event = RESEARCH_TABLE_COMPONENT(
         table_html=f"""
         <div class="research-table-shell stats-table-shell boxscore-table-shell">
             <table class="research-table stats-table">
@@ -2184,54 +4413,1465 @@ def render_boxscore_dataframe(df, stat_columns, key):
         key=key,
         default=None,
     )
+    handle_player_profile_event(
+        table_event,
+        "Games",
+        game_pk=game_pk,
+    )
+    return table_event
 
 
-def render_selected_game_boxscore(schedule_df):
+def ScoreChangeView(score, score_delta=0):
+    changed_class = " score-changed" if score_delta > 0 else ""
+    delta_html = (
+        f'<span class="live-score-delta">+{int(score_delta)}</span>'
+        if score_delta > 0
+        else ""
+    )
+    return (
+        '<span class="live-score-wrap">'
+        f'<strong class="live-score{changed_class}">'
+        f"{escape(score_value(score))}</strong>{delta_html}</span>"
+    )
+
+
+def _count_dot_group(label, kind, active, total):
+    active = max(0, min(int(safe_value(active, 0)), total))
+    dots = "".join(
+        f'<span class="count-dot {kind}{" active" if index < active else ""}"></span>'
+        for index in range(total)
+    )
+    return (
+        '<span class="count-dot-group">'
+        f'<span class="count-dot-label">{escape(label)}</span>{dots}</span>'
+    )
+
+
+def CountDotsView(balls, strikes):
+    return (
+        _count_dot_group("Balls", "ball", balls, 3)
+        + _count_dot_group("Strikes", "strike", strikes, 2)
+    )
+
+
+def OutsDotsView(outs):
+    return _count_dot_group("Outs", "out", outs, 3)
+
+
+HIT_PLAY_TYPES = {"single", "double", "triple", "home_run"}
+OFFENSE_PLAY_TYPES = HIT_PLAY_TYPES | {"walk", "hit_by_pitch", "stolen_base"}
+OUT_PLAY_TYPES = {"strikeout", "groundout", "flyout", "popout", "lineout", "forceout", "double_play", "sac_fly"}
+FIELD_RESULT_COLORS = {
+    "hit": "#187347",
+    "out": "#b42318",
+    "warning": "#b7791f",
+    "neutral": "#6b7888",
+}
+
+
+def play_result_tone(result_type):
+    result_type = safe_text(result_type, default="other")
+    if result_type in HIT_PLAY_TYPES:
+        return "hit"
+    if result_type in OUT_PLAY_TYPES:
+        return "out"
+    if result_type == "error":
+        return "warning"
+    if result_type in {"walk", "hit_by_pitch", "stolen_base"}:
+        return "reach"
+    return "neutral"
+
+
+def field_result_tone(result_type):
+    tone = play_result_tone(result_type)
+    if tone in {"hit", "reach"}:
+        return "hit"
+    if tone == "out":
+        return "out"
+    if tone == "warning":
+        return "warning"
+    return "neutral"
+
+
+def field_result_color(result_type):
+    return FIELD_RESULT_COLORS.get(
+        field_result_tone(result_type),
+        FIELD_RESULT_COLORS["neutral"],
+    )
+
+
+def BaseRunnerDiamondView(live_feed):
+    bases = live_feed.get("bases") or {}
+    base_html = []
+    runner_labels = []
+    for base in ("first", "second", "third"):
+        runner = bases.get(base)
+        occupied = " occupied" if runner else ""
+        title = (
+            safe_text(runner.get("name"), default=f"{base.title()} base occupied")
+            if isinstance(runner, dict)
+            else f"{base.title()} base empty"
+        )
+        runner_headshot = (
+            image_html(
+                runner.get("headshot"),
+                f"{title} on {base} base",
+                class_name="base-runner-headshot",
+                title=title,
+                lazy=False,
+            )
+            if isinstance(runner, dict)
+            else ""
+        )
+        if isinstance(runner, dict):
+            runner_labels.append(
+                f"<span><strong>{escape(base.title())}:</strong> "
+                f"{escape(title)}</span>"
+            )
+        base_html.append(
+            f'<span class="{base}{occupied}" title="{escape(title, quote=True)}">'
+            f"{runner_headshot}</span>"
+        )
+    runner_list = (
+        f'<div class="base-runner-list">{"".join(runner_labels)}</div>'
+        if runner_labels
+        else ""
+    )
+    return f'<div class="base-diamond">{"".join(base_html)}</div>{runner_list}'
+
+
+def _live_field_number(value, default):
+    number = pd.to_numeric(value, errors="coerce")
+    return float(default if pd.isna(number) else number)
+
+
+LIVE_FIELD_BASE_COORDS = {
+    # Manual tuning guide:
+    # x moves left/right, y moves up/down in the SVG viewBox below.
+    # Keep home and second on the same x for symmetry.
+    "home": (125, 210),
+    "first": (158, 177),
+    "second": (125, 144),
+    "third": (92, 177),
+}
+LIVE_FIELD_BASE_SIZE = 8
+LIVE_FIELD_LOCATION_TARGETS = {
+    1: (125, 190),
+    2: (125, 210),
+    3: (160, 180),
+    4: (145, 160),
+    5: (90, 180),
+    6: (105, 160),
+    7: (65, 92),
+    8: (125, 60),
+    9: (185, 92),
+}
+
+
+def contact_play_coordinates(play):
+    play = play if isinstance(play, dict) else {}
+    hit_data = play.get("hit_data") or {}
+    hit_x = pd.to_numeric(hit_data.get("x"), errors="coerce")
+    hit_y = pd.to_numeric(hit_data.get("y"), errors="coerce")
+    if pd.isna(hit_x) or pd.isna(hit_y):
+        hit_x, hit_y = LIVE_FIELD_LOCATION_TARGETS.get(
+            int(_live_field_number(hit_data.get("location"), 0)),
+            (float("nan"), float("nan")),
+        )
+    if pd.isna(hit_x) or pd.isna(hit_y):
+        return None
+    return max(8.0, min(242.0, float(hit_x))), max(18.0, min(208.0, float(hit_y)))
+
+
+def pitch_marker_tone(pitch):
+    pitch = pitch if isinstance(pitch, dict) else {}
+    if pitch.get("is_in_play"):
+        return "in-play"
+    if pitch.get("is_strike"):
+        return "strike"
+    if pitch.get("is_ball"):
+        return "ball"
+    call_text = safe_text(pitch.get("call"), pitch.get("description")).lower()
+    if "strike" in call_text or "foul" in call_text:
+        return "strike"
+    if "ball" in call_text:
+        return "ball"
+    if "play" in call_text:
+        return "in-play"
+    return "unknown"
+
+
+def pitch_zone_fallback_coordinates(zone):
+    zone = pd.to_numeric(zone, errors="coerce")
+    if pd.isna(zone):
+        return None
+    zone = int(zone)
+    zone_map = {
+        1: (-0.48, 3.08),
+        2: (0.0, 3.08),
+        3: (0.48, 3.08),
+        4: (-0.48, 2.5),
+        5: (0.0, 2.5),
+        6: (0.48, 2.5),
+        7: (-0.48, 1.92),
+        8: (0.0, 1.92),
+        9: (0.48, 1.92),
+        11: (-1.08, 3.22),
+        12: (1.08, 3.22),
+        13: (-1.08, 1.72),
+        14: (1.08, 1.72),
+    }
+    return zone_map.get(zone)
+
+
+def pitch_zone_svg_coordinates(pitch, zone_top, zone_bottom):
+    pitch = pitch if isinstance(pitch, dict) else {}
+    p_x = pd.to_numeric(pitch.get("p_x"), errors="coerce")
+    p_z = pd.to_numeric(pitch.get("p_z"), errors="coerce")
+    if pd.isna(p_x) or pd.isna(p_z):
+        fallback = pitch_zone_fallback_coordinates(pitch.get("zone"))
+        if fallback is None:
+            return None
+        p_x, p_z = fallback
+    plate_center_x = 85.0
+    feet_to_px = 42.0
+    zone_center_y = 94.0
+    zone_height = 86.0
+    zone_mid = (zone_top + zone_bottom) / 2
+    zone_span = max(1.0, zone_top - zone_bottom)
+    x = plate_center_x + (float(p_x) * feet_to_px)
+    y = zone_center_y - (((float(p_z) - zone_mid) / zone_span) * zone_height)
+    return max(16.0, min(154.0, x)), max(18.0, min(178.0, y))
+
+
+def StrikeZoneView(live_feed):
+    pitches = [
+        pitch
+        for pitch in (live_feed.get("current_pitches") or [])
+        if isinstance(pitch, dict)
+    ][-12:]
+    latest_pitch = live_feed.get("latest_pitch") or (pitches[-1] if pitches else {})
+    top_values = [
+        pd.to_numeric(pitch.get("strike_zone_top"), errors="coerce")
+        for pitch in pitches
+    ]
+    bottom_values = [
+        pd.to_numeric(pitch.get("strike_zone_bottom"), errors="coerce")
+        for pitch in pitches
+    ]
+    zone_top = next((float(value) for value in reversed(top_values) if pd.notna(value)), 3.5)
+    zone_bottom = next((float(value) for value in reversed(bottom_values) if pd.notna(value)), 1.55)
+    zone_x = 50.0
+    zone_y = 51.0
+    zone_w = 70.0
+    zone_h = 86.0
+    zone_grid = (
+        f'<line class="strike-zone-grid" x1="{zone_x + zone_w / 3:.1f}" y1="{zone_y}" '
+        f'x2="{zone_x + zone_w / 3:.1f}" y2="{zone_y + zone_h}"/>'
+        f'<line class="strike-zone-grid" x1="{zone_x + (zone_w * 2 / 3):.1f}" y1="{zone_y}" '
+        f'x2="{zone_x + (zone_w * 2 / 3):.1f}" y2="{zone_y + zone_h}"/>'
+        f'<line class="strike-zone-grid" x1="{zone_x}" y1="{zone_y + zone_h / 3:.1f}" '
+        f'x2="{zone_x + zone_w}" y2="{zone_y + zone_h / 3:.1f}"/>'
+        f'<line class="strike-zone-grid" x1="{zone_x}" y1="{zone_y + (zone_h * 2 / 3):.1f}" '
+        f'x2="{zone_x + zone_w}" y2="{zone_y + (zone_h * 2 / 3):.1f}"/>'
+    )
+    pitch_markers = []
+    for index, pitch in enumerate(pitches, start=1):
+        coordinates = pitch_zone_svg_coordinates(pitch, zone_top, zone_bottom)
+        if coordinates is None:
+            continue
+        x, y = coordinates
+        tone = pitch_marker_tone(pitch)
+        latest_class = " latest" if pitch is latest_pitch or pitch == latest_pitch else ""
+        pitch_label = row_text(pitch, "pitch_code", "pitch_type")
+        call_label = row_text(pitch, "call", "description", default="Pitch")
+        speed = pd.to_numeric(pitch.get("start_speed"), errors="coerce")
+        speed_label = f" · {float(speed):.1f} mph" if pd.notna(speed) else ""
+        title = f"{index}. {call_label}{speed_label}"
+        pitch_markers.append(
+            f'<circle class="strike-zone-pitch {tone}{latest_class}" '
+            f'cx="{x:.1f}" cy="{y:.1f}" r="6.1">'
+            f"<title>{escape(title)}</title></circle>"
+            f'<text class="strike-zone-count-label" x="{x:.1f}" y="{y:.1f}">{index}</text>'
+        )
+
+    latest_call = (
+        row_text(latest_pitch, "call", "description", default="No pitch data")
+        if isinstance(latest_pitch, dict)
+        else "No pitch data"
+    )
+    latest_type = safe_text(
+        latest_pitch.get("pitch_type") if isinstance(latest_pitch, dict) else "",
+        default="",
+    )
+    latest_speed = pd.to_numeric(
+        latest_pitch.get("start_speed") if isinstance(latest_pitch, dict) else None,
+        errors="coerce",
+    )
+    latest_meta = []
+    if latest_type:
+        latest_meta.append(latest_type)
+    if pd.notna(latest_speed):
+        latest_meta.append(f"{float(latest_speed):.1f} mph")
+    return (
+        '<div class="strike-zone-card">'
+        '<div class="strike-zone-topline"><span></span>'
+        '<strong>Strike Zone</strong></div>'
+        '<svg class="strike-zone-svg" viewBox="0 0 170 190" '
+        'role="img" aria-label="Live strike zone pitch map">'
+        '<rect class="strike-zone-box" x="50" y="51" width="70" height="86"/>'
+        f"{zone_grid}"
+        f'{"".join(pitch_markers)}</svg>'
+        '<div class="strike-zone-meta">'
+        f"<div><span>Latest</span><strong>{escape(latest_call)}</strong></div>"
+        f'<div class="strike-zone-meta-detail">{escape(" · ".join(latest_meta))}</div>'
+        "</div></div>"
+    )
+
+
+def live_field_wall_geometry(live_feed):
+    dimensions = live_feed.get("field_dimensions") or {}
+    dimension_specs = (
+        ("left_line", 22, 330),
+        ("left", 39, 370),
+        ("left_center", 76, 390),
+        ("center", 125, 400),
+        ("right_center", 174, 390),
+        ("right", 211, 370),
+        ("right_line", 228, 330),
+    )
+    wall_points = []
+    dimension_labels = []
+    for key, x, default_distance in dimension_specs:
+        distance = _live_field_number(dimensions.get(key), default_distance)
+        y = max(24.0, min(82.0, 205.0 - (distance * 0.42)))
+        wall_points.append((x, y))
+        dimension_labels.append(
+            f'<text class="field-dimension" x="{x}" y="{max(12, y - 4):.1f}">'
+            f"{int(round(distance))}</text>"
+        )
+
+    wall_path = "M 125 218 " + " ".join(
+        f"L {x} {y:.1f}" for x, y in wall_points
+    ) + " Z"
+    left_line_x, left_line_y = wall_points[0]
+    right_line_x, right_line_y = wall_points[-1]
+    return wall_path, left_line_x, left_line_y, right_line_x, right_line_y, dimension_labels
+
+
+def live_field_infield_geometry():
+    home_x, home_y = LIVE_FIELD_BASE_COORDS["home"]
+    first_x, first_y = LIVE_FIELD_BASE_COORDS["first"]
+    second_x, second_y = LIVE_FIELD_BASE_COORDS["second"]
+    third_x, third_y = LIVE_FIELD_BASE_COORDS["third"]
+    infield_path = (
+        f"M {home_x} {home_y} L {first_x} {first_y} "
+        f"L {second_x} {second_y} L {third_x} {third_y} Z"
+    )
+    home_plate_path = (
+        f"M {home_x - 5} {home_y - 2} L {home_x + 5} {home_y - 2} "
+        f"L {home_x + 4} {home_y + 3} L {home_x} {home_y + 6} "
+        f"L {home_x - 4} {home_y + 3} Z"
+    )
+    mound_x = (home_x + second_x) / 2
+    mound_y = (home_y + second_y) / 2
+    return home_x, home_y, infield_path, home_plate_path, mound_x, mound_y
+
+
+def live_field_base_shape(base, x, y, occupied=False):
+    occupied_class = " occupied" if occupied else ""
+    half_base = LIVE_FIELD_BASE_SIZE / 2
+    return (
+        f'<rect class="field-base{occupied_class}" x="{x - half_base}" '
+        f'y="{y - half_base}" width="{LIVE_FIELD_BASE_SIZE}" '
+        f'height="{LIVE_FIELD_BASE_SIZE}" transform="rotate(45 {x} {y})"/>'
+    )
+
+
+def live_field_base_shapes(bases=None):
+    bases = bases if isinstance(bases, dict) else {}
+    return [
+        live_field_base_shape(base, x, y, occupied=isinstance(bases.get(base), dict))
+        for base, (x, y) in LIVE_FIELD_BASE_COORDS.items()
+        if base != "home"
+    ]
+
+
+def live_field_grass_layer(wall_path, clip_id):
+    stripes = "".join(
+        f'<rect class="field-stripe" x="{x}" y="0" width="15" height="225"/>'
+        for x in range(20, 230, 30)
+    )
+    return (
+        f'<defs><clipPath id="{clip_id}"><path d="{wall_path}"/></clipPath></defs>'
+        f'<g clip-path="url(#{clip_id})">'
+        '<rect class="field-grass" x="0" y="0" width="250" height="225"/>'
+        f"{stripes}</g>"
+    )
+
+
+def LiveFieldView(live_feed):
+    (
+        wall_path,
+        left_line_x,
+        left_line_y,
+        right_line_x,
+        right_line_y,
+        dimension_labels,
+    ) = live_field_wall_geometry(live_feed)
+
+    home_x, home_y, infield_path, home_plate_path, _mound_x, _mound_y = live_field_infield_geometry()
+    base_positions = {
+        base: coords
+        for base, coords in LIVE_FIELD_BASE_COORDS.items()
+        if base != "home"
+    }
+    bases = live_feed.get("bases") or {}
+    base_shapes = []
+    runner_defs = []
+    runner_shapes = []
+    for base, (x, y) in base_positions.items():
+        runner = bases.get(base)
+        occupied = isinstance(runner, dict)
+        base_shapes.append(live_field_base_shape(base, x, y, occupied=occupied))
+        if not occupied:
+            continue
+        runner_name = safe_text(
+            runner.get("name"),
+            default=f"Runner on {base}",
+        )
+        headshot = safe_text(runner.get("headshot"))
+        runner_defs.append(
+            f'<clipPath id="runner-clip-{base}">'
+            f'<circle cx="{x}" cy="{y}" r="10"/></clipPath>'
+        )
+        if headshot:
+            runner_shapes.append(
+                f'<circle class="field-runner-ring" cx="{x}" cy="{y}" r="11"/>'
+                f'<image href="{escape(headshot, quote=True)}" '
+                f'x="{x - 10}" y="{y - 10}" width="20" height="20" '
+                f'preserveAspectRatio="xMidYMid slice" '
+                f'clip-path="url(#runner-clip-{base})">'
+                f"<title>{escape(runner_name)}</title></image>"
+            )
+        else:
+            runner_shapes.append(
+                f'<circle class="field-runner-ring" cx="{x}" cy="{y}" r="8">'
+                f"<title>{escape(runner_name)}</title></circle>"
+            )
+
+    latest_play = live_feed.get("latest_batted_ball") or {}
+    hit_data = latest_play.get("hit_data") or {}
+    hit_coordinates = contact_play_coordinates(latest_play)
+
+    trajectory_html = ""
+    footer_label = ""
+    footer_meta = ""
+    if hit_coordinates is not None:
+        hit_x, hit_y = hit_coordinates
+        control_x = home_x + ((hit_x - home_x) * 0.46)
+        control_y = max(24.0, ((home_y + hit_y) / 2) - 19)
+        result_type = safe_text(
+            latest_play.get("result_type"),
+            default="other",
+        )
+        result_label = safe_text(
+            latest_play.get("result_label"),
+            default="Ball in play",
+        )
+        batter_name = safe_text(
+            (latest_play.get("batter") or {}).get("name"),
+            default="Batter",
+        )
+        description = safe_text(
+            latest_play.get("description"),
+            default=result_label,
+        )
+        tone_class = field_result_tone(result_type)
+        home_run_class = " home-run" if result_type == "home_run" else ""
+        path_data = (
+            f"M {home_x} {home_y} Q {control_x:.1f} {control_y:.1f} "
+            f"{hit_x:.1f} {hit_y:.1f}"
+        )
+        trajectory_html = (
+            f'<path class="field-trajectory {tone_class}{home_run_class}" '
+            f'd="{path_data}"/>'
+            '<circle class="field-ball-flight" r="3.2">'
+            f'<animateMotion dur="1.05s" path="{path_data}" fill="freeze" />'
+            "</circle>"
+            f'<circle class="field-hit-marker {tone_class}{home_run_class}" '
+            f'cx="{hit_x:.1f}" cy="{hit_y:.1f}" r="4.5">'
+            f"<title>{escape(description)}</title></circle>"
+        )
+        footer_label = f"{result_label} - {batter_name}"
+        hit_meta = []
+        distance = pd.to_numeric(hit_data.get("distance"), errors="coerce")
+        launch_speed = pd.to_numeric(
+            hit_data.get("launch_speed"),
+            errors="coerce",
+        )
+        if pd.notna(distance):
+            hit_meta.append(f"{int(round(float(distance)))} ft")
+        if pd.notna(launch_speed):
+            hit_meta.append(f"{float(launch_speed):.1f} mph")
+        footer_meta = " &middot; ".join(hit_meta)
+
+    footer_html = ""
+    if footer_label or footer_meta:
+        footer_html = (
+            '<div class="live-field-footer">'
+            f"<strong>{escape(footer_label)}</strong>"
+            f"<span>{footer_meta}</span></div>"
+        )
+    venue_name = safe_text(
+        live_feed.get("venue_name"),
+        default="Current ballpark",
+    )
+    return (
+        '<div class="live-field-card">'
+        '<div class="live-field-topline"><span></span>'
+        f"<strong>{escape(venue_name)}</strong></div>"
+        '<svg class="live-field-svg" viewBox="0 0 250 225" '
+        'role="img" aria-label="Live batted ball field view">'
+        f'{live_field_grass_layer(wall_path, "live-field-main-grass")}'
+        f'<defs>{"".join(runner_defs)}</defs>'
+        f'<path class="field-shape" d="{wall_path}" fill="none"/>'
+        f'<path class="field-foul-line" d="M {home_x} {home_y + 5} '
+        f'L {left_line_x} {left_line_y:.1f} M {home_x} {home_y + 5} '
+        f'L {right_line_x} {right_line_y:.1f}"/>'
+        f'<path class="field-infield" d="{infield_path}"/>'
+        f'<path class="field-home-plate" d="{home_plate_path}"/>'
+        f'{"".join(base_shapes)}{"".join(runner_shapes)}'
+        f'{"".join(dimension_labels)}{trajectory_html}</svg>'
+        f"{footer_html}</div>"
+    )
+
+
+def _field_static_svg(live_feed, marker_html, trajectory_html="", aria_label="Field view"):
+    (
+        wall_path,
+        left_line_x,
+        left_line_y,
+        right_line_x,
+        right_line_y,
+        dimension_labels,
+    ) = live_field_wall_geometry(live_feed)
+    home_x, home_y, infield_path, home_plate_path, _mound_x, _mound_y = live_field_infield_geometry()
+    base_shapes = live_field_base_shapes()
+    clip_id = "contact-field-grass-" + "".join(
+        character.lower()
+        for character in safe_text(aria_label, default="field")
+        if character.isalnum()
+    )[:32]
+
+    return (
+        '<svg class="live-field-svg" viewBox="0 0 250 225" '
+        f'role="img" aria-label="{escape(aria_label, quote=True)}">'
+        f'{live_field_grass_layer(wall_path, clip_id)}'
+        f'<path class="field-shape" d="{wall_path}" fill="none"/>'
+        f'<path class="field-foul-line" d="M {home_x} {home_y + 5} '
+        f'L {left_line_x} {left_line_y:.1f} M {home_x} {home_y + 5} '
+        f'L {right_line_x} {right_line_y:.1f}"/>'
+        f'<path class="field-infield" d="{infield_path}"/>'
+        f'<path class="field-home-plate" d="{home_plate_path}"/>'
+        f'{"".join(base_shapes)}'
+        f'{"".join(dimension_labels)}{marker_html}{trajectory_html}</svg>'
+    )
+
+
+def contact_team_plays(live_feed, side):
+    plays = live_feed.get("contact_plays") or []
+    return [
+        play
+        for play in plays
+        if safe_text(play.get("batting_side"), default="").lower() == side
+    ]
+
+
+def LiveContactFieldView(live_feed, side):
+    side = "away" if side == "away" else "home"
+    team_name = safe_text(live_feed.get(f"{side}_team"), default=side.title())
+    team_color = team_primary_color(team_name)
+    contacts = contact_team_plays(live_feed, side)
+    latest_index = None
+    if contacts:
+        latest_index = contacts[-1].get("play_index")
+
+    markers = []
+    trajectory_html = ""
+    hit_count = 0
+    out_count = 0
+    home_x, home_y = LIVE_FIELD_BASE_COORDS["home"]
+    latest_contact_key = live_feed.get("_latest_contact_play_key")
+    for play in contacts:
+        coordinates = contact_play_coordinates(play)
+        if coordinates is None:
+            continue
+        hit_x, hit_y = coordinates
+        result_type = safe_text(play.get("result_type"), default="other")
+        tone_class = field_result_tone(result_type)
+        marker_color = field_result_color(result_type)
+        if result_type in HIT_PLAY_TYPES:
+            hit_count += 1
+        elif tone_class == "out":
+            out_count += 1
+        description = safe_text(play.get("description"), default="Contact")
+        markers.append(
+            f'<circle class="field-contact-marker {tone_class}" '
+            f'cx="{hit_x:.1f}" cy="{hit_y:.1f}" r="4.1" '
+            f'style="fill:{marker_color}">'
+            f"<title>{escape(description)}</title></circle>"
+        )
+        is_latest = (
+            _contact_play_key(play) == latest_contact_key
+            if latest_contact_key is not None
+            else latest_index is not None and play.get("play_index") == latest_index
+        )
+        if is_latest:
+            control_x = home_x + ((hit_x - home_x) * 0.46)
+            control_y = max(24.0, ((home_y + hit_y) / 2) - 19)
+            path_data = (
+                f"M {home_x} {home_y} Q {control_x:.1f} {control_y:.1f} "
+                f"{hit_x:.1f} {hit_y:.1f}"
+            )
+            trajectory_html = (
+                f'<path class="field-trajectory {tone_class}" d="{path_data}" '
+                f'style="stroke:{marker_color}"/>'
+                '<circle class="field-ball-flight" r="3.2">'
+                f'<animateMotion dur="1.05s" path="{path_data}" fill="freeze" />'
+                "</circle>"
+                f'<circle class="field-hit-marker contact-latest {tone_class}" '
+                f'cx="{hit_x:.1f}" cy="{hit_y:.1f}" r="4.6" '
+                f'style="fill:{marker_color}">'
+                f"<title>{escape(description)}</title></circle>"
+            )
+
+    return (
+        f'<div class="contact-field-card" style="border-top:3px solid {team_color}">'
+        '<div class="contact-field-header">'
+        f'<div class="contact-field-team">{team_logo_img_html(team_name, alt=team_name)}'
+        f"<span>{escape(team_name)}</span></div>"
+        '<div class="contact-field-totals">'
+        f"<span>{hit_count} Hits</span><span>{out_count} Outs</span>"
+        "</div></div>"
+        f'{_field_static_svg(live_feed, "".join(markers), trajectory_html, f"{team_name} contact field")}'
+        "</div>"
+    )
+
+
+def contact_side_summary(live_feed, side):
+    summary = (live_feed.get("team_batting_summary") or {}).get(side) or {}
+    if summary:
+        return {
+            "hitting": f'{int(safe_value(summary.get("hits"), 0))}/{int(safe_value(summary.get("at_bats"), 0))}',
+            "avg": safe_text(summary.get("avg"), default="-"),
+            "obp": safe_text(summary.get("obp"), default="-"),
+            "ops": safe_text(summary.get("ops"), default="-"),
+            "strikeouts": int(safe_value(summary.get("strikeouts"), 0)),
+            "walks": int(safe_value(summary.get("walks"), 0)),
+            "home_runs": int(safe_value(summary.get("home_runs"), 0)),
+            "stolen_bases": int(safe_value(summary.get("stolen_bases"), 0)),
+        }
+
+    contacts = contact_team_plays(live_feed, side)
+    hits = 0
+    outs = 0
+    runs = 0
+    exit_velocities = []
+    for play in contacts:
+        result_type = safe_text(play.get("result_type"), default="other")
+        tone_class = field_result_tone(result_type)
+        if result_type in HIT_PLAY_TYPES:
+            hits += 1
+        elif tone_class == "out":
+            outs += 1
+        runs += int(safe_value(play.get("runs_scored"), 0))
+        launch_speed = pd.to_numeric(
+            (play.get("hit_data") or {}).get("launch_speed"),
+            errors="coerce",
+        )
+        if pd.notna(launch_speed):
+            exit_velocities.append(float(launch_speed))
+    avg_ev = (
+        f"{sum(exit_velocities) / len(exit_velocities):.1f}"
+        if exit_velocities
+        else "-"
+    )
+    return {
+        "hitting": f"{hits}/{max(hits + outs, len(contacts))}",
+        "avg": "-",
+        "obp": "-",
+        "ops": "-",
+        "strikeouts": 0,
+        "walks": 0,
+        "home_runs": runs if runs else 0,
+        "stolen_bases": 0,
+    }
+
+
+def ContactHeadToHeadStats(live_feed):
+    away_team = safe_text(live_feed.get("away_team"), default="Away")
+    home_team = safe_text(live_feed.get("home_team"), default="Home")
+    away_summary = contact_side_summary(live_feed, "away")
+    home_summary = contact_side_summary(live_feed, "home")
+    away_color = team_primary_color(away_team)
+    home_color = team_primary_color(home_team)
+
+    rows = (
+        ("Hitting", "hitting"),
+        ("Batting AVG", "avg"),
+        ("OBP", "obp"),
+        ("OPS", "ops"),
+        ("Strikeouts", "strikeouts"),
+        ("Walks", "walks"),
+        ("Home Runs", "home_runs"),
+        ("Stolen Bases", "stolen_bases"),
+    )
+
+    def battle_row(label, key):
+        away_value = safe_text(away_summary.get(key), default="-")
+        home_value = safe_text(home_summary.get(key), default="-")
+        return (
+            '<div class="contact-battle-row">'
+            f'<div class="contact-battle-value">{escape(away_value)}</div>'
+            '<div class="contact-battle-mid">'
+            '<span class="contact-battle-line away"></span>'
+            f'<span class="contact-battle-label">{escape(label)}</span>'
+            '<span class="contact-battle-line home"></span>'
+            "</div>"
+            f'<div class="contact-battle-value home">{escape(home_value)}</div>'
+            "</div>"
+        )
+
+    return (
+        f'<div class="contact-h2h-card" style="--away-color:{away_color};--home-color:{home_color}">'
+        '<div class="contact-h2h-header">'
+        '<strong>Head-to-Head</strong>'
+        '<span>Live team batting comparison</span></div>'
+        '<div class="contact-battle-head">'
+        f'<div class="contact-battle-team">{team_logo_img_html(away_team, alt=away_team)}'
+        f"<span>{escape(away_team)}</span></div>"
+        '<div class="contact-battle-vs">VS</div>'
+        f'<div class="contact-battle-team home"><span>{escape(home_team)}</span>'
+        f"{team_logo_img_html(home_team, alt=home_team)}</div>"
+        "</div>"
+        '<div class="contact-battle-list">'
+        f'{"".join(battle_row(label, key) for label, key in rows)}'
+        "</div></div>"
+    )
+
+
+def contact_momentum_delta(play):
+    result_type = safe_text(play.get("result_type"), default="other")
+    runs = int(safe_value(play.get("runs_scored"), 0))
+    if result_type == "home_run":
+        return 2.2 + (runs * 0.65)
+    if result_type == "triple":
+        return 1.7 + (runs * 0.45)
+    if result_type == "double":
+        return 1.25 + (runs * 0.4)
+    if result_type == "single":
+        return 0.85 + (runs * 0.4)
+    if result_type == "error":
+        return 0.75 + (runs * 0.35)
+    if field_result_tone(result_type) == "out":
+        return -0.55
+    return 0.15
+
+
+def contact_play_inning_slot(play, fallback_index=0):
+    inning = pd.to_numeric(play.get("inning"), errors="coerce")
+    if pd.isna(inning):
+        return float(fallback_index)
+    half = safe_text(play.get("half_inning"), default="top").lower()
+    return ((max(1, int(inning)) - 1) * 2) + (1 if half == "bottom" else 0)
+
+
+def momentum_path_segment(start, end):
+    mid_x = (start[0] + end[0]) / 2
+    return (
+        f'M {start[0]:.1f} {start[1]:.1f} '
+        f'C {mid_x:.1f} {start[1]:.1f} {mid_x:.1f} {end[1]:.1f} '
+        f'{end[0]:.1f} {end[1]:.1f}'
+    )
+
+
+def LiveMomentumGraph(live_feed):
+    plays = live_feed.get("contact_plays") or []
+    away_team = safe_text(live_feed.get("away_team"), default="Away")
+    home_team = safe_text(live_feed.get("home_team"), default="Home")
+    away_color = team_primary_color(away_team, "#245f96")
+    home_color = team_primary_color(home_team, "#187347")
+    points = [(34.0, 78.0, 0.0)]
+    hover_targets = []
+    edge = 0.0
+    slots = [contact_play_inning_slot(play, index) for index, play in enumerate(plays, start=1)]
+    slot_counts = {}
+    for slot in slots:
+        slot_counts[slot] = slot_counts.get(slot, 0) + 1
+    slot_seen = {}
+    max_slot = max(17.0, max(slots, default=17.0))
+    for index, play in enumerate(plays, start=1):
+        delta = contact_momentum_delta(play)
+        batting_side = safe_text(play.get("batting_side"), default="away").lower()
+        if batting_side == "home":
+            edge -= delta
+        else:
+            edge += delta
+        edge = max(-7.0, min(7.0, edge))
+        slot = contact_play_inning_slot(play, index)
+        slot_seen[slot] = slot_seen.get(slot, 0) + 1
+        slot_offset = (
+            (slot_seen[slot] / (slot_counts.get(slot, 1) + 1)) * 0.76
+            if slot_counts.get(slot, 1) > 1
+            else 0.38
+        )
+        x = 34.0 + (((slot + slot_offset) / max(1.0, max_slot + 1.0)) * 536.0)
+        y = 78.0 - (edge * 8.0)
+        y = max(18.0, min(138.0, y))
+        points.append((x, y, edge))
+        team_name = away_team if batting_side != "home" else home_team
+        result_label = safe_text(play.get("result_label"), default="Contact")
+        description = safe_text(play.get("description"), default=result_label)
+        inning = safe_text(play.get("inning"))
+        half = safe_text(play.get("half_inning")).title()
+        inning_text = f"{half} {inning}".strip()
+        runs = int(safe_value(play.get("runs_scored"), 0))
+        title_parts = [
+            text
+            for text in (
+                inning_text,
+                team_name,
+                result_label,
+                f"+{runs} run{'s' if runs != 1 else ''}" if runs else "",
+                description,
+            )
+            if text
+        ]
+        hover_targets.append(
+            {
+                "x": x,
+                "y": y,
+                "title": " | ".join(title_parts),
+            }
+        )
+
+    segments = []
+    for start, end in zip(points, points[1:]):
+        mid_edge = (start[2] + end[2]) / 2
+        stroke = away_color if mid_edge >= 0 else home_color
+        segments.append(
+            f'<path class="momentum-segment" d="{momentum_path_segment(start, end)}" '
+            f'stroke="{stroke}"/>'
+        )
+    if len(points) == 1:
+        segments.append(
+            '<line class="momentum-segment" x1="34" y1="78" x2="570" y2="78" '
+            'stroke="#94a3b8"/>'
+        )
+    hover_markers = []
+    for target in hover_targets:
+        hover_markers.append(
+            f'<circle class="momentum-hover-zone" cx="{target["x"]:.1f}" '
+            f'cy="{target["y"]:.1f}" r="12">'
+            f'<title>{escape(target["title"])}</title></circle>'
+        )
+    inning_ticks = []
+    for inning in range(1, 10):
+        x = 34.0 + ((((inning - 1) * 2 + 0.5) / 18.0) * 536.0)
+        inning_ticks.append(
+            f'<line class="momentum-axis" x1="{x:.1f}" y1="20" x2="{x:.1f}" y2="138"/>'
+            f'<text class="momentum-inning-label" x="{x:.1f}" y="150">{inning}</text>'
+        )
+    return (
+        '<div class="momentum-card">'
+        '<div class="contact-h2h-header"><strong>Momentum</strong>'
+        '<span>Hover line shifts for play context</span></div>'
+        '<div class="momentum-layout">'
+        '<div class="momentum-logo-rail">'
+        f"{team_logo_img_html(away_team, alt=away_team)}"
+        f"{team_logo_img_html(home_team, alt=home_team)}"
+        "</div>"
+        '<svg class="momentum-svg" viewBox="0 0 600 156" role="img" '
+        'aria-label="Live team edge momentum graph">'
+        f'{"".join(inning_ticks)}'
+        '<line class="momentum-midline" x1="24" y1="78" x2="584" y2="78"/>'
+        f'{"".join(segments)}'
+        f'{"".join(hover_markers)}'
+        "</svg></div></div>"
+    )
+
+
+def LiveContactTabView(live_feed):
+    return (
+        f"{LiveMomentumGraph(live_feed)}"
+        f"{ContactHeadToHeadStats(live_feed)}"
+        '<div class="contact-field-grid">'
+        f'{LiveContactFieldView(live_feed, "away")}'
+        f'{LiveContactFieldView(live_feed, "home")}'
+        "</div>"
+    )
+
+
+def AbsChallengeTrackerView(live_feed):
+    challenges = live_feed.get("abs_challenges") or {}
+    enabled = bool(challenges.get("enabled"))
+    if not enabled:
+        return ""
+
+    def team_status(side):
+        team_name = safe_text(
+            live_feed.get(f"{side}_team"),
+            default=side.title(),
+        )
+        team_color = team_primary_color(team_name)
+        status = challenges.get(side) or {}
+        remaining = max(0, int(safe_value(status.get("remaining"), 0)))
+        successful = max(0, int(safe_value(status.get("successful"), 0)))
+        failed = max(0, int(safe_value(status.get("failed"), 0)))
+        total_slots = max(2, min(4, remaining + failed))
+        dots = "".join(
+            '<span class="abs-challenge-dot active"></span>'
+            if index < remaining
+            else '<span class="abs-challenge-dot"></span>'
+            for index in range(total_slots)
+        )
+        history = (
+            f"{successful} won &middot; {failed} lost"
+            if successful or failed
+            else ""
+        )
+        challenge_title = f"{remaining} remaining"
+        return (
+            f'<div class="abs-team-status abs-{side}" '
+            f'style="--abs-team-color:{team_color}" '
+            f'title="{escape(team_name, quote=True)} ABS challenges">'
+            '<div class="abs-team-copy">'
+            f"<strong>{remaining} left</strong>"
+            f"<span>{history}</span></div>"
+            f'<div class="abs-challenge-count" title="{challenge_title}">'
+            f"{dots}</div></div>"
+        )
+
+    return (
+        '<div class="abs-challenge-tracker">'
+        '<div class="abs-tracker-title">'
+        "<strong>ABS Challenges</strong></div>"
+        f'{team_status("away")}{team_status("home")}</div>'
+    )
+
+
+def live_base_tracker_html(live_feed):
+    return BaseRunnerDiamondView(live_feed)
+
+
+def _live_player_profile_href(player, group, game_pk=None):
+    player = player if isinstance(player, dict) else {}
+    player_id = pd.to_numeric(player.get("player_id"), errors="coerce")
+    if pd.isna(player_id):
+        return ""
+    params = {
+        "view": "Players",
+        "player": str(int(player_id)),
+        "profile_group": "pitching" if group == "pitching" else "batting",
+        "return_view": "Games",
+    }
+    if game_pk is not None and not is_missing_value(game_pk):
+        params["return_game_pk"] = str(int(game_pk))
+    return f"?{urlencode(params)}"
+
+
+def _wrap_live_profile_card(card_html, player, group, game_pk=None):
+    href = _live_player_profile_href(player, group, game_pk)
+    if not href:
+        return card_html
+    player_name = safe_text(player.get("name"), default="player")
+    return (
+        f'<a class="live-profile-card-link" href="{escape(href, quote=True)}" '
+        f'aria-label="Open {escape(player_name, quote=True)} profile">'
+        f"{card_html}</a>"
+    )
+
+
+def _live_player_card_html(label, player, changed=False, game_pk=None):
+    player = player if isinstance(player, dict) else {}
+    player_name = safe_text(player.get("name"), default="Not available")
+    lineup_number = pd.to_numeric(player.get("lineup_number"), errors="coerce")
+    label_text = (
+        f"#{int(lineup_number)} {label}"
+        if pd.notna(lineup_number)
+        else label
+    )
+    headshot = image_html(
+        player.get("headshot"),
+        f"{player_name} headshot",
+        fallback_src="",
+    )
+    changed_class = " batter-changed" if changed else ""
+    changed_chip = (
+        '<span class="batter-change-chip">Now Batting</span>'
+        if changed
+        else ""
+    )
+    card_html = (
+        f'<div class="current-hitter-card live-player-link-card{changed_class}">'
+        f"{changed_chip}"
+        f"{headshot}"
+        f"<div><span>{escape(label_text)}</span><strong>{escape(player_name)}</strong></div>"
+        "</div>"
+    )
+    return _wrap_live_profile_card(card_html, player, "batting", game_pk)
+
+
+def _live_pitcher_strip_html(player, game_pk=None):
+    player = player if isinstance(player, dict) else {}
+    player_name = safe_text(player.get("name"), default="Not available")
+    headshot = image_html(
+        player.get("headshot"),
+        f"{player_name} headshot",
+        fallback_src="",
+    )
+    stats = (
+        ("Pitch Count", player.get("pitch_count")),
+        ("Ks", player.get("strikeouts")),
+        ("Hits", player.get("hits_allowed")),
+        ("ERA", player.get("era")),
+    )
+    stat_html = "".join(
+        '<div class="live-pitcher-stat">'
+        f"<span>{escape(label)}</span>"
+        f"<strong>{escape(safe_text(value, default='-'))}</strong>"
+        "</div>"
+        for label, value in stats
+    )
+    card_html = (
+        '<div class="live-pitcher-strip live-player-link-card">'
+        '<div class="live-pitcher-identity">'
+        f"{headshot}"
+        f"<div><span>Pitching</span><strong>{escape(player_name)}</strong></div>"
+        "</div>"
+        f'<div class="live-pitcher-stats">{stat_html}</div>'
+        "</div>"
+    )
+    return _wrap_live_profile_card(card_html, player, "pitching", game_pk)
+
+
+def BatterPitcherView(live_feed, batter_changed=False, game_pk=None):
+    return (
+        f'{_live_pitcher_strip_html(live_feed.get("current_pitcher"), game_pk)}'
+        '<div class="current-hitters">'
+        f'{_live_player_card_html("Batter", live_feed.get("current_batter"), batter_changed, game_pk)}'
+        f'{_live_player_card_html("On Deck", live_feed.get("on_deck"), False, game_pk)}'
+        "</div>"
+    )
+
+
+def PlayResultChip(play):
+    result_type = safe_text(play.get("result_type"), default="other")
+    label = safe_text(play.get("result_label"), default="Other")
+    tone = "home-run" if result_type == "home_run" else play_result_tone(result_type)
+    return (
+        f'<span class="play-result-chip {tone}">{escape(label)}</span>'
+    )
+
+
+def _play_count_text(count):
+    count = count if isinstance(count, dict) else {}
+    return (
+        f"{int(safe_value(count.get('balls'), 0))}-"
+        f"{int(safe_value(count.get('strikes'), 0))}"
+    )
+
+
+def _recent_plays_html(live_feed):
+    plays = live_feed.get("recent_plays") or []
+    if not plays:
+        return ""
+
+    rows = []
+    for play in reversed(plays):
+        batter_data = play.get("batter") or {}
+        pitcher_data = play.get("pitcher") or {}
+        batter = safe_text(
+            batter_data.get("name"),
+            default="Batter",
+        )
+        pitcher = safe_text(
+            pitcher_data.get("name"),
+            default="Pitcher",
+        )
+        batter_icon = image_html(
+            batter_data.get("headshot"),
+            f"{batter} headshot",
+            fallback_src="",
+            lazy=False,
+        )
+        pitcher_icon = image_html(
+            pitcher_data.get("headshot"),
+            f"{pitcher} headshot",
+            fallback_src="",
+            lazy=False,
+        )
+        description = safe_text(play.get("description"), default="Play recorded.")
+        half = safe_text(play.get("half_inning")).title()
+        inning = safe_text(play.get("inning"))
+        inning_text = f"{half} {inning}".strip()
+        count_text = (
+            f"{_play_count_text(play.get('count_before'))} → "
+            f"{_play_count_text(play.get('count_after'))}"
+        )
+        runs_scored = int(safe_value(play.get("runs_scored"), 0))
+        runs_text = f" · +{runs_scored} run{'s' if runs_scored != 1 else ''}" if runs_scored else ""
+        rows.append(
+            '<div class="live-play-row">'
+            f"{PlayResultChip(play)}"
+            '<div class="live-play-matchup">'
+            f'<div class="live-play-player-icons">{batter_icon}{pitcher_icon}</div>'
+            '<div class="live-play-matchup-copy">'
+            f"<strong>{escape(batter)}</strong>"
+            f"<span>vs {escape(pitcher)}</span></div></div>"
+            f'<div class="live-play-description">{escape(description)}</div>'
+            f'<div class="live-play-meta">{escape(inning_text)} · '
+            f"{escape(count_text)}{escape(runs_text)}"
+            "</div></div>"
+        )
+    return (
+        '<div class="live-play-panel">'
+        '<div class="live-play-heading">Plays</div>'
+        f'{"".join(rows)}</div>'
+    )
+
+
+def LiveGameHeader(
+    away_team,
+    home_team,
+    away_score,
+    home_score,
+    status_title,
+    detailed_state,
+    score_changes,
+):
+    return (
+        '<div class="live-game-scorebug">'
+        '<div class="live-game-team">'
+        f"{team_logo_img_html(away_team, alt=away_team)}"
+        f"<span>{escape(away_team)}</span>"
+        f'{ScoreChangeView(away_score, score_changes.get("away", 0))}'
+        "</div>"
+        '<div class="live-game-status">'
+        f"<strong>{escape(status_title)}</strong>"
+        f"<span>{escape(detailed_state)}</span>"
+        "</div>"
+        '<div class="live-game-team">'
+        f'{ScoreChangeView(home_score, score_changes.get("home", 0))}'
+        f"<span>{escape(home_team)}</span>"
+        f"{team_logo_img_html(home_team, alt=home_team)}"
+        "</div>"
+        "</div>"
+    )
+
+
+HOME_RUN_NOTICE_SECONDS = 6.8
+
+
+def _live_game_animation_state(game_pk, live_feed):
+    key = f"live_game_previous_state_{int(game_pk)}"
+    home_run_until_key = f"live_game_home_run_until_{int(game_pk)}"
+    previous = st.session_state.get(key)
+    current = {
+        "away_score": pd.to_numeric(live_feed.get("away_score"), errors="coerce"),
+        "home_score": pd.to_numeric(live_feed.get("home_score"), errors="coerce"),
+        "latest_play_index": (live_feed.get("latest_completed_play") or {}).get(
+            "play_index"
+        ),
+        "latest_play_type": (live_feed.get("latest_completed_play") or {}).get(
+            "result_type"
+        ),
+        "current_batter_id": (live_feed.get("current_batter") or {}).get(
+            "player_id"
+        ),
+    }
+    score_changes = {"away": 0, "home": 0}
+    home_run = False
+    batter_changed = False
+    if isinstance(previous, dict):
+        for side in ("away", "home"):
+            old_score = pd.to_numeric(
+                previous.get(f"{side}_score"),
+                errors="coerce",
+            )
+            new_score = current[f"{side}_score"]
+            if pd.notna(old_score) and pd.notna(new_score) and new_score > old_score:
+                score_changes[side] = int(new_score - old_score)
+        home_run = (
+            current["latest_play_index"] is not None
+            and current["latest_play_index"] != previous.get("latest_play_index")
+            and current["latest_play_type"] == "home_run"
+        )
+        if home_run:
+            st.session_state[home_run_until_key] = time.time() + HOME_RUN_NOTICE_SECONDS
+        batter_changed = (
+            current["current_batter_id"] is not None
+            and previous.get("current_batter_id") is not None
+            and current["current_batter_id"]
+            != previous.get("current_batter_id")
+        )
+    if st.session_state.get(home_run_until_key, 0) > time.time():
+        home_run = True
+    st.session_state[key] = current
+    return score_changes, home_run, batter_changed
+
+
+def _contact_play_key(play):
+    play = play if isinstance(play, dict) else {}
+    hit_data = play.get("hit_data") or {}
+    play_index = play.get("play_index")
+    if play_index is not None:
+        return ("play_index", play_index)
+    return (
+        play.get("inning"),
+        play.get("half_inning"),
+        safe_text((play.get("batter") or {}).get("player_id")),
+        safe_text(play.get("result_type")),
+        safe_text(play.get("description")),
+        safe_text(hit_data.get("x")),
+        safe_text(hit_data.get("y")),
+        safe_text(hit_data.get("location")),
+    )
+
+
+def _live_demo_enabled():
+    return (
+        os.getenv("ALL_RISE_LIVE_DEMO") == "1"
+        and os.getenv("ALL_RISE_ALLOW_LIVE_DEMO") == "1"
+    )
+
+
+def _merge_contact_play_history(game_pk, live_feed):
+    live_feed = live_feed if isinstance(live_feed, dict) else {}
+    history_key = f"live_game_contact_history_{int(game_pk)}"
+    use_persisted_contacts = not _live_demo_enabled()
+    persisted_contacts = (
+        database.load_live_game_contacts(game_pk) if use_persisted_contacts else []
+    )
+    current_contacts = [
+        play
+        for play in (live_feed.get("contact_plays") or [])
+        if isinstance(play, dict) and play.get("hit_data")
+    ]
+    history = st.session_state.get(history_key, [])
+    merged = []
+    seen = set()
+    for play in [*persisted_contacts, *history, *current_contacts]:
+        play_key = _contact_play_key(play)
+        if play_key in seen:
+            continue
+        seen.add(play_key)
+        merged.append(play)
+    merged = merged[-120:]
+    st.session_state[history_key] = merged
+    live_feed["contact_plays"] = merged
+    if use_persisted_contacts and merged:
+        database.save_live_game_contacts(game_pk, merged)
+    if current_contacts:
+        live_feed["_latest_contact_play_key"] = _contact_play_key(current_contacts[-1])
+    return live_feed
+
+
+def _live_game_feed_state(game_pk):
+    feed_key = f"live_game_latest_feed_{int(game_pk)}"
+    final_key = f"live_game_final_{int(game_pk)}"
+    updated_key = f"live_game_updated_at_{int(game_pk)}"
+
+    if _live_demo_enabled():
+        demo_started_key = f"live_game_demo_started_at_{int(game_pk)}"
+        now = time.time()
+        demo_started_at = st.session_state.get(demo_started_key)
+        if demo_started_at is None:
+            demo_started_at = now
+            st.session_state[demo_started_key] = demo_started_at
+        demo_seconds = pd.to_numeric(
+            os.getenv("ALL_RISE_LIVE_DEMO_SECONDS", "4"),
+            errors="coerce",
+        )
+        if pd.isna(demo_seconds) or float(demo_seconds) <= 0:
+            demo_seconds = 4.0
+        demo_tick = int((now - float(demo_started_at)) // float(demo_seconds))
+        feed = build_live_game_demo_feed(demo_tick)
+        feed = _merge_contact_play_history(game_pk, feed)
+        st.session_state[feed_key] = feed
+        st.session_state[updated_key] = time.time()
+        return feed, False
+
+    if st.session_state.get(final_key) and st.session_state.get(feed_key):
+        return st.session_state[feed_key], False
+
+    try:
+        feed = load_live_game_feed(int(game_pk))
+        if feed:
+            feed = _merge_contact_play_history(game_pk, feed)
+            st.session_state[feed_key] = feed
+            st.session_state[updated_key] = time.time()
+            if safe_text(feed.get("abstract_state")).lower() == "final":
+                st.session_state[final_key] = True
+            return feed, False
+    except Exception:
+        pass
+
+    return st.session_state.get(feed_key, {}), True
+
+
+def dismiss_live_game_dialog():
     game_pk = st.session_state.get("selected_boxscore_game_pk")
+    if game_pk is not None:
+        st.session_state.pop(f"live_game_previous_state_{int(game_pk)}", None)
+        st.session_state.pop(f"live_game_home_run_until_{int(game_pk)}", None)
+        st.session_state.pop(f"live_game_demo_started_at_{int(game_pk)}", None)
+        st.session_state.pop(f"live_game_contact_history_{int(game_pk)}", None)
+    st.session_state.selected_boxscore_game_pk = None
+
+
+@st.fragment(run_every="2s")
+def render_live_game_live_tab(schedule_df, game_pk):
     row = selected_game_row(schedule_df, game_pk)
     if row is None:
+        st.warning("This game is no longer available in the selected schedule.")
         return
 
-    away_team = row_text(row, "away_team", default="Away")
-    home_team = row_text(row, "home_team", default="Home")
-    away_code = display_team_code(row, "away")
-    home_code = display_team_code(row, "home")
-    heading_columns = st.columns([8, 1], vertical_alignment="center")
-    with heading_columns[0]:
+    live_feed, feed_error = _live_game_feed_state(game_pk)
+    # Freeze one response for the whole render so batter, count, bases,
+    # pitcher stats, and plays always advance together.
+    live_feed = deepcopy(live_feed)
+
+    away_team = safe_text(
+        live_feed.get("away_team"),
+        default=row_text(row, "away_team", default="Away"),
+    )
+    home_team = safe_text(
+        live_feed.get("home_team"),
+        default=row_text(row, "home_team", default="Home"),
+    )
+    away_score = live_feed.get("away_score")
+    if away_score is None:
+        away_score = row.get("away_score")
+    home_score = live_feed.get("home_score")
+    if home_score is None:
+        home_score = row.get("home_score")
+    inning = safe_text(
+        live_feed.get("inning_ordinal"),
+        default=row_text(row, "current_inning_ordinal", "current_inning"),
+    )
+    inning_state = safe_text(
+        live_feed.get("inning_state"),
+        default=row_text(row, "inning_state", "inning_half"),
+    )
+    detailed_state = safe_text(
+        live_feed.get("detailed_state"),
+        default=game_status_text(row),
+    )
+    status_title = (
+        f"{inning_state} {inning}".strip()
+        if safe_text(live_feed.get("abstract_state")).lower() == "live"
+        else detailed_state
+    )
+    score_changes, home_run, batter_changed = _live_game_animation_state(
+        game_pk,
+        live_feed,
+    )
+
+    st.markdown(
+        LiveGameHeader(
+            away_team,
+            home_team,
+            away_score,
+            home_score,
+            status_title,
+            detailed_state,
+            score_changes,
+        ),
+        unsafe_allow_html=True,
+    )
+    if home_run:
         st.markdown(
-            f"""
-            <div class="boxscore-shell">
-                <div class="section-label">Live Box Score</div>
-                <div class="boxscore-scoreboard">
-                    <div class="boxscore-team">
-                        {team_logo_img_html(away_team, alt=away_team, class_name="boxscore-logo")}
-                        <span>{escape(away_code)}</span>
-                        <strong>{escape(score_value(row.get("away_score")))}</strong>
-                    </div>
-                    <span class="schedule-at">@</span>
-                    <div class="boxscore-team">
-                        {team_logo_img_html(home_team, alt=home_team, class_name="boxscore-logo")}
-                        <span>{escape(home_code)}</span>
-                        <strong>{escape(score_value(row.get("home_score")))}</strong>
-                    </div>
-                    <span class="score-status">{escape(game_status_text(row))}</span>
-                </div>
-            </div>
-            """,
+            '<div class="home-run-notice" role="status" aria-label="Home Run">'
+            '<span class="home-run-fire" aria-hidden="true">'
+            '<svg viewBox="0 0 1200 90" preserveAspectRatio="none" '
+            'xmlns="http://www.w3.org/2000/svg">'
+            '<path class="flame-back" d="M0 90V70 '
+            'C36 72 42 39 71 52 C94 62 104 22 132 40 '
+            'C164 62 175 20 202 33 C229 47 232 9 263 31 '
+            'C294 53 307 18 335 39 C362 59 373 15 406 31 '
+            'C438 46 442 11 475 35 C505 56 520 19 552 38 '
+            'C586 58 595 11 626 32 C660 55 675 18 708 39 '
+            'C742 60 752 13 784 31 C818 50 826 15 858 37 '
+            'C890 59 904 20 936 38 C968 56 978 17 1011 34 '
+            'C1046 52 1056 23 1088 43 C1124 65 1138 37 1166 55 '
+            'C1184 66 1193 63 1200 60 V90Z"/>'
+            '<path class="flame-mid" d="M0 90V78 '
+            'C43 79 54 58 84 66 C112 73 116 37 145 51 '
+            'C174 66 188 31 218 47 C245 62 257 25 286 45 '
+            'C319 67 333 33 365 51 C397 70 405 35 438 50 '
+            'C470 65 486 29 519 48 C553 69 566 35 599 51 '
+            'C634 68 647 29 681 49 C715 68 731 34 764 51 '
+            'C798 69 813 31 846 48 C881 68 894 36 927 52 '
+            'C961 69 976 33 1009 49 C1042 66 1057 39 1088 55 '
+            'C1123 73 1144 50 1171 63 C1187 71 1194 69 1200 66 V90Z"/>'
+            '<path class="flame-core" d="M28 90V82 '
+            'C70 76 76 62 103 70 C132 78 135 50 160 61 '
+            'C190 75 204 44 232 60 C263 77 274 48 302 63 '
+            'C333 80 348 49 377 64 C409 80 422 52 453 65 '
+            'C488 80 502 47 532 64 C565 81 581 52 612 66 '
+            'C646 82 660 48 692 64 C728 82 742 52 775 66 '
+            'C810 82 826 50 858 64 C893 81 909 52 941 66 '
+            'C976 82 992 54 1025 68 C1059 82 1078 61 1107 70 '
+            'C1138 80 1160 72 1178 76 V90Z"/>'
+            '</svg></span>'
+            "<strong>Home Run</strong></div>",
             unsafe_allow_html=True,
         )
-    with heading_columns[1]:
-        if st.button(
-            "Close",
-            key="close_boxscore",
-            type="tertiary",
-            use_container_width=True,
-        ):
-            st.session_state.selected_boxscore_game_pk = None
-            return
+    st.markdown(
+        f"""
+        {AbsChallengeTrackerView(live_feed)}
+        <div class="live-situation-grid">
+            <div class="live-situation-panel">
+                {LiveFieldView(live_feed)}
+            </div>
+            <div class="live-situation-panel">
+                {StrikeZoneView(live_feed)}
+            </div>
+            <div class="live-situation-panel">
+                <div class="metric-label">At The Plate</div>
+                {BatterPitcherView(live_feed, batter_changed, game_pk)}
+                <div class="live-count-board">
+                    {CountDotsView(live_feed.get("balls"), live_feed.get("strikes"))}
+                    {OutsDotsView(live_feed.get("outs"))}
+                    <span class="foul-count">Fouls {int(safe_value(live_feed.get("fouls"), 0))}</span>
+                </div>
+            </div>
+        </div>
+        {_recent_plays_html(live_feed)}
+        """,
+        unsafe_allow_html=True,
+    )
 
+
+@st.fragment(run_every="2s")
+def render_live_game_contact_tab(schedule_df, game_pk):
+    row = selected_game_row(schedule_df, game_pk)
+    if row is None:
+        st.warning("This game is no longer available in the selected schedule.")
+        return
+
+    live_feed, _feed_error = _live_game_feed_state(game_pk)
+    live_feed = deepcopy(live_feed)
+    if not live_feed:
+        st.info("Stats will appear when the live feed starts.")
+        return
+    st.markdown(LiveContactTabView(live_feed), unsafe_allow_html=True)
+
+
+def render_live_game_box_score_tab(row, game_pk):
     team_options = boxscore_team_options(row)
-    team_filter_key = f"boxscore_team_side_{game_pk}"
     option_labels = [option["label"] for option in team_options]
     side_by_label = {
         option["label"]: option["side"]
@@ -2240,30 +5880,78 @@ def render_selected_game_boxscore(schedule_df):
     selected_team_label = render_box_tabs(
         f"boxscore-team-tabs-{game_pk}",
         option_labels,
-        team_filter_key,
+        f"boxscore_team_side_{game_pk}",
         option_labels[0],
     )
     selected_side = side_by_label[selected_team_label]
 
-    boxscore = load_game_boxscore(int(game_pk))
+    try:
+        boxscore = load_game_boxscore(int(game_pk))
+    except Exception:
+        boxscore = {"batting": pd.DataFrame(), "pitching": pd.DataFrame()}
+        st.warning("The live box score is temporarily unavailable.")
+
     boxscore_group = render_box_tabs(
         f"boxscore-group-tabs-{game_pk}",
         ["Hitters", "Pitchers"],
         f"boxscore_group_{game_pk}",
         "Hitters",
     )
+    season_value = pd.to_datetime(row.get("game_date"), errors="coerce")
+    season_value = (
+        int(season_value.year)
+        if pd.notna(season_value)
+        else int(st.session_state.selected_game_date.year)
+    )
     if boxscore_group == "Hitters":
         render_boxscore_dataframe(
             filter_boxscore_team(boxscore.get("batting", pd.DataFrame()), selected_side),
-            ["Pos", "AB", "R", "H", "RBI", "BB", "SO", "HR", "SB", "AVG", "OPS"],
+            ["Lineup", "Pos", "AB", "R", "H", "RBI", "BB", "SO", "HR", "SB", "AVG", "OPS"],
             key=f"boxscore_hitters_{game_pk}",
+            player_group="batting",
+            season_value=season_value,
+            game_pk=game_pk,
         )
     else:
         render_boxscore_dataframe(
             filter_boxscore_team(boxscore.get("pitching", pd.DataFrame()), selected_side),
             ["IP", "H", "R", "ER", "BB", "SO", "HR", "PC-ST", "ERA", "WHIP"],
             key=f"boxscore_pitchers_{game_pk}",
+            player_group="pitching",
+            season_value=season_value,
+            game_pk=game_pk,
         )
+
+
+@st.dialog(
+    "Game Center",
+    width="large",
+    on_dismiss=dismiss_live_game_dialog,
+)
+def render_live_game_dialog(schedule_df, game_pk):
+    row = selected_game_row(schedule_df, game_pk)
+    if row is None:
+        st.warning("This game is no longer available in the selected schedule.")
+        return
+    detail_view = render_box_tabs(
+        f"live-game-detail-tabs-{game_pk}",
+        ["Live", "Stats", "Box Score"],
+        f"live_game_detail_view_{game_pk}",
+        "Live",
+    )
+    if detail_view == "Live":
+        render_live_game_live_tab(schedule_df, game_pk)
+    elif detail_view == "Stats":
+        render_live_game_contact_tab(schedule_df, game_pk)
+    else:
+        render_live_game_box_score_tab(row, game_pk)
+
+
+def render_selected_game_boxscore(schedule_df):
+    game_pk = st.session_state.get("selected_boxscore_game_pk")
+    if selected_game_row(schedule_df, game_pk) is None:
+        return
+    render_live_game_dialog(schedule_df, int(game_pk))
 
 
 @st.fragment
@@ -2308,15 +5996,6 @@ def render_games_tab(schedule_df, filtered_schedule_df, selected_game, selected_
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        f"""
-        <div class="section-shell">
-            <div class="section-label">Schedule</div>
-            <div class="section-title">Today's Games <span class="title-date">{format_display_date(selected_date)}</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
     st.html(
         '<div class="research-table-note">'
         "Click a game or score to open its live box score."
@@ -2329,6 +6008,7 @@ def render_games_tab(schedule_df, filtered_schedule_df, selected_game, selected_
 
 BATTER_STREAK_METRICS = [
     {"label": "Hits", "stat": "H", "threshold": 1},
+    {"label": "H + R + RBI", "stat": "H_R_RBI", "threshold": 2},
     {"label": "HR", "stat": "HR", "threshold": 1},
     {"label": "RBI", "stat": "RBI", "threshold": 1},
     {"label": "Runs", "stat": "R", "threshold": 1},
@@ -2343,6 +6023,18 @@ PITCHER_STREAK_METRICS = [
     {"label": "8+ Ks", "stat": "SO", "threshold": 8},
     {"label": "9+ Ks", "stat": "SO", "threshold": 9},
 ]
+
+
+def add_composite_streak_columns(df):
+    if df is None or df.empty:
+        return df
+    result = df.copy()
+    if all(column in result.columns for column in ("H", "R", "RBI")):
+        result["H_R_RBI"] = sum(
+            pd.to_numeric(result[column], errors="coerce").fillna(0)
+            for column in ("H", "R", "RBI")
+        )
+    return result
 
 
 def streak_candidates_from_stats(stats_df, player_type, schedule, limit=None):
@@ -2508,6 +6200,7 @@ def build_entering_streak_rows(
 
     if historical_logs is None:
         historical_logs = pd.DataFrame()
+    historical_logs = add_composite_streak_columns(historical_logs)
     if not historical_logs.empty and "player_id" in historical_logs.columns:
         historical_logs = historical_logs.copy()
         historical_logs["player_id"] = pd.to_numeric(
@@ -2579,6 +6272,8 @@ def build_fast_live_streak_rows(
     live_df,
     selected_date,
 ):
+    historical_logs = add_composite_streak_columns(historical_logs)
+    live_df = add_composite_streak_columns(live_df)
     result = build_entering_streak_rows(
         candidates,
         metrics,
@@ -2646,7 +6341,13 @@ def build_fast_live_streak_rows(
     return result
 
 
-def render_streak_leaderboard(streak_df, metric_label, key):
+def render_streak_leaderboard(
+    streak_df,
+    metric_label,
+    key,
+    player_group,
+    season_value,
+):
     if streak_df.empty or "Metric" not in streak_df.columns:
         st.html('<div class="leaderboard-empty">No local completed-game streak data is available for this metric.</div>')
         return
@@ -2694,13 +6395,27 @@ def render_streak_leaderboard(streak_df, metric_label, key):
             if not is_missing_value(injury_tooltip)
             else ""
         )
+        profile_payload = player_profile_payload(
+            row.get("player_id"),
+            row.get("Player"),
+            row.get("Team"),
+            player_group,
+            season_value,
+        )
+        profile_json = json.dumps(
+            profile_payload or {},
+            separators=(",", ":"),
+        )
         rows.append(
             f"""
             <div class="leaderboard-row">
                 <div class="leaderboard-rank">{rank}</div>
                 {headshot}
                 <div class="leaderboard-name">
-                    <strong>{escape(row_text(row, "Player", default="Unknown"))}{injury_badge}</strong>
+                    <button type="button" class="research-player-link"
+                            data-research-event="{escape(profile_json, quote=True)}">
+                        <strong>{escape(row_text(row, "Player", default="Unknown"))}{injury_badge}</strong>
+                    </button>
                     <span>{escape(row_text(row, "Team"))} | Today: {escape(today_text)}</span>
                 </div>
                 <div class="leaderboard-bar-track">
@@ -2712,13 +6427,213 @@ def render_streak_leaderboard(streak_df, metric_label, key):
             """
         )
 
-    st.html(
-        f"""
-        <div class="leaderboard-shell" id="{escape(key, quote=True)}">
-            {''.join(rows)}
-        </div>
-        """
+    table_event = RESEARCH_TABLE_COMPONENT(
+        table_html=f"""
+            <div class="leaderboard-shell" id="{escape(key, quote=True)}">
+                {''.join(rows)}
+            </div>
+        """,
+        table_height=min(540, max(90, len(rows) * 59)),
+        key=key,
+        default=None,
     )
+    handle_player_profile_event(table_event, "Streaks")
+
+
+def team_record_class(record):
+    wins = int(safe_value(record.get("wins"), 0))
+    losses = int(safe_value(record.get("losses"), 0))
+    if wins > losses:
+        return "good"
+    if losses > wins:
+        return "bad"
+    return "neutral"
+
+
+def historical_pitcher_game_pks(schedule, pitcher_logs):
+    if schedule is None or schedule.empty or pitcher_logs is None or pitcher_logs.empty:
+        return ()
+
+    game_pks = set()
+    player_ids = pd.to_numeric(
+        pitcher_logs.get("player_id", pd.Series(dtype=float)),
+        errors="coerce",
+    )
+    opponent_ids = pd.to_numeric(
+        pitcher_logs.get("opponent_id", pd.Series(dtype=float)),
+        errors="coerce",
+    )
+    games_started = pd.to_numeric(
+        pitcher_logs.get("GS", pd.Series(1, index=pitcher_logs.index)),
+        errors="coerce",
+    ).fillna(0)
+
+    for _, game in schedule.iterrows():
+        for side, opponent_side in (("away", "home"), ("home", "away")):
+            team_id = pd.to_numeric(game.get(f"{side}_team_id"), errors="coerce")
+            pitcher_id = pd.to_numeric(
+                game.get(f"{opponent_side}_probable_pitcher_id"),
+                errors="coerce",
+            )
+            if pd.isna(team_id) or pd.isna(pitcher_id):
+                continue
+            matches = pitcher_logs[
+                player_ids.eq(int(pitcher_id))
+                & opponent_ids.eq(int(team_id))
+                & games_started.ge(1)
+            ]
+            game_pks.update(
+                int(game_pk)
+                for game_pk in pd.to_numeric(
+                    matches.get("game_pk", pd.Series(dtype=float)),
+                    errors="coerce",
+                ).dropna()
+            )
+    return tuple(sorted(game_pks))
+
+
+def build_team_win_streak_rows(
+    schedule,
+    season_results_df,
+    historical_results_df,
+    pitcher_logs,
+):
+    rows = []
+    if schedule is None or schedule.empty:
+        return pd.DataFrame()
+
+    for _, game in schedule.iterrows():
+        for side, opponent_side in (("away", "home"), ("home", "away")):
+            team_id = game.get(f"{side}_team_id")
+            team_name = row_text(game, f"{side}_team", default=side.title())
+            team_code = row_text(game, f"{side}_team_abbr", default=team_name)
+            pitcher_id = game.get(f"{opponent_side}_probable_pitcher_id")
+            pitcher_name = row_text(
+                game,
+                f"{opponent_side}_probable_pitcher",
+                default="Starter TBD",
+            )
+            record = calculate_team_record_vs_pitcher(
+                historical_results_df,
+                pitcher_logs,
+                team_id,
+                pitcher_id,
+            )
+            rows.append(
+                {
+                    "Team": team_name,
+                    "TeamCode": team_code,
+                    "team_id": team_id,
+                    "Streak": calculate_team_win_streak(
+                        season_results_df,
+                        team_id,
+                    ),
+                    "Pitcher": pitcher_name,
+                    "Record": record,
+                }
+            )
+    result = pd.DataFrame(rows)
+    if result.empty:
+        return result
+    return result.sort_values(
+        ["Streak", "Team"],
+        ascending=[False, True],
+    ).reset_index(drop=True)
+
+
+def render_team_win_streaks(schedule, selected_date_value):
+    season_value = pd.to_datetime(selected_date_value).year
+    try:
+        results_df = load_team_season_results(
+            season_value,
+            selected_date_value,
+        )
+    except Exception:
+        results_df = pd.DataFrame()
+
+    active_pitcher_ids = set()
+    for _, game in schedule.iterrows():
+        for side, opponent_side in (("away", "home"), ("home", "away")):
+            team_id = game.get(f"{side}_team_id")
+            if calculate_team_win_streak(results_df, team_id) < 1:
+                continue
+            pitcher_id = pd.to_numeric(
+                game.get(f"{opponent_side}_probable_pitcher_id"),
+                errors="coerce",
+            )
+            if pd.notna(pitcher_id):
+                active_pitcher_ids.add(int(pitcher_id))
+    pitcher_ids = tuple(sorted(active_pitcher_ids))
+    try:
+        pitcher_logs = (
+            load_probable_pitcher_career_logs(
+                pitcher_ids,
+                selected_date_value,
+            )
+            if pitcher_ids
+            else pd.DataFrame()
+        )
+    except Exception:
+        pitcher_logs = pd.DataFrame()
+
+    historical_game_pks = historical_pitcher_game_pks(
+        schedule,
+        pitcher_logs,
+    )
+    try:
+        historical_results = (
+            load_historical_game_results(historical_game_pks)
+            if historical_game_pks
+            else pd.DataFrame()
+        )
+    except Exception:
+        historical_results = pd.DataFrame()
+
+    streaks = build_team_win_streak_rows(
+        schedule,
+        results_df,
+        historical_results,
+        pitcher_logs,
+    )
+    if streaks.empty:
+        st.info("Team win-streak history is not available for this slate yet.")
+        return
+
+    active = streaks[
+        pd.to_numeric(streaks["Streak"], errors="coerce").fillna(0) > 0
+    ].copy()
+    if active.empty:
+        st.info("No teams on this slate currently have an active win streak.")
+        return
+
+    max_streak = max(1, int(active["Streak"].max()))
+    rows = []
+    for rank, (_, row) in enumerate(active.iterrows(), start=1):
+        streak = int(safe_value(row.get("Streak"), 0))
+        width = max(3, round((streak / max_streak) * 100, 1))
+        record = row.get("Record") or {}
+        wins = int(safe_value(record.get("wins"), 0))
+        losses = int(safe_value(record.get("losses"), 0))
+        pitcher_name = row_text(row, "Pitcher", default="today's starter")
+        record_text = f"{wins}-{losses} vs {pitcher_name}"
+        rows.append(
+            f"""
+            <div class="leaderboard-row">
+                <div class="leaderboard-rank">{rank}</div>
+                {team_logo_img_html(row.get("TeamCode"), alt=row.get("Team"), class_name="team-streak-logo")}
+                <div class="leaderboard-name">
+                    <strong>{escape(row_text(row, "Team", default="Unknown"))}</strong>
+                    <span class="team-streak-record {team_record_class(record)}">{escape(record_text)}</span>
+                </div>
+                <div class="leaderboard-bar-track">
+                    <span class="leaderboard-bar-fill" style="width:{width}%"></span>
+                </div>
+                <div class="leaderboard-count">{streak}</div>
+                <span class="live-chip">Wins</span>
+            </div>
+            """
+        )
+    st.html(f'<div class="leaderboard-shell">{"".join(rows)}</div>')
 
 
 @st.fragment
@@ -2752,22 +6667,16 @@ def render_streaks_tab(
         selected_date_value,
     )
 
-    st.markdown(
-        f"""
-        <div class="section-shell">
-            <div class="section-label">Live Streaks</div>
-            <div class="section-title">Streak Leaders <span class="title-date">{format_display_date(selected_date_value)}</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     streak_group = render_box_tabs(
         "streak-group-tabs",
-        ["Batter Streaks", "Pitcher Streaks"],
+        ["Batter Streaks", "Pitcher Streaks", "Team Win Streaks"],
         "active_streak_group",
         "Batter Streaks",
     )
+
+    if streak_group == "Team Win Streaks":
+        render_team_win_streaks(schedule, selected_date_value)
+        return
 
     if streak_group == "Pitcher Streaks":
         metrics = PITCHER_STREAK_METRICS
@@ -2830,6 +6739,8 @@ def render_streaks_tab(
             pitcher_streaks,
             active_metric_label,
             key=f"pitcher-streak-{active_metric_label}",
+            player_group="pitching",
+            season_value=season_value,
         )
         return
 
@@ -2852,6 +6763,7 @@ def render_streaks_tab(
             if selected_game_value == "All Games"
             else schedule
         ),
+        limit=150 if active_metric_label == "H + R + RBI" else None,
     )
     batter_ids = (
         tuple(batter_candidates["player_id"].tolist())
@@ -2875,6 +6787,20 @@ def render_streaks_tab(
                 season_value,
             ),
         )
+    if (
+        active_metric_label == "H + R + RBI"
+        and (batter_logs.empty or "R" not in batter_logs.columns)
+    ):
+        try:
+            batter_logs = merge_streak_history(
+                batter_logs,
+                load_batter_composite_streak_logs(
+                    batter_ids,
+                    season_value,
+                ),
+            )
+        except Exception:
+            pass
     batter_streaks = build_fast_live_streak_rows(
         batter_candidates,
         active_metric,
@@ -2892,6 +6818,8 @@ def render_streaks_tab(
         batter_streaks,
         active_metric_label,
         key=f"batter-streak-{active_metric_label}",
+        player_group="batting",
+        season_value=season_value,
     )
 
 
@@ -3335,23 +7263,15 @@ def render_clean_stats_table(
             if column in STATS_ALIGN_LEFT_COLUMNS:
                 event_payload = None
                 if column == "Player" and player_log_group:
-                    player_id = pd.to_numeric(
-                        row.get("player_id"),
-                        errors="coerce",
-                    )
                     event_payload = json.dumps(
-                        {
-                            "log_type": "player_season",
-                            "group": player_log_group,
-                            "player_id": (
-                                int(player_id)
-                                if pd.notna(player_id)
-                                else None
-                            ),
-                            "player": row.get("Player"),
-                            "team": row.get("Team"),
-                            "season": season,
-                        },
+                        player_profile_payload(
+                            row.get("player_id"),
+                            row.get("Player"),
+                            row.get("Team"),
+                            player_log_group,
+                            season,
+                        )
+                        or {},
                         separators=(",", ":"),
                     )
                 content = stats_identity_html(
@@ -3382,17 +7302,13 @@ def render_clean_stats_table(
         default=None,
     )
     if player_log_group:
-        render_selected_player_season_log(
-            table_key,
-            selected_log_from_event(table_key, table_event),
-        )
+        handle_player_profile_event(table_event, "Player Stats")
 
 
 def render_team_stats_tab(batter_stats_df, pitcher_stats_df):
     st.markdown(
         """
         <div class="section-shell">
-            <div class="section-label">Team Stats</div>
             <div class="section-title">Season Team Leaders</div>
         </div>
         """,
@@ -3469,7 +7385,6 @@ def render_player_stats_tab(batter_stats_df, pitcher_stats_df, season):
     st.markdown(
         """
         <div class="section-shell">
-            <div class="section-label">Player Stats</div>
             <div class="section-title">Season Player Leaders</div>
         </div>
         """,
@@ -3477,7 +7392,7 @@ def render_player_stats_tab(batter_stats_df, pitcher_stats_df, season):
     )
     st.html(
         '<div class="research-table-note">'
-        "Click a player name to open their season game log. "
+        "Click a player name to open their full profile. "
         "Click a column heading to sort the leaderboard."
         "</div>"
     )
@@ -3533,6 +7448,490 @@ def render_player_stats_tab(batter_stats_df, pitcher_stats_df, season):
         table_key="player-pitcher-stats",
         player_log_group="pitching",
         season=season,
+    )
+
+
+def build_player_directory(batter_stats_df, pitcher_stats_df, season_value):
+    frames = []
+    for stats_df, player_type, group, label in (
+        (batter_stats_df, "batter", "batting", "Batter"),
+        (pitcher_stats_df, "pitcher", "pitching", "Pitcher"),
+    ):
+        leaders = prepare_player_stats(stats_df, player_type)
+        if leaders.empty:
+            continue
+        leaders = leaders.copy()
+        leaders.insert(0, "Rank", range(1, len(leaders) + 1))
+        leaders["group"] = group
+        leaders["player_type"] = label
+        leaders["season"] = int(season_value)
+        frames.append(leaders)
+    return pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+
+
+def player_directory_payload(row):
+    return player_profile_payload(
+        row.get("player_id"),
+        row.get("Player"),
+        row.get("Team"),
+        row.get("group"),
+        row.get("season"),
+    )
+
+
+def render_player_cards(leaders, card_key, limit=5, roster=False):
+    if leaders.empty:
+        st.info("Current player rankings are not available yet.")
+        return
+
+    display_leaders = leaders.copy()
+    if limit is not None:
+        display_leaders = display_leaders.head(limit)
+    cards = []
+    for _, row in display_leaders.iterrows():
+        player_name = row_text(row, "Player", default="Player")
+        team = row_text(row, "Team")
+        rank = pd.to_numeric(row.get("Rank"), errors="coerce")
+        rank_text = (
+            f"Rank #{int(rank)}"
+            if pd.notna(rank)
+            else "Active Roster"
+        )
+        player_type = row_text(
+            row,
+            "Position",
+            "player_type",
+            default="Player",
+        )
+        payload = json.dumps(
+            player_directory_payload(row) or {},
+            separators=(",", ":"),
+        )
+        headshot = image_html(
+            player_image_url(row.get("player_id"), width=160),
+            f"{player_name} headshot",
+            fallback_src=team_logo_fallback_url(team),
+        )
+        cards.append(
+            f"""
+            <button type="button" class="player-card"
+                    data-research-event="{escape(payload, quote=True)}">
+                {headshot}
+                <span class="player-card-rank">{escape(rank_text)}</span>
+                <span class="player-card-name">{escape(player_name)}</span>
+                <span class="player-card-team">{escape(team)} · {escape(player_type)}</span>
+            </button>
+            """
+        )
+    grid_class = (
+        "player-card-grid roster-player-card-grid"
+        if roster
+        else "player-card-grid"
+    )
+    row_count = max(1, (len(cards) + 4) // 5)
+    event = RESEARCH_TABLE_COMPONENT(
+        table_html=f'<div class="{grid_class}">{"".join(cards)}</div>',
+        table_height=(
+            min(740, max(235, row_count * 220))
+            if roster
+            else 235
+        ),
+        key=card_key,
+        default=None,
+    )
+    handle_player_profile_event(event, "Players")
+
+
+def player_team_options(player_directory):
+    if player_directory.empty:
+        return {}
+    teams = {}
+    for _, row in player_directory.iterrows():
+        team_id = pd.to_numeric(row.get("team_id"), errors="coerce")
+        team_name = row_text(row, "team_name", default=row_text(row, "Team"))
+        team_abbr = row_text(row, "Team", default=team_name)
+        if pd.isna(team_id) or not team_name:
+            continue
+        teams[team_name] = (int(team_id), team_name, team_abbr)
+    return dict(sorted(teams.items(), key=lambda item: item[0].casefold()))
+
+
+def enrich_roster_with_rankings(roster_df, player_directory, season_value):
+    if roster_df is None or roster_df.empty:
+        return pd.DataFrame()
+
+    ranked_by_group = {}
+    ranked_any = {}
+    for _, row in player_directory.iterrows():
+        player_id = pd.to_numeric(row.get("player_id"), errors="coerce")
+        if pd.isna(player_id):
+            continue
+        player_id = int(player_id)
+        ranked_by_group[(player_id, row_text(row, "group"))] = row
+        ranked_any.setdefault(player_id, row)
+
+    rows = []
+    for _, roster_row in roster_df.iterrows():
+        player_id = pd.to_numeric(roster_row.get("player_id"), errors="coerce")
+        if pd.isna(player_id):
+            continue
+        player_id = int(player_id)
+        group = row_text(roster_row, "group", default="batting")
+        ranked_row = ranked_by_group.get(
+            (player_id, group),
+            ranked_any.get(player_id),
+        )
+        combined = roster_row.to_dict()
+        if ranked_row is not None:
+            for key, value in ranked_row.items():
+                if key not in {"Player", "Team", "team_name", "team_id", "group"}:
+                    combined[key] = value
+        combined["player_id"] = player_id
+        combined["group"] = group
+        combined["season"] = int(season_value)
+        combined["player_type"] = (
+            "Pitcher" if group == "pitching" else "Batter"
+        )
+        rows.append(combined)
+    result = pd.DataFrame(rows)
+    if result.empty:
+        return result
+    return result.sort_values(
+        ["group", "Position", "Player"],
+        ascending=[False, True, True],
+        na_position="last",
+    ).reset_index(drop=True)
+
+
+def profile_stat_columns(group):
+    if group == "pitching":
+        return ["IP", "GS", "K", "ERA", "WHIP", "K/9"]
+    return ["PA", "H", "HR", "RBI", "AVG", "OPS"]
+
+
+def profile_game_log_columns(group, game_log_df):
+    if group == "pitching":
+        requested = [
+            "game_date",
+            "team",
+            "opponent",
+            "home_away",
+            "IP",
+            "Pitch Count",
+            "BF",
+            "H",
+            "BB",
+            "HBP",
+            "SO",
+            "HR",
+            "R",
+            "ER",
+        ]
+    else:
+        requested = [
+            "game_date",
+            "team",
+            "opponent",
+            "home_away",
+            "PA",
+            "AB",
+            "H",
+            "TB",
+            "BB",
+            "HBP",
+            "SO",
+            "HR",
+            "RBI",
+            "R",
+            "SB",
+            "AVG",
+            "OBP",
+            "SLG",
+            "OPS",
+            "K%",
+            "BB%",
+        ]
+    return [column for column in requested if column in game_log_df.columns]
+
+
+def render_player_profile(profile, player_directory, default_season):
+    return_state = st.session_state.get("player_profile_return") or {}
+    return_view = safe_text(return_state.get("view"), default="Players")
+    return_label = (
+        "← Live Game"
+        if return_view == "Games" and return_state.get("game_pk")
+        else f"← {return_view}"
+    )
+    if st.button(
+        return_label,
+        key="player_profile_back",
+    ):
+        return_from_player_profile()
+
+    player_id = int(profile["player_id"])
+    group = safe_text(profile.get("group"), default="batting")
+    ranked_rows = player_directory[
+        pd.to_numeric(
+            player_directory.get("player_id", pd.Series(dtype=float)),
+            errors="coerce",
+        ).eq(player_id)
+    ].copy()
+    group_rows = ranked_rows[
+        ranked_rows.get("group", pd.Series(dtype=str)).eq(group)
+    ]
+    if not group_rows.empty:
+        ranked_row = group_rows.iloc[0]
+    elif not ranked_rows.empty:
+        ranked_row = ranked_rows.iloc[0]
+        group = row_text(ranked_row, "group", default=group)
+    else:
+        ranked_row = pd.Series(dtype=object)
+
+    try:
+        metadata = load_player_profile(player_id)
+    except Exception:
+        metadata = {}
+
+    player_name = safe_text(
+        metadata.get("name"),
+        default=safe_text(
+            profile.get("player"),
+            default=row_text(ranked_row, "Player", default="Player"),
+        ),
+    )
+    team = safe_text(
+        metadata.get("team"),
+        default=safe_text(
+            profile.get("team"),
+            default=row_text(ranked_row, "Team"),
+        ),
+    )
+    position = safe_text(
+        metadata.get("position"),
+        default="P" if group == "pitching" else "Position unavailable",
+    )
+    rank = pd.to_numeric(ranked_row.get("Rank"), errors="coerce")
+    rank_text = f"#{int(rank)} {group.title()} Rank" if pd.notna(rank) else "Rank unavailable"
+    headshot = safe_text(
+        metadata.get("headshot"),
+        default=player_image_url(player_id, width=180),
+    )
+
+    st.markdown(
+        f"""
+        <div class="player-profile-hero">
+            {image_html(headshot, f"{player_name} headshot", fallback_src=team_logo_fallback_url(team))}
+            <div>
+                <div class="player-profile-title">{escape(player_name)}</div>
+                <div class="player-profile-meta">
+                    {escape(team)} · {escape(position)} · {escape(rank_text)}
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    stat_items = []
+    for column in profile_stat_columns(group):
+        stat_items.append(
+            '<div class="profile-stat">'
+            f'<div class="metric-label">{escape(column)}</div>'
+            f"<strong>{escape(stats_cell_value(column, ranked_row.get(column)))}</strong>"
+            "</div>"
+        )
+    st.html(f'<div class="profile-stat-grid">{"".join(stat_items)}</div>')
+
+    season_options = list(range(int(default_season), 2004, -1))
+    profile_season_key = f"player_profile_season_{player_id}_{group}"
+    if st.session_state.get(profile_season_key) not in season_options:
+        st.session_state[profile_season_key] = int(
+            safe_value(profile.get("season"), default_season)
+        )
+    selected_season = st.selectbox(
+        "Game log season",
+        season_options,
+        key=profile_season_key,
+    )
+
+    game_log_df = load_database_player_game_log(
+        player_id,
+        group,
+        selected_season,
+    )
+    st.markdown(
+        f"""
+        <div class="section-shell game-log-heading">
+            <div class="section-title">{escape(player_name)} · {selected_season}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if game_log_df.empty:
+        st.info("No completed-game history is available for this player and season.")
+        return
+
+    game_log_df = game_log_df.copy()
+    game_log_df["_game_date_sort"] = pd.to_datetime(
+        game_log_df.get("game_date"),
+        errors="coerce",
+    )
+    game_log_df = (
+        game_log_df.sort_values(
+            "_game_date_sort",
+            ascending=False,
+            na_position="last",
+        )
+        .drop(columns="_game_date_sort")
+        .reset_index(drop=True)
+    )
+    columns = profile_game_log_columns(group, game_log_df)
+    render_game_log_table(
+        game_log_df[columns],
+        columns,
+        log_type=group,
+        table_key=f"player-profile-{player_id}-{group}-{selected_season}",
+    )
+    chart_column = "SO" if group == "pitching" else "TB"
+    chart_html = build_recent_bar_chart_html(
+        game_log_df,
+        value_column=chart_column,
+        title=(
+            "Strikeouts - Last 5 Games"
+            if group == "pitching"
+            else "Total Bases - Last 5 Games"
+        ),
+        subtitle=player_name,
+        scale_floor=10 if group == "pitching" else 4,
+        accent="#173f67" if group == "pitching" else "#245f96",
+    )
+    if chart_html:
+        st.html(chart_html)
+
+
+def render_players_tab(batter_stats_df, pitcher_stats_df, season_value):
+    player_directory = build_player_directory(
+        batter_stats_df,
+        pitcher_stats_df,
+        season_value,
+    )
+    selected_profile = st.session_state.get("selected_player_profile")
+    query_player_id = pd.to_numeric(
+        current_query_value("player"),
+        errors="coerce",
+    )
+    if selected_profile is None and pd.notna(query_player_id):
+        query_group = safe_text(current_query_value("profile_group")).lower()
+        query_rows = player_directory[
+            pd.to_numeric(
+                player_directory.get("player_id", pd.Series(dtype=float)),
+                errors="coerce",
+            ).eq(int(query_player_id))
+        ]
+        if query_group in {"batting", "pitching"} and "group" in query_rows:
+            group_rows = query_rows[
+                query_rows["group"].astype(str).str.lower().eq(query_group)
+            ]
+            if not group_rows.empty:
+                query_rows = group_rows
+        if not query_rows.empty:
+            return_game_pk = pd.to_numeric(
+                current_query_value("return_game_pk"),
+                errors="coerce",
+            )
+            selected_profile = player_directory_payload(query_rows.iloc[0])
+            st.session_state.selected_player_profile = selected_profile
+            st.session_state.player_profile_return = {
+                "view": safe_text(current_query_value("return_view"), default="Players"),
+                "game_pk": int(return_game_pk) if pd.notna(return_game_pk) else None,
+            }
+
+    if selected_profile is not None:
+        render_player_profile(
+            selected_profile,
+            player_directory,
+            season_value,
+        )
+        return
+
+    st.markdown(
+        """
+        <div class="section-shell">
+            <div class="section-title">Player Profiles</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if player_directory.empty:
+        st.info("Current player data is not available yet.")
+        return
+
+    search_labels = {}
+    for _, row in player_directory.iterrows():
+        label = (
+            f"{row_text(row, 'Player')} — {row_text(row, 'Team')} "
+            f"({row_text(row, 'player_type')})"
+        )
+        search_labels[label] = player_directory_payload(row)
+    selected_label = st.selectbox(
+        "Search players",
+        sorted(search_labels, key=str.casefold),
+        index=None,
+        placeholder="Search player...",
+        key="players_search",
+        label_visibility="collapsed",
+    )
+    if selected_label:
+        navigate_to_player_profile(
+            search_labels[selected_label],
+            "Players",
+        )
+
+    player_group = render_box_tabs(
+        "players-leader-tabs",
+        ["Batters", "Pitchers", "Teams"],
+        "players_leader_group",
+        "Batters",
+    )
+    if player_group == "Teams":
+        team_options = player_team_options(player_directory)
+        selected_team = st.selectbox(
+            "Team roster",
+            list(team_options),
+            index=None,
+            key="players_team_filter",
+            placeholder="Select team...",
+            label_visibility="collapsed",
+        )
+        if not selected_team:
+            return
+        team_record = team_options[selected_team]
+        try:
+            roster_df = load_active_team_rosters(
+                (team_record,),
+                app_today,
+            )
+        except Exception:
+            roster_df = pd.DataFrame()
+        roster_players = enrich_roster_with_rankings(
+            roster_df,
+            player_directory,
+            season_value,
+        )
+        render_player_cards(
+            roster_players,
+            card_key=f"team-roster-cards-{team_record[0]}",
+            limit=None,
+            roster=True,
+        )
+        return
+
+    group = "batting" if player_group == "Batters" else "pitching"
+    leaders = player_directory[player_directory["group"] == group].copy()
+    render_player_cards(
+        leaders,
+        card_key=f"top-player-cards-{group}",
+        limit=5,
     )
 
 
@@ -3697,13 +8096,15 @@ def player_perspective_game(game, player_team):
     return f"{away_team} @ {home_team}"
 
 
-def research_log_payload(row, log_type):
+def research_log_payload(row, log_type, matchup_rank=None, matchup_total=None):
     if log_type == "pitcher":
         payload = {
             "log_type": "pitcher",
             "pitcher_id": row.get("pitcher_id"),
             "pitcher": row.get("pitcher"),
             "opponent": row.get("opponent"),
+            "matchup_grade": row.get("k_matchup_grade"),
+            "matchup_score": row.get("k_matchup_score"),
         }
     else:
         payload = {
@@ -3712,7 +8113,11 @@ def research_log_payload(row, log_type):
             "opposing_pitcher_id": row.get("opposing_pitcher_id"),
             "batter": row.get("batter"),
             "opposing_pitcher": row.get("opposing_pitcher"),
+            "matchup_grade": row.get("matchup_grade"),
+            "matchup_score": row.get("weather_adjusted_score"),
         }
+    payload["matchup_rank"] = matchup_rank
+    payload["matchup_total"] = matchup_total
     clean_payload = {}
     for key, value in payload.items():
         if is_missing_value(value):
@@ -3802,7 +8207,7 @@ def render_research_table(df, columns, player_column, log_type, table_key):
         )
 
     body_rows = []
-    for _, row in df.iterrows():
+    for matchup_rank, (_, row) in enumerate(df.iterrows(), start=1):
         player_name = row_text(row, player_column, default="Unknown")
         player_id_column = f"{player_column}_id"
         player_id = row.get(player_id_column)
@@ -3826,7 +8231,12 @@ def render_research_table(df, columns, player_column, log_type, table_key):
             row.get(player_team_column),
         )
         player_payload = json.dumps(
-            research_log_payload(row, log_type),
+            research_log_payload(
+                row,
+                log_type,
+                matchup_rank=matchup_rank,
+                matchup_total=len(df),
+            ),
             separators=(",", ":"),
         )
         player_sort_value, player_sort_kind = research_sort_metadata(
@@ -4065,7 +8475,6 @@ def render_selected_player_season_log(table_key, selected_log):
     st.markdown(
         f"""
         <div class="section-shell game-log-heading">
-            <div class="section-label">Season Game Log</div>
             <div class="section-title">
                 {escape(player_name)} - {season_value}
             </div>
@@ -4186,14 +8595,61 @@ def selected_log_from_event(table_key, event):
 def render_selected_research_log(table_key, selected_log):
     if selected_log is None:
         return
+    render_matchup_log_dialog(table_key, selected_log)
 
-    if st.button(
-        "\u00d7 Close log",
-        key=f"{table_key}_close_log",
-        type="tertiary",
-    ):
-        st.session_state[f"{table_key}_selected_log"] = None
-        return
+
+def dismiss_matchup_log_dialog():
+    for key in list(st.session_state):
+        if key.endswith("_selected_log"):
+            st.session_state[key] = None
+
+
+@st.dialog(
+    "Matchup Game Log",
+    width="large",
+    on_dismiss=dismiss_matchup_log_dialog,
+)
+def render_matchup_log_dialog(table_key, selected_log):
+    matchup_rank = pd.to_numeric(
+        selected_log.get("matchup_rank"),
+        errors="coerce",
+    )
+    matchup_total = pd.to_numeric(
+        selected_log.get("matchup_total"),
+        errors="coerce",
+    )
+    matchup_grade = safe_text(
+        selected_log.get("matchup_grade"),
+        default="Not rated",
+    )
+    matchup_score = selected_log.get("matchup_score")
+    score_text = research_cell_value("k_matchup_score", matchup_score)
+    rank_text = (
+        f"#{int(matchup_rank)} of {int(matchup_total)}"
+        if pd.notna(matchup_rank) and pd.notna(matchup_total)
+        else "Not ranked"
+    )
+    st.markdown(
+        f"""
+        <div class="matchup-rank-strip">
+            <div class="matchup-rank-item">
+                <div class="metric-label">Matchup Rank</div>
+                <div class="matchup-rank-value">{escape(rank_text)}</div>
+            </div>
+            <div class="matchup-rank-item">
+                <div class="metric-label">Grade</div>
+                <div class="matchup-rank-value">
+                    <span class="research-grade {matchup_grade_class(matchup_grade)}">{escape(matchup_grade)}</span>
+                </div>
+            </div>
+            <div class="matchup-rank-item">
+                <div class="metric-label">Score</div>
+                <div class="matchup-rank-value">{escape(score_text)}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if selected_log.get("log_type") == "pitcher":
         display_pitcher_vs_team_game_log(selected_log)
@@ -4210,7 +8666,6 @@ def display_bvp_game_log(selected_row):
     st.markdown(
         f"""
         <div class="section-shell game-log-heading">
-            <div class="section-label">Career Game Log</div>
             <div class="section-title">
                 {escape(str(batter_name))} vs {escape(str(pitcher_name))}
             </div>
@@ -4291,7 +8746,6 @@ def display_pitcher_vs_team_game_log(selected_row):
     st.markdown(
         f"""
         <div class="section-shell game-log-heading">
-            <div class="section-label">Career Game Log</div>
             <div class="section-title">
                 {escape(str(pitcher_name))} vs {escape(str(opponent_team))}
             </div>
@@ -4637,18 +9091,18 @@ def render_matchup_filter_fragment(
         st.session_state.selected_game = "All Games"
 
     with st.container(key="matchup_filter_toolbar"):
-        batter_column, game_column, pitcher_column = st.columns(
-            [1.8, 2.25, 1.8],
+        selected_game = st.selectbox(
+            "Game",
+            game_options,
+            key="selected_game",
+            label_visibility="collapsed",
+        )
+
+        batter_column, pitcher_column = st.columns(
+            [1, 1],
             gap="small",
             vertical_alignment="bottom",
         )
-        with game_column:
-            selected_game = st.selectbox(
-                "Game",
-                game_options,
-                key="selected_game",
-                label_visibility="collapsed",
-            )
 
         matchup_schedule_df = filter_by_game(schedule_df, selected_game)
         batter_options = scheduled_batter_options(
@@ -4734,6 +9188,93 @@ def render_hand_split_loading(preload_future):
     st.info("Preparing throwing-hand splits in the background...")
 
 
+UPDATE_NOTICE_VERSION = "1.2"
+UPDATE_NOTICE_STORAGE_KEY = f"all-rise-update-{UPDATE_NOTICE_VERSION}-seen"
+UPDATE_NOTICE_SESSION_KEY = f"show_update_notice_{UPDATE_NOTICE_VERSION.replace('.', '_')}"
+UPDATE_NOTICE_PREVIEW_PARAM = "preview_update"
+
+
+def dismiss_update_notice():
+    st.session_state[UPDATE_NOTICE_SESSION_KEY] = False
+    st.query_params.pop(UPDATE_NOTICE_PREVIEW_PARAM, None)
+
+
+def force_update_notice_preview():
+    return safe_text(current_query_value(UPDATE_NOTICE_PREVIEW_PARAM)).lower() in {
+        "1",
+        "true",
+        "update-1.2",
+    }
+
+
+@st.dialog(
+    f"Update {UPDATE_NOTICE_VERSION}",
+    width="large",
+    on_dismiss=dismiss_update_notice,
+)
+def render_update_notice_dialog():
+    st.markdown(
+        f"""
+        <div class="update-notice">
+            <div class="update-notice-kicker">All Rise Analytics</div>
+            <h2 class="update-notice-title">Update {UPDATE_NOTICE_VERSION} is live</h2>
+            <p class="update-notice-copy">
+                New live game tools, deeper Stats views, and upgraded Streaks tracking are now available.
+                Here is what is worth checking out first.
+            </p>
+            <div class="update-notice-list">
+                <div class="update-notice-item">
+                    <strong>Stats tab for live games</strong>
+                    <span>Open a game and switch to Stats to see contact locations, hits, outs, strike zone activity, and momentum.</span>
+                </div>
+                <div class="update-notice-item">
+                    <strong>Contact charts now carry over</strong>
+                    <span>Batted-ball locations can stay available when you revisit a game, including previous-day games that have contact data.</span>
+                </div>
+                <div class="update-notice-item">
+                    <strong>Streaks got sharper</strong>
+                    <span>Track batter, pitcher, and team win streaks with updated categories, cleaner leaderboards, and better matchup context.</span>
+                </div>
+                <div class="update-notice-item">
+                    <strong>Live player profiles</strong>
+                    <span>Tap the current pitcher, batter, or on-deck hitter from Game Center to jump straight into their profile.</span>
+                </div>
+                <div class="update-notice-item">
+                    <strong>Game cards show more at a glance</strong>
+                    <span>Live games can now show base runners, outs, count context, weather, and your local start time right from the slate.</span>
+                </div>
+                <div class="update-notice-item">
+                    <strong>Pitch tracking added</strong>
+                    <span>Use the strike zone view to follow balls, strikes, and balls in play during live game action.</span>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if st.button("Check out Update 1.2", key="dismiss_update_1_2"):
+        dismiss_update_notice()
+        st.rerun(scope="app")
+
+
+def render_update_notice_probe():
+    event = RESEARCH_TABLE_COMPONENT(
+        table_html="",
+        table_height=1,
+        local_storage_key=UPDATE_NOTICE_STORAGE_KEY,
+        local_storage_value=UPDATE_NOTICE_VERSION,
+        local_storage_event_type="update_notice",
+        key=f"update-notice-probe-{UPDATE_NOTICE_VERSION}",
+        default=None,
+    )
+    if isinstance(event, dict) and event.get("type") == "update_notice":
+        event_key = f"update_notice_event_{UPDATE_NOTICE_VERSION}"
+        event_id = safe_text(event.get("event_id"))
+        if event_id and event_id != st.session_state.get(event_key):
+            st.session_state[event_key] = event_id
+            st.session_state[UPDATE_NOTICE_SESSION_KEY] = True
+
+
 @st.cache_resource
 def start_hand_split_preload(season):
     preload = getattr(
@@ -4760,6 +9301,13 @@ if "selected_game_date" not in st.session_state:
     st.session_state.selected_game_date = app_today
 
 
+render_update_notice_probe()
+if force_update_notice_preview():
+    st.session_state[UPDATE_NOTICE_SESSION_KEY] = True
+if st.session_state.get(UPDATE_NOTICE_SESSION_KEY):
+    render_update_notice_dialog()
+
+
 def shift_selected_date(days):
     st.session_state.selected_game_date += timedelta(days=days)
 
@@ -4768,28 +9316,23 @@ view_options = [
     "Matchups",
     "Games",
     "Streaks",
+    "Players",
     "Player Stats",
     "Team Stats",
     "Details",
 ]
-initial_view = current_query_value("view", "Matchups")
+pending_active_view = st.session_state.pop("pending_active_view", None)
+if pending_active_view in view_options:
+    st.session_state.active_view = pending_active_view
+initial_view = current_query_value("view", "Games")
 initial_view = st.session_state.get("active_view", initial_view)
 if initial_view == "Overview":
     initial_view = "Games"
 if initial_view not in view_options:
-    initial_view = "Matchups"
+    initial_view = "Games"
 st.session_state.active_view = initial_view
 active_view = render_view_tabs(view_options)
 view_loading = st.empty()
-view_loading.markdown(
-    f"""
-    <div class="view-loading" role="status" aria-live="polite">
-        <span class="view-loading-wheel" aria-hidden="true"></span>
-        <span>Loading {escape(active_view)}...</span>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
 if active_view not in {"Games", "Details"}:
     database.ensure_database()
 needs_schedule = active_view in {"Games", "Matchups", "Streaks"}
@@ -4803,18 +9346,37 @@ if active_view == "Matchups":
 game_filter_slot = None
 selected_date = st.session_state.selected_game_date
 
+if active_view in {"Games", "Streaks"}:
+    page_title = {
+        "Games": "Today's Games",
+        "Streaks": "Streak Leaders",
+    }[active_view]
+    st.markdown(
+        f"""
+        <div class="section-shell aligned-page-title">
+            <div class="section-title">{page_title} <span class="title-date">{format_display_date(selected_date)}</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 if needs_schedule:
-    with st.container(key="matchup_toolbar"):
+    toolbar_key = {
+        "Games": "games_toolbar",
+        "Streaks": "streak_toolbar",
+        "Matchups": "matchup_toolbar",
+    }[active_view]
+    with st.container(key=toolbar_key):
         if active_view == "Matchups":
             toolbar_columns = st.columns(
-                [5.85, 0.38, 1.45, 0.38],
+                [0.38, 1.45, 0.38],
                 gap="small",
                 vertical_alignment="bottom",
             )
-            previous_column = toolbar_columns[1]
-            date_column = toolbar_columns[2]
-            next_column = toolbar_columns[3]
-        else:
+            previous_column = toolbar_columns[0]
+            date_column = toolbar_columns[1]
+            next_column = toolbar_columns[2]
+        elif active_view == "Games":
             toolbar_columns = st.columns(
                 [2.7, 0.38, 1.45, 0.38, 3.25],
                 gap="small",
@@ -4825,6 +9387,15 @@ if needs_schedule:
             previous_column = toolbar_columns[1]
             date_column = toolbar_columns[2]
             next_column = toolbar_columns[3]
+        else:
+            toolbar_columns = st.columns(
+                [0.38, 1.45, 0.38],
+                gap="small",
+                vertical_alignment="bottom",
+            )
+            previous_column = toolbar_columns[0]
+            date_column = toolbar_columns[1]
+            next_column = toolbar_columns[2]
 
         with previous_column:
             st.button(
@@ -5059,9 +9630,46 @@ def load_pitcher_matchups(schedule_df, batters_df, pitchers_df):
     )
 
 
-@st.cache_data(show_spinner=False, ttl=20)
+@st.cache_data(show_spinner=False, ttl=9)
 def load_game_boxscore(game_pk):
     return get_game_boxscore(int(game_pk))
+
+
+@st.cache_data(show_spinner=False, ttl=2, max_entries=32)
+def load_live_game_feed(game_pk):
+    return get_live_game_feed(int(game_pk))
+
+
+@st.cache_data(show_spinner=False, ttl=600)
+def load_player_profile(player_id):
+    return get_player_profile(int(player_id))
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_team_season_results(season, through_date):
+    return get_season_team_results(int(season), str(through_date))
+
+
+@st.cache_data(show_spinner=False, ttl=21600)
+def load_probable_pitcher_career_logs(player_ids, through_date):
+    return get_people_career_game_logs(
+        tuple(player_ids),
+        "pitching",
+        str(through_date),
+    )
+
+
+@st.cache_data(show_spinner=False, ttl=21600)
+def load_historical_game_results(game_pks):
+    return get_game_results(tuple(game_pks))
+
+
+@st.cache_data(show_spinner=False, ttl=600)
+def load_active_team_rosters(team_records, roster_date):
+    return get_active_team_rosters(
+        tuple(team_records),
+        str(roster_date),
+    )
 
 
 @st.cache_data(show_spinner=False, ttl=600)
@@ -5101,6 +9709,15 @@ def load_batter_streak_logs(player_ids, season):
     if loader is None:
         return pd.DataFrame()
     return pd.DataFrame(loader(tuple(player_ids), season))
+
+
+@st.cache_data(show_spinner=False, ttl=1800)
+def load_batter_composite_streak_logs(player_ids, season):
+    return fetch_people_game_logs(
+        tuple(player_ids),
+        "hitting",
+        int(season),
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -5297,11 +9914,28 @@ def monitored_streak_history(batter_ids, pitcher_ids, season):
         return state["batting"].copy(), state["pitching"].copy()
 
 
-if active_view in {"Matchups", "Streaks", "Team Stats", "Player Stats"}:
+if active_view in {"Matchups", "Streaks", "Players", "Team Stats", "Player Stats"}:
     start_live_stat_monitor(season)
 
 if needs_schedule:
-    live_schedule_df = load_schedule(selected_date)
+    try:
+        live_schedule_df = load_schedule(selected_date)
+    except Exception:
+        view_loading.empty()
+        st.warning(
+            "The live MLB schedule is temporarily unavailable. "
+            "Check your connection and try again."
+        )
+        if st.button("Retry schedule", key="retry_schedule"):
+            load_schedule.clear()
+            st.rerun(scope="app")
+        st.stop()
+
+    if live_schedule_df.attrs.get("schedule_source") == "saved":
+        st.warning(
+            "Live schedule updates are temporarily unavailable. "
+            "Showing the last saved schedule for this date."
+        )
 
     if live_schedule_df.empty:
         view_loading.empty()
@@ -5359,6 +9993,7 @@ game_options = get_game_options(schedule_df)
 needs_stats = active_view in {
     "Matchups",
     "Streaks",
+    "Players",
     "Team Stats",
     "Player Stats",
 }
@@ -5387,7 +10022,7 @@ if needs_stats:
     batters_df, pitchers_df = monitored_live_stat_tables(season)
     pitchers_df = ensure_probable_pitcher_rows(pitchers_df, schedule_df)
 
-if needs_schedule and not needs_matchups:
+if active_view == "Games":
     if st.session_state.get("selected_game") not in game_options:
         st.session_state.selected_game = "All Games"
     selected_game = game_filter_slot.selectbox(
@@ -5510,6 +10145,9 @@ elif active_view == "Streaks":
 elif active_view == "Team Stats":
     render_team_stats_tab(batters_df, pitchers_df)
 
+elif active_view == "Players":
+    render_players_tab(batters_df, pitchers_df, season)
+
 elif active_view == "Player Stats":
     render_player_stats_tab(batters_df, pitchers_df, season)
 
@@ -5524,7 +10162,8 @@ elif active_view == "Details":
             - **Games:** Use today's schedule to check live scores, weather, probable pitchers, and click a game for the box score.
             - **Matchups:** Compare hitter and pitcher matchups, then click a player name to open the related game log.
             - **Streaks:** See the top active hitting and pitching streaks with live game updates.
-            - **Player Stats:** Sort season player leaderboards and use the headshot/team columns to scan players quickly.
+            - **Players:** Search current players, open a full profile, and browse season game logs.
+            - **Player Stats:** Sort season player leaderboards and click a player to open their profile.
             - **Team Stats:** Rank team batting and pitching totals, or switch to per-game views above each table.
             - **Details:** Check app notes here and use the Glossary tab for stat definitions.
             """
@@ -5541,10 +10180,6 @@ elif active_view == "Details":
             """,
             unsafe_allow_html=True,
         )
-
-        st.subheader("Data Refresh Status")
-        st.markdown(cloud_status_html, unsafe_allow_html=True)
-
     with glossary_tab:
         st.markdown(
             """

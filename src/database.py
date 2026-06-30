@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from datetime import datetime
 import gzip
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -328,6 +329,37 @@ def init_database():
                 message TEXT,
                 created_at TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS live_game_contacts (
+                game_pk INTEGER NOT NULL,
+                play_key TEXT NOT NULL,
+                play_index INTEGER,
+                inning INTEGER,
+                half_inning TEXT,
+                batting_side TEXT,
+                batting_team TEXT,
+                batter_id INTEGER,
+                batter_name TEXT,
+                pitcher_id INTEGER,
+                pitcher_name TEXT,
+                result_type TEXT,
+                result_label TEXT,
+                description TEXT,
+                runs_scored INTEGER,
+                away_score INTEGER,
+                home_score INTEGER,
+                hit_x REAL,
+                hit_y REAL,
+                launch_speed REAL,
+                launch_angle REAL,
+                distance REAL,
+                trajectory TEXT,
+                hardness TEXT,
+                location INTEGER,
+                payload_json TEXT,
+                updated_at TEXT,
+                PRIMARY KEY (game_pk, play_key)
+            );
             """
         )
 
@@ -420,6 +452,8 @@ def init_database():
                 ON pitcher_game_logs(season, pitcher_id, game_date);
             CREATE INDEX IF NOT EXISTS idx_pitcher_stats_pitcher_season
                 ON pitcher_stats(pitcher_id, season);
+            CREATE INDEX IF NOT EXISTS idx_live_game_contacts_game
+                ON live_game_contacts(game_pk, inning, play_index);
             DROP TABLE IF EXISTS plate_appearances;
             """
         )
@@ -536,6 +570,162 @@ def _delete_game_logs(conn, game_pk):
 def delete_game_logs(game_pk):
     with transaction() as conn:
         _delete_game_logs(conn, game_pk)
+
+
+def _nullable_int(value):
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _nullable_float(value):
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def live_contact_play_key(play):
+    play = play if isinstance(play, dict) else {}
+    hit_data = play.get("hit_data") or {}
+    play_index = play.get("play_index")
+    if play_index is not None:
+        return f"play_index:{play_index}"
+    return "|".join(
+        str(part or "")
+        for part in (
+            play.get("inning"),
+            play.get("half_inning"),
+            (play.get("batter") or {}).get("player_id"),
+            (play.get("pitcher") or {}).get("player_id"),
+            play.get("result_type"),
+            play.get("description"),
+            hit_data.get("x"),
+            hit_data.get("y"),
+            hit_data.get("location"),
+        )
+    )
+
+
+def save_live_game_contacts(game_pk, plays):
+    """Persist batted-ball contact plays so the Stats tab survives reloads/days."""
+    contact_plays = [
+        play
+        for play in (plays or [])
+        if isinstance(play, dict) and play.get("hit_data")
+    ]
+    if not contact_plays:
+        return 0
+
+    rows = []
+    for play in contact_plays:
+        hit_data = play.get("hit_data") or {}
+        batter = play.get("batter") or {}
+        pitcher = play.get("pitcher") or {}
+        rows.append(
+            (
+                int(game_pk),
+                live_contact_play_key(play),
+                _nullable_int(play.get("play_index")),
+                _nullable_int(play.get("inning")),
+                play.get("half_inning"),
+                play.get("batting_side"),
+                play.get("batting_team"),
+                _nullable_int(batter.get("player_id")),
+                batter.get("name"),
+                _nullable_int(pitcher.get("player_id")),
+                pitcher.get("name"),
+                play.get("result_type"),
+                play.get("result_label"),
+                play.get("description"),
+                _nullable_int(play.get("runs_scored")),
+                _nullable_int(play.get("away_score")),
+                _nullable_int(play.get("home_score")),
+                _nullable_float(hit_data.get("x")),
+                _nullable_float(hit_data.get("y")),
+                _nullable_float(hit_data.get("launch_speed")),
+                _nullable_float(hit_data.get("launch_angle")),
+                _nullable_float(hit_data.get("distance")),
+                hit_data.get("trajectory"),
+                hit_data.get("hardness"),
+                _nullable_int(hit_data.get("location")),
+                json.dumps(play, separators=(",", ":"), default=str),
+                now_text(),
+            )
+        )
+
+    ensure_database()
+    with transaction() as conn:
+        conn.executemany(
+            """
+            INSERT INTO live_game_contacts (
+                game_pk, play_key, play_index, inning, half_inning,
+                batting_side, batting_team, batter_id, batter_name,
+                pitcher_id, pitcher_name, result_type, result_label,
+                description, runs_scored, away_score, home_score,
+                hit_x, hit_y, launch_speed, launch_angle, distance,
+                trajectory, hardness, location, payload_json, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(game_pk, play_key) DO UPDATE SET
+                play_index = excluded.play_index,
+                inning = excluded.inning,
+                half_inning = excluded.half_inning,
+                batting_side = excluded.batting_side,
+                batting_team = excluded.batting_team,
+                batter_id = excluded.batter_id,
+                batter_name = excluded.batter_name,
+                pitcher_id = excluded.pitcher_id,
+                pitcher_name = excluded.pitcher_name,
+                result_type = excluded.result_type,
+                result_label = excluded.result_label,
+                description = excluded.description,
+                runs_scored = excluded.runs_scored,
+                away_score = excluded.away_score,
+                home_score = excluded.home_score,
+                hit_x = excluded.hit_x,
+                hit_y = excluded.hit_y,
+                launch_speed = excluded.launch_speed,
+                launch_angle = excluded.launch_angle,
+                distance = excluded.distance,
+                trajectory = excluded.trajectory,
+                hardness = excluded.hardness,
+                location = excluded.location,
+                payload_json = excluded.payload_json,
+                updated_at = excluded.updated_at
+            """,
+            rows,
+        )
+    return len(rows)
+
+
+def load_live_game_contacts(game_pk):
+    ensure_database()
+    with read_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT payload_json
+            FROM live_game_contacts
+            WHERE game_pk = ?
+            ORDER BY COALESCE(inning, 0), COALESCE(play_index, 0), play_key
+            """,
+            (int(game_pk),),
+        ).fetchall()
+
+    plays = []
+    for row in rows:
+        try:
+            play = json.loads(row["payload_json"] or "{}")
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if isinstance(play, dict) and play.get("hit_data"):
+            plays.append(play)
+    return plays
 
 
 def _upsert_batter_pitcher_game_log(conn, log_row):
