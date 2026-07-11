@@ -5,6 +5,8 @@ import pandas as pd
 from functools import lru_cache
 from pathlib import Path
 
+from src.api_client import get_json
+
 
 SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule"
 PEOPLE_URL = "https://statsapi.mlb.com/api/v1/people"
@@ -61,13 +63,12 @@ def get_pitcher_hands(player_ids):
         return {}
 
     try:
-        response = requests.get(
+        data = get_json(
             PEOPLE_URL,
             params={"personIds": ",".join(str(player_id) for player_id in player_ids)},
+            provider="MLB StatsAPI",
             timeout=20,
         )
-        response.raise_for_status()
-        data = response.json()
         return {
             int(person["id"]): person.get("pitchHand", {}).get("code")
             for person in data.get("people", [])
@@ -85,9 +86,12 @@ def get_daily_schedule(game_date):
     }
 
     try:
-        response = requests.get(SCHEDULE_URL, params=params, timeout=20)
-        response.raise_for_status()
-        data = response.json()
+        data = get_json(
+            SCHEDULE_URL,
+            params=params,
+            provider="MLB StatsAPI",
+            timeout=20,
+        )
     except requests.RequestException:
         cached = read_cached_schedule(game_date)
         if not cached.empty:
@@ -121,6 +125,15 @@ def get_daily_schedule(game_date):
             status = game.get("status", {})
             linescore = game.get("linescore", {})
             offense = linescore.get("offense") or {}
+            field_dimensions = {
+                "left_line": field_info.get("leftLine"),
+                "left": field_info.get("left"),
+                "left_center": field_info.get("leftCenter"),
+                "center": field_info.get("center"),
+                "right_center": field_info.get("rightCenter"),
+                "right": field_info.get("right"),
+                "right_line": field_info.get("rightLine"),
+            }
 
             rows.append({
                 "game_date": game_date,
@@ -166,6 +179,14 @@ def get_daily_schedule(game_date):
                 "field_azimuth": location.get("azimuthAngle"),
                 "venue_elevation_ft": location.get("elevation"),
                 "roof_type": field_info.get("roofType"),
+                "field_dimensions": field_dimensions,
+                "field_left_line": field_dimensions["left_line"],
+                "field_left": field_dimensions["left"],
+                "field_left_center": field_dimensions["left_center"],
+                "field_center": field_dimensions["center"],
+                "field_right_center": field_dimensions["right_center"],
+                "field_right": field_dimensions["right"],
+                "field_right_line": field_dimensions["right_line"],
             })
 
     pitcher_hands = get_pitcher_hands(

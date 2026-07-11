@@ -1,19 +1,21 @@
 from contextlib import contextmanager
 from datetime import datetime
 import gzip
+import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import sqlite3
 from threading import Lock
 import time
-import urllib.error
-import urllib.request
 from urllib.parse import urlparse
 
+from src.api_client import get as http_get
 from src.matchup_grading import grade_hitter_matchup
 
 
+LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "mlb.db"
 DEFAULT_DB_URL = (
@@ -25,37 +27,102 @@ FALLBACK_DB_URL = (
     "releases/download/mlb-data/mlb.db"
 )
 DB_PATH = Path(os.environ.get("MLB_DB_PATH", DEFAULT_DB_PATH))
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 5
 _INITIALIZED_PATH = None
 _BOOTSTRAP_LOCK = Lock()
 _INITIALIZE_LOCK = Lock()
+BVP_STAT_COLUMNS = (
+    "batter_id",
+    "pitcher_id",
+    "PA",
+    "AB",
+    "H",
+    "doubles",
+    "triples",
+    "BB",
+    "HBP",
+    "SO",
+    "HR",
+    "RBI",
+    "SF",
+    "TB",
+    "AVG",
+    "OBP",
+    "SLG",
+    "OPS",
+    "K_pct",
+    "BB_pct",
+    "last_game_date",
+)
+PITCHER_STAT_COLUMNS = (
+    "season",
+    "pitcher_id",
+    "pitcher_name",
+    "games",
+    "starts",
+    "IP_outs",
+    "IP",
+    "avg_ip_per_start",
+    "avg_pitch_count_per_start",
+    "BF",
+    "H",
+    "BB",
+    "HBP",
+    "SO",
+    "HR",
+    "R",
+    "ER",
+    "ERA",
+    "WHIP",
+    "K_pct",
+    "K9",
+    "projected_ip",
+    "projected_pitch_count",
+    "projected_ks",
+    "last_game_date",
+    "last_updated",
+)
 
 
 def now_text():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _download_database(database_url, temporary_path):
-    request = urllib.request.Request(
+def _download_database(database_url, temporary_path, expected_sha256=None):
+    response = http_get(
         database_url,
-        headers={"User-Agent": "all-rise-analytics/1.0"},
+        provider="GitHub release database",
+        timeout=90,
+        attempts=2,
+        stream=True,
     )
-    with urllib.request.urlopen(request, timeout=600) as response:
-        source = (
-            gzip.GzipFile(fileobj=response)
-            if urlparse(database_url).path.lower().endswith(".gz")
-            else response
-        )
-        try:
-            with temporary_path.open("wb") as handle:
-                while True:
-                    chunk = source.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    handle.write(chunk)
-        finally:
-            if source is not response:
-                source.close()
+    response.raise_for_status()
+    response.raw.decode_content = False
+    source = (
+        gzip.GzipFile(fileobj=response.raw)
+        if urlparse(database_url).path.lower().endswith(".gz")
+        else response.raw
+    )
+    digest = hashlib.sha256()
+    try:
+        with temporary_path.open("wb") as handle:
+            while True:
+                chunk = source.read(1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                handle.write(chunk)
+    finally:
+        if source is not response.raw:
+            source.close()
+        response.close()
+
+    if expected_sha256:
+        actual_sha256 = digest.hexdigest()
+        if actual_sha256.lower() != str(expected_sha256).strip().lower():
+            raise ValueError(
+                "Downloaded MLB database SHA256 did not match MLB_DB_SHA256."
+            )
 
 
 def _bootstrap_database():
@@ -87,11 +154,21 @@ def _bootstrap_database():
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = DB_PATH.with_suffix(DB_PATH.suffix + ".download")
-    attempts = 80 if automatic_urls else 1
+    default_attempts = "2" if automatic_urls else "1"
+    attempts = max(1, int(os.environ.get("MLB_DB_BOOTSTRAP_ATTEMPTS", default_attempts)))
+    retry_delay = max(
+        0.0,
+        float(os.environ.get("MLB_DB_BOOTSTRAP_RETRY_DELAY_SECONDS", "2") or 2),
+    )
+    expected_sha256 = os.environ.get("MLB_DB_SHA256")
     for attempt in range(attempts):
         for database_url in database_urls:
             try:
-                _download_database(database_url, temporary_path)
+                _download_database(
+                    database_url,
+                    temporary_path,
+                    expected_sha256=expected_sha256,
+                )
                 with temporary_path.open("rb") as handle:
                     if handle.read(16) != b"SQLite format 3\x00":
                         raise ValueError(
@@ -99,16 +176,23 @@ def _bootstrap_database():
                         )
                 temporary_path.replace(DB_PATH)
                 return
-            except urllib.error.HTTPError as error:
-                if error.code != 404:
-                    raise
+            except Exception as error:
+                LOGGER.warning(
+                    "Database bootstrap download failed from %s: %s",
+                    database_url,
+                    error,
+                )
             finally:
                 if temporary_path.exists():
                     temporary_path.unlink()
 
         if attempt == attempts - 1:
             break
-        time.sleep(15)
+        time.sleep(retry_delay)
+    LOGGER.warning(
+        "Database bootstrap did not create %s; continuing with local schema.",
+        DB_PATH,
+    )
 
 
 def bootstrap_database():
@@ -125,14 +209,54 @@ def bootstrap_database():
         _bootstrap_database()
 
 
+def _configure_connection(conn):
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 30000")
+    conn.execute("PRAGMA temp_store = MEMORY")
+    if os.environ.get("MLB_DB_DISABLE_WAL", "").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+    }:
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+        except sqlite3.DatabaseError as error:
+            LOGGER.debug("SQLite WAL mode was not enabled: %s", error)
+    return conn
+
+
 def get_connection():
     bootstrap_database()
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=30)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA busy_timeout = 30000")
-    return conn
+    return _configure_connection(conn)
+
+
+def db_cache_key():
+    path = DB_PATH.resolve()
+    try:
+        stat = path.stat()
+    except OSError:
+        return (str(path), None, None, SCHEMA_VERSION)
+
+    user_version = None
+    try:
+        conn = sqlite3.connect(path)
+        try:
+            user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+        finally:
+            conn.close()
+    except sqlite3.DatabaseError:
+        user_version = SCHEMA_VERSION
+
+    return (
+        str(path),
+        int(stat.st_mtime_ns),
+        int(stat.st_size),
+        int(user_version or 0),
+        SCHEMA_VERSION,
+    )
 
 
 @contextmanager
@@ -198,6 +322,12 @@ def init_database():
                 updated_at TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS pitch_types (
+                pitch_code TEXT PRIMARY KEY,
+                pitch_name TEXT,
+                updated_at TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS processed_games (
                 game_pk INTEGER PRIMARY KEY,
                 game_id TEXT,
@@ -260,6 +390,89 @@ def init_database():
                 last_game_date TEXT,
                 last_updated TEXT,
                 PRIMARY KEY (batter_id, pitcher_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS batter_pitch_type_game_logs (
+                game_pk INTEGER,
+                game_id TEXT,
+                source TEXT,
+                game_date TEXT,
+                season INTEGER,
+                batter_id INTEGER,
+                batting_team TEXT,
+                pitcher_hand TEXT,
+                pitch_code TEXT,
+                PA INTEGER,
+                AB INTEGER,
+                H INTEGER,
+                singles INTEGER,
+                doubles INTEGER,
+                triples INTEGER,
+                BB INTEGER,
+                HBP INTEGER,
+                SO INTEGER,
+                HR INTEGER,
+                SF INTEGER,
+                TB INTEGER,
+                PRIMARY KEY (game_pk, batter_id, pitcher_hand, pitch_code)
+            );
+
+            CREATE TABLE IF NOT EXISTS batter_pitch_type_stats (
+                season INTEGER,
+                batter_id INTEGER,
+                batter_name TEXT,
+                pitcher_hand TEXT,
+                pitch_code TEXT,
+                pitch_name TEXT,
+                PA INTEGER,
+                AB INTEGER,
+                H INTEGER,
+                singles INTEGER,
+                doubles INTEGER,
+                triples INTEGER,
+                BB INTEGER,
+                HBP INTEGER,
+                SO INTEGER,
+                HR INTEGER,
+                SF INTEGER,
+                TB INTEGER,
+                AVG REAL,
+                SLG REAL,
+                ISO REAL,
+                K_pct REAL,
+                last_game_date TEXT,
+                last_updated TEXT,
+                PRIMARY KEY (season, batter_id, pitcher_hand, pitch_code)
+            );
+
+            CREATE TABLE IF NOT EXISTS pitcher_pitch_type_game_logs (
+                game_pk INTEGER,
+                game_id TEXT,
+                source TEXT,
+                game_date TEXT,
+                season INTEGER,
+                pitcher_id INTEGER,
+                team TEXT,
+                opponent TEXT,
+                pitch_code TEXT,
+                pitch_count INTEGER,
+                total_speed REAL,
+                measured_pitches INTEGER,
+                PRIMARY KEY (game_pk, pitcher_id, pitch_code)
+            );
+
+            CREATE TABLE IF NOT EXISTS pitcher_pitch_type_stats (
+                season INTEGER,
+                pitcher_id INTEGER,
+                pitcher_name TEXT,
+                pitch_code TEXT,
+                pitch_name TEXT,
+                pitch_count INTEGER,
+                percentage REAL,
+                avg_speed REAL,
+                last_game_date TEXT,
+                last_updated TEXT,
+                PRIMARY KEY (season, pitcher_id, pitch_code)
             );
 
             CREATE TABLE IF NOT EXISTS pitcher_game_logs (
@@ -360,6 +573,117 @@ def init_database():
                 updated_at TEXT,
                 PRIMARY KEY (game_pk, play_key)
             );
+
+            CREATE TABLE IF NOT EXISTS pitch_level_events (
+                game_pk INTEGER NOT NULL,
+                game_date TEXT,
+                season INTEGER,
+                at_bat_number INTEGER NOT NULL,
+                pitch_number INTEGER NOT NULL,
+                batter_id INTEGER,
+                pitcher_id INTEGER,
+                batter_side TEXT,
+                pitcher_hand TEXT,
+                pitch_type TEXT,
+                pitch_name TEXT,
+                release_speed REAL,
+                release_spin_rate REAL,
+                pfx_x REAL,
+                pfx_z REAL,
+                plate_x REAL,
+                plate_z REAL,
+                zone INTEGER,
+                pitch_description TEXT,
+                event TEXT,
+                launch_speed REAL,
+                launch_angle REAL,
+                estimated_distance REAL,
+                estimated_woba REAL,
+                estimated_ba REAL,
+                barrel INTEGER,
+                hard_hit INTEGER,
+                balls INTEGER,
+                strikes INTEGER,
+                outs INTEGER,
+                inning INTEGER,
+                rbi INTEGER,
+                runs_produced INTEGER,
+                updated_at TEXT,
+                PRIMARY KEY (game_pk, at_bat_number, pitch_number)
+            );
+
+            CREATE TABLE IF NOT EXISTS plate_appearance_sequences (
+                game_pk INTEGER NOT NULL,
+                game_date TEXT,
+                season INTEGER,
+                at_bat_number INTEGER NOT NULL,
+                batter_id INTEGER,
+                pitcher_id INTEGER,
+                inning INTEGER,
+                outs INTEGER,
+                starting_count TEXT,
+                final_count TEXT,
+                pa_result TEXT,
+                rbi INTEGER,
+                runs_produced INTEGER,
+                pitch_count INTEGER,
+                pitch_sequence TEXT,
+                launch_speed REAL,
+                launch_angle REAL,
+                estimated_distance REAL,
+                barrel INTEGER,
+                hard_hit INTEGER,
+                updated_at TEXT,
+                PRIMARY KEY (game_pk, at_bat_number)
+            );
+
+            CREATE TABLE IF NOT EXISTS bvp_pitch_type_stats (
+                season INTEGER,
+                batter_id INTEGER,
+                pitcher_id INTEGER,
+                pitch_type TEXT,
+                pitch_name TEXT,
+                pitch_count INTEGER,
+                usage_pct REAL,
+                avg_velocity REAL,
+                max_velocity REAL,
+                avg_spin_rate REAL,
+                horizontal_movement REAL,
+                vertical_movement REAL,
+                zone_pct REAL,
+                chase_pct REAL,
+                whiff_pct REAL,
+                csw_pct REAL,
+                contact_pct REAL,
+                hard_hit_pct REAL,
+                barrel_pct REAL,
+                AVG REAL,
+                SLG REAL,
+                wOBA REAL,
+                xwOBA REAL,
+                K_pct REAL,
+                balls_in_play INTEGER,
+                sample_size TEXT,
+                last_game_date TEXT,
+                last_updated TEXT,
+                PRIMARY KEY (season, batter_id, pitcher_id, pitch_type)
+            );
+
+            CREATE TABLE IF NOT EXISTS daily_bullpen_projections (
+                game_date TEXT NOT NULL,
+                game_pk INTEGER NOT NULL,
+                team_id INTEGER NOT NULL,
+                pitcher_id INTEGER NOT NULL,
+                projected_role TEXT,
+                availability_score REAL,
+                availability_label TEXT,
+                appearance_probability REAL,
+                expected_batters_faced_range TEXT,
+                recent_workload TEXT,
+                projection_reason TEXT,
+                projection_timestamp TEXT,
+                PRIMARY KEY (game_pk, team_id, pitcher_id)
+            );
             """
         )
 
@@ -438,22 +762,82 @@ def init_database():
                 ON games(game_date);
             CREATE INDEX IF NOT EXISTS idx_game_logs_batter_pitcher
                 ON batter_pitcher_game_logs(batter_id, pitcher_id);
+            CREATE INDEX IF NOT EXISTS idx_bpg_logs_batter_pitcher_date_game
+                ON batter_pitcher_game_logs(
+                    batter_id,
+                    pitcher_id,
+                    game_date DESC,
+                    game_pk DESC
+                );
             CREATE INDEX IF NOT EXISTS idx_game_logs_game_date
                 ON batter_pitcher_game_logs(game_date);
             CREATE INDEX IF NOT EXISTS idx_batter_streak_logs
                 ON batter_pitcher_game_logs(season, batter_id, game_date, game_pk);
             CREATE INDEX IF NOT EXISTS idx_bvp_stats_batter_pitcher
                 ON batter_pitcher_stats(batter_id, pitcher_id);
+            CREATE INDEX IF NOT EXISTS idx_batter_pitch_type_logs_lookup
+                ON batter_pitch_type_game_logs(season, batter_id, pitcher_hand);
+            CREATE INDEX IF NOT EXISTS idx_batter_pitch_type_stats_lookup
+                ON batter_pitch_type_stats(batter_id, season, pitcher_hand);
+            CREATE INDEX IF NOT EXISTS idx_batter_pitch_type_stats_batch
+                ON batter_pitch_type_stats(
+                    season,
+                    batter_id,
+                    pitcher_hand,
+                    pitch_code
+                );
+            CREATE INDEX IF NOT EXISTS idx_pitcher_pitch_type_logs_lookup
+                ON pitcher_pitch_type_game_logs(season, pitcher_id);
+            CREATE INDEX IF NOT EXISTS idx_pitcher_pitch_type_stats_lookup
+                ON pitcher_pitch_type_stats(pitcher_id, season);
+            CREATE INDEX IF NOT EXISTS idx_pitcher_pitch_type_stats_batch
+                ON pitcher_pitch_type_stats(
+                    season,
+                    pitcher_id,
+                    pitch_count DESC
+                );
             CREATE INDEX IF NOT EXISTS idx_pitcher_logs_pitcher
                 ON pitcher_game_logs(pitcher_id);
             CREATE INDEX IF NOT EXISTS idx_pitcher_logs_opponent
                 ON pitcher_game_logs(opponent);
+            CREATE INDEX IF NOT EXISTS idx_pitcher_logs_pitcher_opponent_date_game
+                ON pitcher_game_logs(
+                    pitcher_id,
+                    opponent,
+                    game_date DESC,
+                    game_pk DESC
+                );
+            CREATE INDEX IF NOT EXISTS idx_pitcher_logs_season_pitcher_date_game
+                ON pitcher_game_logs(
+                    season,
+                    pitcher_id,
+                    game_date DESC,
+                    game_pk DESC
+                );
             CREATE INDEX IF NOT EXISTS idx_pitcher_streak_logs
                 ON pitcher_game_logs(season, pitcher_id, game_date);
             CREATE INDEX IF NOT EXISTS idx_pitcher_stats_pitcher_season
                 ON pitcher_stats(pitcher_id, season);
             CREATE INDEX IF NOT EXISTS idx_live_game_contacts_game
                 ON live_game_contacts(game_pk, inning, play_index);
+            CREATE INDEX IF NOT EXISTS idx_pitch_level_batter_pitcher_date
+                ON pitch_level_events(batter_id, pitcher_id, game_date);
+            CREATE INDEX IF NOT EXISTS idx_pitch_level_pitcher_type_date
+                ON pitch_level_events(pitcher_id, pitch_type, game_date);
+            CREATE INDEX IF NOT EXISTS idx_pitch_level_batter_type_date
+                ON pitch_level_events(batter_id, pitch_type, game_date);
+            CREATE INDEX IF NOT EXISTS idx_pitch_level_game_pitch
+                ON pitch_level_events(game_pk, at_bat_number, pitch_number);
+            CREATE INDEX IF NOT EXISTS idx_pa_sequences_batter_pitcher_date
+                ON plate_appearance_sequences(batter_id, pitcher_id, game_date);
+            CREATE INDEX IF NOT EXISTS idx_bvp_pitch_type_batter_pitcher
+                ON bvp_pitch_type_stats(batter_id, pitcher_id, season);
+            CREATE INDEX IF NOT EXISTS idx_bvp_pitch_type_pitcher
+                ON bvp_pitch_type_stats(pitcher_id, pitch_type, last_game_date);
+            CREATE INDEX IF NOT EXISTS idx_daily_bullpen_team_date
+                ON daily_bullpen_projections(team_id, game_date);
+            CREATE INDEX IF NOT EXISTS idx_daily_bullpen_game_pitcher
+                ON daily_bullpen_projections(game_pk, pitcher_id);
             DROP TABLE IF EXISTS plate_appearances;
             """
         )
@@ -551,6 +935,29 @@ def upsert_player(player_id, player_name, retro_id=None):
         _upsert_player(conn, player_id, player_name, retro_id)
 
 
+def _upsert_pitch_type(conn, pitch_code, pitch_name):
+    if pitch_code is None:
+        return
+    pitch_code = str(pitch_code).strip()
+    if not pitch_code:
+        return
+    conn.execute(
+        """
+        INSERT INTO pitch_types (pitch_code, pitch_name, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(pitch_code) DO UPDATE SET
+            pitch_name = COALESCE(excluded.pitch_name, pitch_types.pitch_name),
+            updated_at = excluded.updated_at
+        """,
+        (pitch_code, pitch_name, now_text()),
+    )
+
+
+def upsert_pitch_type(pitch_code, pitch_name):
+    with transaction() as conn:
+        _upsert_pitch_type(conn, pitch_code, pitch_name)
+
+
 def is_game_processed(game_pk):
     ensure_database()
     with read_connection() as conn:
@@ -563,6 +970,8 @@ def is_game_processed(game_pk):
 
 def _delete_game_logs(conn, game_pk):
     conn.execute("DELETE FROM batter_pitcher_game_logs WHERE game_pk = ?", (int(game_pk),))
+    conn.execute("DELETE FROM batter_pitch_type_game_logs WHERE game_pk = ?", (int(game_pk),))
+    conn.execute("DELETE FROM pitcher_pitch_type_game_logs WHERE game_pk = ?", (int(game_pk),))
     conn.execute("DELETE FROM pitcher_game_logs WHERE game_pk = ?", (int(game_pk),))
     conn.execute("DELETE FROM processed_games WHERE game_pk = ?", (int(game_pk),))
 
@@ -791,6 +1200,113 @@ def upsert_batter_pitcher_game_log(log_row):
         _upsert_batter_pitcher_game_log(conn, log_row)
 
 
+def _upsert_batter_pitch_type_game_log(conn, log_row):
+    game_pk = int(log_row["game_pk"])
+    game_id = log_row.get("game_id") or f"mlb:{game_pk}"
+    source = log_row.get("source") or "mlb_statsapi"
+    conn.execute(
+        """
+        INSERT INTO batter_pitch_type_game_logs (
+            game_pk, game_id, source, game_date, season, batter_id,
+            batting_team, pitcher_hand, pitch_code, PA, AB, H, singles,
+            doubles, triples, BB, HBP, SO, HR, SF, TB
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(game_pk, batter_id, pitcher_hand, pitch_code) DO UPDATE SET
+            game_id = excluded.game_id,
+            source = excluded.source,
+            game_date = excluded.game_date,
+            season = excluded.season,
+            batting_team = excluded.batting_team,
+            PA = excluded.PA,
+            AB = excluded.AB,
+            H = excluded.H,
+            singles = excluded.singles,
+            doubles = excluded.doubles,
+            triples = excluded.triples,
+            BB = excluded.BB,
+            HBP = excluded.HBP,
+            SO = excluded.SO,
+            HR = excluded.HR,
+            SF = excluded.SF,
+            TB = excluded.TB
+        """,
+        (
+            game_pk,
+            game_id,
+            source,
+            log_row.get("game_date"),
+            log_row.get("season"),
+            log_row.get("batter_id"),
+            log_row.get("batting_team"),
+            log_row.get("pitcher_hand"),
+            log_row.get("pitch_code"),
+            log_row.get("PA", 0),
+            log_row.get("AB", 0),
+            log_row.get("H", 0),
+            log_row.get("singles", 0),
+            log_row.get("doubles", 0),
+            log_row.get("triples", 0),
+            log_row.get("BB", 0),
+            log_row.get("HBP", 0),
+            log_row.get("SO", 0),
+            log_row.get("HR", 0),
+            log_row.get("SF", 0),
+            log_row.get("TB", 0),
+        ),
+    )
+
+
+def upsert_batter_pitch_type_game_log(log_row):
+    with transaction() as conn:
+        _upsert_batter_pitch_type_game_log(conn, log_row)
+
+
+def _upsert_pitcher_pitch_type_game_log(conn, log_row):
+    game_pk = int(log_row["game_pk"])
+    game_id = log_row.get("game_id") or f"mlb:{game_pk}"
+    source = log_row.get("source") or "mlb_statsapi"
+    conn.execute(
+        """
+        INSERT INTO pitcher_pitch_type_game_logs (
+            game_pk, game_id, source, game_date, season, pitcher_id,
+            team, opponent, pitch_code, pitch_count, total_speed,
+            measured_pitches
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(game_pk, pitcher_id, pitch_code) DO UPDATE SET
+            game_id = excluded.game_id,
+            source = excluded.source,
+            game_date = excluded.game_date,
+            season = excluded.season,
+            team = excluded.team,
+            opponent = excluded.opponent,
+            pitch_count = excluded.pitch_count,
+            total_speed = excluded.total_speed,
+            measured_pitches = excluded.measured_pitches
+        """,
+        (
+            game_pk,
+            game_id,
+            source,
+            log_row.get("game_date"),
+            log_row.get("season"),
+            log_row.get("pitcher_id"),
+            log_row.get("team"),
+            log_row.get("opponent"),
+            log_row.get("pitch_code"),
+            _nullable_int(log_row.get("pitch_count")) or 0,
+            _nullable_float(log_row.get("total_speed")) or 0,
+            _nullable_int(log_row.get("measured_pitches")) or 0,
+        ),
+    )
+
+
+def upsert_pitcher_pitch_type_game_log(log_row):
+    with transaction() as conn:
+        _upsert_pitcher_pitch_type_game_log(conn, log_row)
+
+
 def _upsert_pitcher_game_log(conn, log_row):
     game_pk = int(log_row["game_pk"])
     game_id = log_row.get("game_id") or f"mlb:{game_pk}"
@@ -923,18 +1439,30 @@ def save_completed_game(
     batter_pitcher_logs,
     pitcher_logs,
     plate_appearances_loaded,
+    batter_pitch_type_logs=None,
+    pitcher_pitch_type_logs=None,
+    pitch_types=None,
     reprocess_existing=False,
 ):
     """Persist one completed StatsAPI game as a single atomic transaction."""
     game_pk, game_id, source = _game_identity(game)
+    batter_pitch_type_logs = batter_pitch_type_logs or []
+    pitcher_pitch_type_logs = pitcher_pitch_type_logs or []
+    pitch_types = pitch_types or {}
     with transaction() as conn:
         if reprocess_existing:
             _delete_game_logs(conn, game_pk)
         _upsert_game(conn, game)
         for player_id, player_name in players.items():
             _upsert_player(conn, player_id, player_name)
+        for pitch_code, pitch_name in pitch_types.items():
+            _upsert_pitch_type(conn, pitch_code, pitch_name)
         for row in batter_pitcher_logs:
             _upsert_batter_pitcher_game_log(conn, row)
+        for row in batter_pitch_type_logs:
+            _upsert_batter_pitch_type_game_log(conn, row)
+        for row in pitcher_pitch_type_logs:
+            _upsert_pitcher_pitch_type_game_log(conn, row)
         for row in pitcher_logs:
             _upsert_pitcher_game_log(conn, row)
         _mark_game_processed(
@@ -960,6 +1488,10 @@ def replace_retrosheet_season(
     """Replace one historical season only after it has parsed successfully."""
     with transaction() as conn:
         conn.execute("DELETE FROM batter_pitcher_game_logs WHERE season = ?", (season,))
+        conn.execute("DELETE FROM batter_pitch_type_game_logs WHERE season = ?", (season,))
+        conn.execute("DELETE FROM batter_pitch_type_stats WHERE season = ?", (season,))
+        conn.execute("DELETE FROM pitcher_pitch_type_game_logs WHERE season = ?", (season,))
+        conn.execute("DELETE FROM pitcher_pitch_type_stats WHERE season = ?", (season,))
         conn.execute("DELETE FROM pitcher_game_logs WHERE season = ?", (season,))
         conn.execute("DELETE FROM processed_games WHERE season = ?", (season,))
         conn.execute("DELETE FROM games WHERE season = ?", (season,))
@@ -1050,6 +1582,109 @@ def rebuild_batter_pitcher_stats():
         )
 
 
+def rebuild_batter_pitch_type_stats():
+    with transaction() as conn:
+        conn.execute("DELETE FROM batter_pitch_type_stats")
+        conn.execute(
+            """
+            INSERT INTO batter_pitch_type_stats (
+                season, batter_id, batter_name, pitcher_hand, pitch_code,
+                pitch_name, PA, AB, H, singles, doubles, triples, BB, HBP,
+                SO, HR, SF, TB, AVG, SLG, ISO, K_pct, last_game_date,
+                last_updated
+            )
+            SELECT
+                gl.season,
+                gl.batter_id,
+                MAX(bp.player_name),
+                gl.pitcher_hand,
+                gl.pitch_code,
+                COALESCE(MAX(pt.pitch_name), gl.pitch_code),
+                SUM(gl.PA),
+                SUM(gl.AB),
+                SUM(gl.H),
+                SUM(gl.singles),
+                SUM(gl.doubles),
+                SUM(gl.triples),
+                SUM(gl.BB),
+                SUM(gl.HBP),
+                SUM(gl.SO),
+                SUM(gl.HR),
+                SUM(gl.SF),
+                SUM(gl.TB),
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.H) * 1.0 / SUM(gl.AB), 3) ELSE 0 END,
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.TB) * 1.0 / SUM(gl.AB), 3) ELSE 0 END,
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(
+                        (SUM(gl.TB) - SUM(gl.H)) * 1.0 / SUM(gl.AB),
+                        3
+                    ) ELSE 0 END,
+                CASE WHEN SUM(gl.PA) > 0
+                    THEN ROUND(SUM(gl.SO) * 100.0 / SUM(gl.PA), 2) ELSE 0 END,
+                MAX(gl.game_date),
+                ?
+            FROM batter_pitch_type_game_logs gl
+            LEFT JOIN players bp ON gl.batter_id = bp.player_id
+            LEFT JOIN pitch_types pt ON gl.pitch_code = pt.pitch_code
+            GROUP BY gl.season, gl.batter_id, gl.pitcher_hand, gl.pitch_code
+            """,
+            (now_text(),),
+        )
+
+
+def rebuild_pitcher_pitch_type_stats():
+    with transaction() as conn:
+        conn.execute("DELETE FROM pitcher_pitch_type_stats")
+        conn.execute(
+            """
+            INSERT INTO pitcher_pitch_type_stats (
+                season, pitcher_id, pitcher_name, pitch_code, pitch_name,
+                pitch_count, percentage, avg_speed, last_game_date,
+                last_updated
+            )
+            WITH pitch_totals AS (
+                SELECT
+                    season,
+                    pitcher_id,
+                    SUM(pitch_count) AS total_pitches
+                FROM pitcher_pitch_type_game_logs
+                GROUP BY season, pitcher_id
+            )
+            SELECT
+                gl.season,
+                gl.pitcher_id,
+                MAX(pp.player_name),
+                gl.pitch_code,
+                COALESCE(MAX(pt.pitch_name), gl.pitch_code),
+                SUM(gl.pitch_count),
+                CASE WHEN MAX(pitch_totals.total_pitches) > 0
+                    THEN ROUND(
+                        SUM(gl.pitch_count) * 100.0 /
+                        MAX(pitch_totals.total_pitches),
+                        1
+                    ) ELSE 0 END,
+                CASE WHEN SUM(gl.measured_pitches) > 0
+                    THEN ROUND(
+                        SUM(gl.total_speed) * 1.0 /
+                        SUM(gl.measured_pitches),
+                        1
+                    ) END,
+                MAX(gl.game_date),
+                ?
+            FROM pitcher_pitch_type_game_logs gl
+            INNER JOIN pitch_totals
+                ON pitch_totals.season = gl.season
+                AND pitch_totals.pitcher_id = gl.pitcher_id
+            LEFT JOIN players pp ON gl.pitcher_id = pp.player_id
+            LEFT JOIN pitch_types pt ON gl.pitch_code = pt.pitch_code
+            GROUP BY gl.season, gl.pitcher_id, gl.pitch_code
+            """,
+            (now_text(),),
+        )
+
+
 def rebuild_pitcher_stats():
     with transaction() as conn:
         conn.execute("DELETE FROM pitcher_stats")
@@ -1121,6 +1756,8 @@ def rebuild_pitcher_stats():
 
 def rebuild_all_summary_stats():
     rebuild_batter_pitcher_stats()
+    rebuild_batter_pitch_type_stats()
+    rebuild_pitcher_pitch_type_stats()
     rebuild_pitcher_stats()
 
 
@@ -1156,8 +1793,8 @@ def get_batter_vs_pitcher_stats_from_db(batter_id, pitcher_id):
     ensure_database()
     with read_connection() as conn:
         row = conn.execute(
-            """
-            SELECT *
+            f"""
+            SELECT {", ".join(BVP_STAT_COLUMNS)}
             FROM batter_pitcher_stats
             WHERE batter_id = ? AND pitcher_id = ?
             """,
@@ -1165,6 +1802,10 @@ def get_batter_vs_pitcher_stats_from_db(batter_id, pitcher_id):
         ).fetchone()
     if row is None:
         return empty_bvp_result("No History")
+    return _bvp_result_from_row(row)
+
+
+def _bvp_result_from_row(row):
     return {
         "PA": row["PA"],
         "AB": row["AB"],
@@ -1176,12 +1817,15 @@ def get_batter_vs_pitcher_stats_from_db(batter_id, pitcher_id):
         "SO": row["SO"],
         "HR": row["HR"],
         "RBI": row["RBI"],
+        "SF": row["SF"],
+        "TB": row["TB"],
         "AVG": row["AVG"],
         "OBP": row["OBP"],
         "SLG": row["SLG"],
         "OPS": row["OPS"],
         "K%": row["K_pct"],
         "BB%": row["BB_pct"],
+        "last_game_date": row["last_game_date"],
         "matchup_grade": grade_bvp(row["AB"], row["AVG"]),
     }
 
@@ -1189,6 +1833,7 @@ def get_batter_vs_pitcher_stats_from_db(batter_id, pitcher_id):
 def get_batter_vs_pitcher_stats_batch_from_db(matchup_pairs):
     ensure_database()
     clean_pairs = []
+    seen_pairs = set()
     for batter_id, pitcher_id in matchup_pairs:
         if batter_id is None or pitcher_id is None:
             continue
@@ -1196,8 +1841,10 @@ def get_batter_vs_pitcher_stats_batch_from_db(matchup_pairs):
             pair = (int(batter_id), int(pitcher_id))
         except (TypeError, ValueError):
             continue
-        if pair not in clean_pairs:
-            clean_pairs.append(pair)
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        clean_pairs.append(pair)
 
     results = {
         pair: empty_bvp_result("No History")
@@ -1217,32 +1864,16 @@ def get_batter_vs_pitcher_stats_batch_from_db(matchup_pairs):
             ]
             rows = conn.execute(
                 f"""
-                SELECT *
+                SELECT {", ".join(BVP_STAT_COLUMNS)}
                 FROM batter_pitcher_stats
                 WHERE (batter_id, pitcher_id) IN ({placeholders})
                 """,
                 params,
             ).fetchall()
             for row in rows:
-                results[(row["batter_id"], row["pitcher_id"])] = {
-                    "PA": row["PA"],
-                    "AB": row["AB"],
-                    "H": row["H"],
-                    "2B": row["doubles"],
-                    "3B": row["triples"],
-                    "BB": row["BB"],
-                    "HBP": row["HBP"],
-                    "SO": row["SO"],
-                    "HR": row["HR"],
-                    "RBI": row["RBI"],
-                    "AVG": row["AVG"],
-                    "OBP": row["OBP"],
-                    "SLG": row["SLG"],
-                    "OPS": row["OPS"],
-                    "K%": row["K_pct"],
-                    "BB%": row["BB_pct"],
-                    "matchup_grade": grade_bvp(row["AB"], row["AVG"]),
-                }
+                results[(row["batter_id"], row["pitcher_id"])] = (
+                    _bvp_result_from_row(row)
+                )
     return results
 
 
@@ -1286,6 +1917,134 @@ def get_batter_vs_pitcher_game_logs_from_db(batter_id, pitcher_id):
             ORDER BY gl.game_date DESC
             """,
             (int(batter_id), int(pitcher_id)),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_batter_pitch_type_stats_from_db(batter_id, season, pitcher_hand=None):
+    if batter_id is None or season is None:
+        return []
+    rows = get_batter_pitch_type_stats_batch_from_db(
+        [batter_id],
+        season,
+        pitcher_hand=pitcher_hand,
+    )
+    return [
+        {key: value for key, value in row.items() if key != "batter_id"}
+        for row in rows
+    ]
+
+
+def get_batter_pitch_type_stats_batch_from_db(
+    batter_ids,
+    season,
+    pitcher_hand=None,
+):
+    if season is None:
+        return []
+    clean_ids = []
+    seen_ids = set()
+    for batter_id in batter_ids:
+        if batter_id is None:
+            continue
+        try:
+            numeric_id = int(batter_id)
+        except (TypeError, ValueError):
+            continue
+        if numeric_id in seen_ids:
+            continue
+        seen_ids.add(numeric_id)
+        clean_ids.append(numeric_id)
+    if not clean_ids:
+        return []
+
+    ensure_database()
+    placeholders = ",".join("?" for _ in clean_ids)
+    params = [int(season), *clean_ids]
+    hand_filter = ""
+    if pitcher_hand:
+        hand_filter = " AND pitcher_hand = ?"
+        params.append(str(pitcher_hand).upper()[:1])
+    with read_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT
+                batter_id,
+                pitch_code,
+                COALESCE(pitch_name, pitch_code) AS PITCH,
+                pitcher_hand,
+                PA,
+                AB,
+                H,
+                singles AS "1B",
+                doubles AS "2B",
+                triples AS "3B",
+                HR,
+                SO AS K,
+                BB,
+                HBP,
+                SF,
+                TB,
+                AVG,
+                SLG,
+                ISO,
+                K_pct AS "K%"
+            FROM batter_pitch_type_stats
+            WHERE season = ? AND batter_id IN ({placeholders}){hand_filter}
+            ORDER BY batter_id, AB DESC, PA DESC, PITCH
+            """,
+            params,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_pitcher_pitch_type_stats_from_db(pitcher_id, season):
+    if pitcher_id is None or season is None:
+        return []
+    rows = get_pitcher_pitch_type_stats_batch_from_db([pitcher_id], season)
+    return [
+        {key: value for key, value in row.items() if key != "pitcher_id"}
+        for row in rows
+    ]
+
+
+def get_pitcher_pitch_type_stats_batch_from_db(pitcher_ids, season):
+    if season is None:
+        return []
+    clean_ids = []
+    seen_ids = set()
+    for pitcher_id in pitcher_ids:
+        if pitcher_id is None:
+            continue
+        try:
+            numeric_id = int(pitcher_id)
+        except (TypeError, ValueError):
+            continue
+        if numeric_id in seen_ids:
+            continue
+        seen_ids.add(numeric_id)
+        clean_ids.append(numeric_id)
+    if not clean_ids:
+        return []
+
+    ensure_database()
+    placeholders = ",".join("?" for _ in clean_ids)
+    with read_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT
+                pitcher_id,
+                pitch_code,
+                COALESCE(pitch_name, pitch_code) AS PITCH,
+                pitch_count AS COUNT,
+                percentage AS PERCENTAGE,
+                avg_speed AS "AVG SPEED",
+                last_game_date
+            FROM pitcher_pitch_type_stats
+            WHERE season = ? AND pitcher_id IN ({placeholders})
+            ORDER BY pitcher_id, pitch_count DESC, PITCH
+            """,
+            [int(season), *clean_ids],
         ).fetchall()
     return [dict(row) for row in rows]
 
@@ -1399,7 +2158,10 @@ def get_pitcher_stats_from_db(season, pitcher_id):
     ensure_database()
     with read_connection() as conn:
         row = conn.execute(
-            "SELECT * FROM pitcher_stats WHERE season = ? AND pitcher_id = ?",
+            (
+                f"SELECT {', '.join(PITCHER_STAT_COLUMNS)} "
+                "FROM pitcher_stats WHERE season = ? AND pitcher_id = ?"
+            ),
             (int(season), int(pitcher_id)),
         ).fetchone()
     return dict(row) if row else None
@@ -1617,6 +2379,373 @@ def get_pitcher_streak_game_logs_from_db(pitcher_ids, season=None):
     return [dict(row) for row in rows]
 
 
+PITCH_LEVEL_COLUMNS = (
+    "game_pk",
+    "game_date",
+    "season",
+    "at_bat_number",
+    "pitch_number",
+    "batter_id",
+    "pitcher_id",
+    "batter_side",
+    "pitcher_hand",
+    "pitch_type",
+    "pitch_name",
+    "release_speed",
+    "release_spin_rate",
+    "pfx_x",
+    "pfx_z",
+    "plate_x",
+    "plate_z",
+    "zone",
+    "pitch_description",
+    "event",
+    "launch_speed",
+    "launch_angle",
+    "estimated_distance",
+    "estimated_woba",
+    "estimated_ba",
+    "barrel",
+    "hard_hit",
+    "balls",
+    "strikes",
+    "outs",
+    "inning",
+    "rbi",
+    "runs_produced",
+)
+
+PLATE_SEQUENCE_COLUMNS = (
+    "game_pk",
+    "game_date",
+    "season",
+    "at_bat_number",
+    "batter_id",
+    "pitcher_id",
+    "inning",
+    "outs",
+    "starting_count",
+    "final_count",
+    "pa_result",
+    "rbi",
+    "runs_produced",
+    "pitch_count",
+    "pitch_sequence",
+    "launch_speed",
+    "launch_angle",
+    "estimated_distance",
+    "barrel",
+    "hard_hit",
+)
+
+BVP_PITCH_TYPE_COLUMNS = (
+    "season",
+    "batter_id",
+    "pitcher_id",
+    "pitch_type",
+    "pitch_name",
+    "pitch_count",
+    "usage_pct",
+    "avg_velocity",
+    "max_velocity",
+    "avg_spin_rate",
+    "horizontal_movement",
+    "vertical_movement",
+    "zone_pct",
+    "chase_pct",
+    "whiff_pct",
+    "csw_pct",
+    "contact_pct",
+    "hard_hit_pct",
+    "barrel_pct",
+    "AVG",
+    "SLG",
+    "wOBA",
+    "xwOBA",
+    "K_pct",
+    "balls_in_play",
+    "sample_size",
+    "last_game_date",
+)
+
+
+def _clean_int_values(values):
+    clean_values = []
+    seen = set()
+    for value in values:
+        if value is None:
+            continue
+        try:
+            clean_value = int(value)
+        except (TypeError, ValueError):
+            continue
+        if clean_value in seen:
+            continue
+        seen.add(clean_value)
+        clean_values.append(clean_value)
+    return clean_values
+
+
+def save_pitch_level_events(events):
+    rows = [dict(row) for row in events or []]
+    if not rows:
+        return 0
+    ensure_database()
+    columns = (*PITCH_LEVEL_COLUMNS, "updated_at")
+    placeholders = ",".join("?" for _ in columns)
+    updates = ", ".join(
+        f"{column}=excluded.{column}"
+        for column in columns
+        if column not in {"game_pk", "at_bat_number", "pitch_number"}
+    )
+    saved_at = now_text()
+    values = [
+        tuple(row.get(column) for column in PITCH_LEVEL_COLUMNS) + (saved_at,)
+        for row in rows
+    ]
+    with transaction() as conn:
+        conn.executemany(
+            f"""
+            INSERT INTO pitch_level_events ({", ".join(columns)})
+            VALUES ({placeholders})
+            ON CONFLICT(game_pk, at_bat_number, pitch_number)
+            DO UPDATE SET {updates}
+            """,
+            values,
+        )
+    return len(rows)
+
+
+def save_plate_appearance_sequences(sequences):
+    rows = [dict(row) for row in sequences or []]
+    if not rows:
+        return 0
+    ensure_database()
+    columns = (*PLATE_SEQUENCE_COLUMNS, "updated_at")
+    placeholders = ",".join("?" for _ in columns)
+    updates = ", ".join(
+        f"{column}=excluded.{column}"
+        for column in columns
+        if column not in {"game_pk", "at_bat_number"}
+    )
+    saved_at = now_text()
+    values = [
+        tuple(row.get(column) for column in PLATE_SEQUENCE_COLUMNS) + (saved_at,)
+        for row in rows
+    ]
+    with transaction() as conn:
+        conn.executemany(
+            f"""
+            INSERT INTO plate_appearance_sequences ({", ".join(columns)})
+            VALUES ({placeholders})
+            ON CONFLICT(game_pk, at_bat_number)
+            DO UPDATE SET {updates}
+            """,
+            values,
+        )
+    return len(rows)
+
+
+def save_bvp_pitch_type_stats(rows):
+    rows = [dict(row) for row in rows or []]
+    if not rows:
+        return 0
+    ensure_database()
+    columns = (*BVP_PITCH_TYPE_COLUMNS, "last_updated")
+    placeholders = ",".join("?" for _ in columns)
+    updates = ", ".join(
+        f"{column}=excluded.{column}"
+        for column in columns
+        if column not in {"season", "batter_id", "pitcher_id", "pitch_type"}
+    )
+    saved_at = now_text()
+    values = [
+        tuple(row.get(column) for column in BVP_PITCH_TYPE_COLUMNS) + (saved_at,)
+        for row in rows
+    ]
+    with transaction() as conn:
+        conn.executemany(
+            f"""
+            INSERT INTO bvp_pitch_type_stats ({", ".join(columns)})
+            VALUES ({placeholders})
+            ON CONFLICT(season, batter_id, pitcher_id, pitch_type)
+            DO UPDATE SET {updates}
+            """,
+            values,
+        )
+    return len(rows)
+
+
+def get_pitch_level_events_for_matchup(batter_id, pitcher_id):
+    if batter_id is None or pitcher_id is None:
+        return []
+    ensure_database()
+    with read_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM pitch_level_events
+            WHERE batter_id = ? AND pitcher_id = ?
+            ORDER BY game_date DESC, game_pk DESC, at_bat_number, pitch_number
+            """,
+            (int(batter_id), int(pitcher_id)),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_plate_appearance_sequences_for_matchup(batter_id, pitcher_id):
+    if batter_id is None or pitcher_id is None:
+        return []
+    ensure_database()
+    with read_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM plate_appearance_sequences
+            WHERE batter_id = ? AND pitcher_id = ?
+            ORDER BY game_date DESC, game_pk DESC, at_bat_number DESC
+            """,
+            (int(batter_id), int(pitcher_id)),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_bvp_pitch_type_stats_from_db(batter_id, pitcher_id, season=None):
+    if batter_id is None or pitcher_id is None:
+        return []
+    ensure_database()
+    params = [int(batter_id), int(pitcher_id)]
+    season_filter = ""
+    if season is not None:
+        season_filter = " AND season = ?"
+        params.append(int(season))
+    with read_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT
+                season,
+                batter_id,
+                pitcher_id,
+                pitch_type,
+                COALESCE(pitch_name, pitch_type) AS pitch_name,
+                pitch_count,
+                usage_pct,
+                avg_velocity,
+                max_velocity,
+                avg_spin_rate,
+                horizontal_movement,
+                vertical_movement,
+                zone_pct,
+                chase_pct,
+                whiff_pct,
+                csw_pct,
+                contact_pct,
+                hard_hit_pct,
+                barrel_pct,
+                AVG,
+                SLG,
+                wOBA,
+                xwOBA,
+                K_pct AS "K%",
+                balls_in_play,
+                sample_size,
+                last_game_date
+            FROM bvp_pitch_type_stats
+            WHERE batter_id = ? AND pitcher_id = ?{season_filter}
+            ORDER BY pitch_count DESC, pitch_name
+            """,
+            params,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_pitcher_game_logs_batch_from_db(pitcher_ids, season=None, through_date=None):
+    pitcher_ids = _clean_int_values(pitcher_ids)
+    if not pitcher_ids:
+        return []
+    ensure_database()
+    placeholders = ",".join("?" for _ in pitcher_ids)
+    params = list(pitcher_ids)
+    filters = [f"pitcher_id IN ({placeholders})"]
+    if season is not None:
+        filters.append("season = ?")
+        params.append(int(season))
+    if through_date is not None:
+        filters.append("game_date <= ?")
+        params.append(str(through_date))
+    where_clause = " AND ".join(filters)
+    with read_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT *
+            FROM pitcher_game_logs
+            WHERE {where_clause}
+            ORDER BY pitcher_id, game_date DESC, game_pk DESC
+            """,
+            params,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def save_daily_bullpen_projections(rows):
+    rows = [dict(row) for row in rows or []]
+    if not rows:
+        return 0
+    ensure_database()
+    columns = (
+        "game_date",
+        "game_pk",
+        "team_id",
+        "pitcher_id",
+        "projected_role",
+        "availability_score",
+        "availability_label",
+        "appearance_probability",
+        "expected_batters_faced_range",
+        "recent_workload",
+        "projection_reason",
+        "projection_timestamp",
+    )
+    placeholders = ",".join("?" for _ in columns)
+    updates = ", ".join(
+        f"{column}=excluded.{column}"
+        for column in columns
+        if column not in {"game_pk", "team_id", "pitcher_id"}
+    )
+    values = [
+        tuple(row.get(column) for column in columns)
+        for row in rows
+    ]
+    with transaction() as conn:
+        conn.executemany(
+            f"""
+            INSERT INTO daily_bullpen_projections ({", ".join(columns)})
+            VALUES ({placeholders})
+            ON CONFLICT(game_pk, team_id, pitcher_id)
+            DO UPDATE SET {updates}
+            """,
+            values,
+        )
+    return len(rows)
+
+
+def get_daily_bullpen_projection_from_db(game_pk, team_id):
+    if game_pk is None or team_id is None:
+        return []
+    ensure_database()
+    with read_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM daily_bullpen_projections
+            WHERE game_pk = ? AND team_id = ?
+            ORDER BY appearance_probability DESC, projected_role, pitcher_id
+            """,
+            (int(game_pk), int(team_id)),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def log_refresh(
     refresh_type,
     refresh_date,
@@ -1659,8 +2788,17 @@ def database_counts():
         "processed_games",
         "batter_pitcher_game_logs",
         "batter_pitcher_stats",
+        "pitch_types",
+        "batter_pitch_type_game_logs",
+        "batter_pitch_type_stats",
+        "pitcher_pitch_type_game_logs",
+        "pitcher_pitch_type_stats",
         "pitcher_game_logs",
         "pitcher_stats",
+        "pitch_level_events",
+        "plate_appearance_sequences",
+        "bvp_pitch_type_stats",
+        "daily_bullpen_projections",
     ]
     with read_connection() as conn:
         return {

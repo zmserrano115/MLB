@@ -164,6 +164,41 @@
       content: "\2193";
     }
 
+    .research-table th.is-active-sort {
+      background: #e2ebf3;
+      color: #173f67;
+      box-shadow: inset 0 -2px 0 #9db8cf;
+    }
+
+    .research-table td.is-active-sort {
+      background: #f4f8fb;
+      box-shadow:
+        inset 1px 0 0 rgba(157, 184, 207, 0.42),
+        inset -1px 0 0 rgba(157, 184, 207, 0.42);
+    }
+
+    .research-table tbody tr:hover td.is-active-sort {
+      background: #edf4fa;
+    }
+
+    .research-table th.sticky-game.is-active-sort,
+    .research-table th.sticky-player.is-active-sort,
+    .research-table th.sticky-grade.is-active-sort {
+      background: #dbe6f0;
+    }
+
+    .research-table td.sticky-game.is-active-sort,
+    .research-table td.sticky-player.is-active-sort,
+    .research-table td.sticky-grade.is-active-sort {
+      background: #f1f6fa;
+    }
+
+    .research-table tbody tr:hover td.sticky-game.is-active-sort,
+    .research-table tbody tr:hover td.sticky-player.is-active-sort,
+    .research-table tbody tr:hover td.sticky-grade.is-active-sort {
+      background: #eaf2f8;
+    }
+
     .research-game {
       display: inline-flex;
       align-items: center;
@@ -551,28 +586,47 @@
       }
 
       .research-table {
-        font-size: 11px;
+        font-size: 10.5px;
       }
 
       .research-table th,
       .research-table td {
-        padding: 0 8px;
+        height: 32px;
+        padding: 0 5px;
+      }
+
+      .research-table th {
+        height: 34px;
+        font-size: 9px;
+      }
+
+      .research-sort-button {
+        height: 34px;
+        gap: 2px;
       }
 
       .research-table .sticky-game {
-        width: 72px;
-        min-width: 72px;
+        width: 54px;
+        min-width: 54px;
       }
 
       .research-table .sticky-player {
-        left: 72px;
-        width: 145px;
-        min-width: 145px;
+        left: 54px;
+        width: 126px;
+        min-width: 126px;
+      }
+
+      .research-table th:not(.sticky-game):not(.sticky-player):not(.sticky-grade) {
+        min-width: 44px !important;
+      }
+
+      .research-table th.align-left:not(.sticky-game):not(.sticky-player):not(.sticky-grade) {
+        min-width: 82px !important;
       }
 
       .research-table .sticky-grade {
         right: auto;
-        min-width: 96px;
+        min-width: 82px;
         box-shadow: none;
       }
 
@@ -604,14 +658,37 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .research-game {
+        gap: 2px;
+      }
+
       .research-game img {
-        width: 21px;
-        height: 21px;
+        width: 18px;
+        height: 18px;
       }
 
       .research-log-opponent img {
-        width: 21px;
-        height: 21px;
+        width: 18px;
+        height: 18px;
+      }
+
+      .research-at {
+        font-size: 9px;
+      }
+
+      .research-player-link {
+        max-width: calc(100% - 18px);
+      }
+
+      .research-player-identity {
+        gap: 5px;
+      }
+
+      .research-headshot,
+      .stats-headshot,
+      .stats-identity-img {
+        width: 22px;
+        height: 22px;
       }
     }
   </style>
@@ -689,13 +766,20 @@
       table.querySelectorAll("th[aria-sort]").forEach((header) => {
         header.setAttribute("aria-sort", "none");
       });
+      table.querySelectorAll(".is-active-sort").forEach((cell) => {
+        cell.classList.remove("is-active-sort");
+      });
       const header = table.tHead?.rows[0]?.cells[columnIndex];
       if (header) {
         header.setAttribute(
           "aria-sort",
           direction === "asc" ? "ascending" : "descending",
         );
+        header.classList.add("is-active-sort");
       }
+      Array.from(body.rows).forEach((row) => {
+        row.cells[columnIndex]?.classList.add("is-active-sort");
+      });
       if (remember) activeSort = { columnIndex, direction };
       updateRankCells();
     }

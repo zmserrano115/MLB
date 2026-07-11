@@ -3,8 +3,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 import traceback
 
-import requests
-
+from src.api_client import get_json
 from src.database import (
     init_database,
     is_game_processed,
@@ -73,6 +72,15 @@ def safe_int(value, default=0):
         return default
 
 
+def safe_float(value, default=None):
+    try:
+        if value is None or value == "":
+            return default
+        return float(value)
+    except Exception:
+        return default
+
+
 def ip_to_outs(ip_value):
     if ip_value is None:
         return 0
@@ -106,10 +114,12 @@ def get_schedule_for_date(game_date, game_type="R"):
         "gameType": game_type,
     }
 
-    response = requests.get(MLB_SCHEDULE_URL, params=params, timeout=30)
-    response.raise_for_status()
-
-    data = response.json()
+    data = get_json(
+        MLB_SCHEDULE_URL,
+        params=params,
+        provider="MLB StatsAPI",
+        timeout=30,
+    )
     games = []
 
     for date_block in data.get("dates", []):
@@ -159,9 +169,11 @@ def is_completed_game(game):
 
 def get_game_feed(game_pk):
     url = MLB_GAME_FEED_URL.format(game_pk=game_pk)
-    response = requests.get(url, timeout=45)
-    response.raise_for_status()
-    return response.json()
+    return get_json(
+        url,
+        provider="MLB StatsAPI",
+        timeout=45,
+    )
 
 
 def get_total_bases(event_type):
@@ -178,6 +190,209 @@ def get_total_bases(event_type):
         return 4
 
     return 0
+
+
+def pitch_type_from_event(event):
+    details = event.get("details", {}) or {}
+    pitch_type = details.get("type", {}) or {}
+    pitch_code = pitch_type.get("code")
+    if not pitch_code:
+        return None, None
+    if event.get("isPitch") is False and not event.get("pitchData"):
+        return None, None
+    return str(pitch_code).strip(), pitch_type.get("description") or pitch_code
+
+
+def pitch_type_from_play(play):
+    for event in reversed(play.get("playEvents", []) or []):
+        pitch_code, pitch_name = pitch_type_from_event(event)
+        if pitch_code:
+            return pitch_code, pitch_name
+    return None, None
+
+
+def pitcher_hand_from_matchup(matchup):
+    pitch_hand = (matchup or {}).get("pitchHand", {}) or {}
+    code = str(pitch_hand.get("code") or "").strip().upper()
+    if code in {"L", "R"}:
+        return code
+    description = str(pitch_hand.get("description") or "").strip().lower()
+    if description.startswith("left"):
+        return "L"
+    if description.startswith("right"):
+        return "R"
+    return None
+
+
+def parse_game_to_batter_pitch_type_logs(feed, game):
+    all_plays = feed.get("liveData", {}).get("plays", {}).get("allPlays", [])
+    away_team = game.get("away_team")
+    home_team = game.get("home_team")
+
+    grouped_logs = defaultdict(
+        lambda: {
+            "PA": 0,
+            "AB": 0,
+            "H": 0,
+            "singles": 0,
+            "doubles": 0,
+            "triples": 0,
+            "BB": 0,
+            "HBP": 0,
+            "SO": 0,
+            "HR": 0,
+            "SF": 0,
+            "TB": 0,
+        }
+    )
+    pitch_types = {}
+
+    for play in all_plays:
+        matchup = play.get("matchup", {}) or {}
+        result = play.get("result", {}) or {}
+        about = play.get("about", {}) or {}
+        batter = matchup.get("batter", {}) or {}
+        batter_id = batter.get("id")
+        if batter_id is None:
+            continue
+
+        event_type = result.get("eventType")
+        if event_type not in PA_EVENT_TYPES:
+            continue
+
+        pitch_code, pitch_name = pitch_type_from_play(play)
+        pitcher_hand = pitcher_hand_from_matchup(matchup)
+        if not pitch_code or not pitcher_hand:
+            continue
+        pitch_types[pitch_code] = pitch_name
+
+        half_inning = about.get("halfInning")
+        batting_team = away_team if half_inning == "top" else home_team
+        key = (
+            int(game.get("game_pk")),
+            int(batter_id),
+            batting_team,
+            pitcher_hand,
+            pitch_code,
+        )
+        log = grouped_logs[key]
+        log["PA"] += 1
+
+        if event_type not in NON_AB_EVENT_TYPES:
+            log["AB"] += 1
+
+        if event_type in HIT_EVENT_TYPES:
+            log["H"] += 1
+        if event_type == "single":
+            log["singles"] += 1
+        if event_type == "double":
+            log["doubles"] += 1
+        if event_type == "triple":
+            log["triples"] += 1
+        if event_type == "home_run":
+            log["HR"] += 1
+        if event_type in ["walk", "intent_walk"]:
+            log["BB"] += 1
+        if event_type == "hit_by_pitch":
+            log["HBP"] += 1
+        if event_type in ["strikeout", "strikeout_double_play"]:
+            log["SO"] += 1
+        if event_type in ["sac_fly", "sac_fly_double_play"]:
+            log["SF"] += 1
+        log["TB"] += get_total_bases(event_type)
+
+    game_logs = []
+    for key, values in grouped_logs.items():
+        game_pk, batter_id, batting_team, pitcher_hand, pitch_code = key
+        game_logs.append(
+            {
+                "game_pk": game_pk,
+                "game_date": game.get("game_date"),
+                "season": game.get("season"),
+                "batter_id": batter_id,
+                "batting_team": batting_team,
+                "pitcher_hand": pitcher_hand,
+                "pitch_code": pitch_code,
+                **values,
+            }
+        )
+
+    return pitch_types, game_logs
+
+
+def parse_game_to_pitcher_pitch_type_logs(feed, game):
+    all_plays = feed.get("liveData", {}).get("plays", {}).get("allPlays", [])
+    away_team = game.get("away_team")
+    home_team = game.get("home_team")
+
+    grouped_logs = defaultdict(
+        lambda: {
+            "pitch_count": 0,
+            "total_speed": 0.0,
+            "measured_pitches": 0,
+        }
+    )
+    players = {}
+    pitch_types = {}
+
+    for play in all_plays:
+        matchup = play.get("matchup", {}) or {}
+        about = play.get("about", {}) or {}
+        pitcher = matchup.get("pitcher", {}) or {}
+        pitcher_id = pitcher.get("id")
+        if pitcher_id is None:
+            continue
+
+        half_inning = about.get("halfInning")
+        if half_inning == "top":
+            pitching_team = home_team
+            opponent = away_team
+        else:
+            pitching_team = away_team
+            opponent = home_team
+
+        for event in play.get("playEvents", []) or []:
+            pitch_code, pitch_name = pitch_type_from_event(event)
+            if not pitch_code:
+                continue
+
+            pitcher_id = int(pitcher_id)
+            players[pitcher_id] = pitcher.get("fullName")
+            pitch_types[pitch_code] = pitch_name
+
+            key = (
+                int(game.get("game_pk")),
+                pitcher_id,
+                pitching_team,
+                opponent,
+                pitch_code,
+            )
+            log = grouped_logs[key]
+            log["pitch_count"] += 1
+
+            pitch_data = event.get("pitchData", {}) or {}
+            speed = safe_float(pitch_data.get("startSpeed"), default=None)
+            if speed is not None:
+                log["total_speed"] += speed
+                log["measured_pitches"] += 1
+
+    game_logs = []
+    for key, values in grouped_logs.items():
+        game_pk, pitcher_id, pitching_team, opponent, pitch_code = key
+        game_logs.append(
+            {
+                "game_pk": game_pk,
+                "game_date": game.get("game_date"),
+                "season": game.get("season"),
+                "pitcher_id": pitcher_id,
+                "team": pitching_team,
+                "opponent": opponent,
+                "pitch_code": pitch_code,
+                **values,
+            }
+        )
+
+    return players, pitch_types, game_logs
 
 
 def parse_game_to_batter_pitcher_logs(feed, game):
@@ -396,16 +611,23 @@ def process_completed_game(game, reprocess_existing=False, rebuild_after=False):
     feed = get_game_feed(game_pk)
 
     bvp_players, bvp_game_logs, plate_appearances_loaded = parse_game_to_batter_pitcher_logs(feed, game)
+    pitch_types, batter_pitch_type_logs = parse_game_to_batter_pitch_type_logs(feed, game)
+    pitch_mix_players, pitcher_pitch_types, pitcher_pitch_type_logs = parse_game_to_pitcher_pitch_type_logs(feed, game)
     pitcher_players, pitcher_logs = parse_pitcher_game_logs(feed, game)
 
     all_players = {}
     all_players.update(bvp_players)
+    all_players.update(pitch_mix_players)
     all_players.update(pitcher_players)
+    pitch_types.update(pitcher_pitch_types)
 
     save_completed_game(
         game=game,
         players=all_players,
         batter_pitcher_logs=bvp_game_logs,
+        batter_pitch_type_logs=batter_pitch_type_logs,
+        pitcher_pitch_type_logs=pitcher_pitch_type_logs,
+        pitch_types=pitch_types,
         pitcher_logs=pitcher_logs,
         plate_appearances_loaded=plate_appearances_loaded,
         reprocess_existing=reprocess_existing,

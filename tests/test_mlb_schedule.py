@@ -10,11 +10,9 @@ from src.mlb_schedule import get_daily_schedule, write_cached_schedule
 
 
 class ScheduleTests(unittest.TestCase):
-    @patch("src.mlb_schedule.requests.get")
-    def test_probable_pitcher_hands_use_one_bulk_people_request(self, mock_get):
-        schedule_response = Mock()
-        schedule_response.raise_for_status.return_value = None
-        schedule_response.json.return_value = {
+    @patch("src.mlb_schedule.get_json")
+    def test_probable_pitcher_hands_use_one_bulk_people_request(self, mock_get_json):
+        schedule_payload = {
             "dates": [
                 {
                     "games": [
@@ -43,7 +41,16 @@ class ScheduleTests(unittest.TestCase):
                                     "azimuthAngle": 20.0,
                                     "elevation": 5200,
                                 },
-                                "fieldInfo": {"roofType": "Open"},
+                                "fieldInfo": {
+                                    "roofType": "Open",
+                                    "leftLine": 315,
+                                    "left": 370,
+                                    "leftCenter": 390,
+                                    "center": 404,
+                                    "rightCenter": 375,
+                                    "right": 370,
+                                    "rightLine": 322,
+                                },
                             },
                             "teams": {
                                 "away": {
@@ -76,15 +83,13 @@ class ScheduleTests(unittest.TestCase):
                 }
             ]
         }
-        people_response = Mock()
-        people_response.raise_for_status.return_value = None
-        people_response.json.return_value = {
+        people_payload = {
             "people": [
                 {"id": 100, "pitchHand": {"code": "R"}},
                 {"id": 200, "pitchHand": {"code": "L"}},
             ]
         }
-        mock_get.side_effect = [schedule_response, people_response]
+        mock_get_json.side_effect = [schedule_payload, people_payload]
 
         with tempfile.TemporaryDirectory() as cache_dir, patch(
             "src.mlb_schedule.SCHEDULE_CACHE_DIR",
@@ -92,13 +97,15 @@ class ScheduleTests(unittest.TestCase):
         ):
             schedule = get_daily_schedule("2026-06-01")
 
-        self.assertEqual(mock_get.call_count, 2)
+        self.assertEqual(mock_get_json.call_count, 2)
         self.assertEqual(schedule.iloc[0]["away_pitcher_hand"], "R")
         self.assertEqual(schedule.iloc[0]["home_pitcher_hand"], "L")
         self.assertEqual(schedule.iloc[0]["venue_name"], "Test Park")
         self.assertEqual(schedule.iloc[0]["venue_latitude"], 39.756)
         self.assertEqual(schedule.iloc[0]["field_azimuth"], 20.0)
         self.assertEqual(schedule.iloc[0]["roof_type"], "Open")
+        self.assertEqual(schedule.iloc[0]["field_center"], 404)
+        self.assertEqual(schedule.iloc[0]["field_dimensions"]["left_line"], 315)
         self.assertEqual(schedule.iloc[0]["away_team_abbr"], "AWY")
         self.assertEqual(schedule.iloc[0]["home_team_abbr"], "HOM")
         self.assertEqual(schedule.iloc[0]["away_score"], 4)
@@ -110,9 +117,9 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(schedule.iloc[0]["abstract_game_state"], "Live")
         self.assertEqual(schedule.iloc[0]["current_inning_ordinal"], "6th")
 
-    @patch("src.mlb_schedule.requests.get")
-    def test_schedule_uses_saved_copy_when_live_request_fails(self, mock_get):
-        mock_get.side_effect = requests.ConnectionError("temporary DNS failure")
+    @patch("src.mlb_schedule.get_json")
+    def test_schedule_uses_saved_copy_when_live_request_fails(self, mock_get_json):
+        mock_get_json.side_effect = requests.ConnectionError("temporary DNS failure")
         saved = pd.DataFrame(
             [
                 {

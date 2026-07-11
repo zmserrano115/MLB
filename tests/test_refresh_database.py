@@ -3,7 +3,9 @@ import unittest
 from refresh_database import (
     ip_to_outs,
     outs_to_baseball_ip,
+    parse_game_to_batter_pitch_type_logs,
     parse_game_to_batter_pitcher_logs,
+    parse_game_to_pitcher_pitch_type_logs,
     parse_pitcher_game_logs,
 )
 
@@ -25,17 +27,43 @@ class StatsApiParserTests(unittest.TestCase):
                             "matchup": {
                                 "batter": {"id": 10, "fullName": "Batter"},
                                 "pitcher": {"id": 20, "fullName": "Pitcher"},
+                                "pitchHand": {"code": "L"},
                             },
                             "result": {"eventType": "double", "rbi": 1},
                             "about": {"halfInning": "top"},
+                            "playEvents": [
+                                {
+                                    "isPitch": True,
+                                    "details": {
+                                        "type": {
+                                            "code": "FF",
+                                            "description": "Four-Seam Fastball",
+                                        }
+                                    },
+                                    "pitchData": {"startSpeed": 96.8},
+                                }
+                            ],
                         },
                         {
                             "matchup": {
                                 "batter": {"id": 10, "fullName": "Batter"},
                                 "pitcher": {"id": 20, "fullName": "Pitcher"},
+                                "pitchHand": {"code": "L"},
                             },
                             "result": {"eventType": "walk", "rbi": 0},
                             "about": {"halfInning": "top"},
+                            "playEvents": [
+                                {
+                                    "isPitch": True,
+                                    "details": {
+                                        "type": {
+                                            "code": "SL",
+                                            "description": "Slider",
+                                        }
+                                    },
+                                    "pitchData": {"startSpeed": 84.2},
+                                }
+                            ],
                         },
                     ]
                 },
@@ -77,6 +105,39 @@ class StatsApiParserTests(unittest.TestCase):
         self.assertEqual(logs[0]["AB"], 1)
         self.assertEqual(logs[0]["doubles"], 1)
         self.assertEqual(logs[0]["TB"], 2)
+
+        pitch_types, pitch_type_logs = parse_game_to_batter_pitch_type_logs(
+            feed,
+            game,
+        )
+        self.assertEqual(pitch_types["FF"], "Four-Seam Fastball")
+        self.assertEqual(pitch_types["SL"], "Slider")
+        pitch_logs_by_code = {
+            row["pitch_code"]: row
+            for row in pitch_type_logs
+        }
+        self.assertEqual(pitch_logs_by_code["FF"]["pitcher_hand"], "L")
+        self.assertEqual(pitch_logs_by_code["FF"]["AB"], 1)
+        self.assertEqual(pitch_logs_by_code["FF"]["H"], 1)
+        self.assertEqual(pitch_logs_by_code["FF"]["doubles"], 1)
+        self.assertEqual(pitch_logs_by_code["FF"]["TB"], 2)
+        self.assertEqual(pitch_logs_by_code["SL"]["PA"], 1)
+        self.assertEqual(pitch_logs_by_code["SL"]["AB"], 0)
+        self.assertEqual(pitch_logs_by_code["SL"]["BB"], 1)
+
+        pitch_mix_players, pitcher_pitch_types, pitcher_pitch_logs = (
+            parse_game_to_pitcher_pitch_type_logs(feed, game)
+        )
+        self.assertEqual(pitch_mix_players[20], "Pitcher")
+        self.assertEqual(pitcher_pitch_types["FF"], "Four-Seam Fastball")
+        pitch_mix_by_code = {
+            row["pitch_code"]: row
+            for row in pitcher_pitch_logs
+        }
+        self.assertEqual(pitch_mix_by_code["FF"]["pitch_count"], 1)
+        self.assertEqual(pitch_mix_by_code["FF"]["measured_pitches"], 1)
+        self.assertEqual(pitch_mix_by_code["FF"]["total_speed"], 96.8)
+        self.assertEqual(pitch_mix_by_code["SL"]["pitch_count"], 1)
 
         _, pitcher_logs = parse_pitcher_game_logs(feed, game)
         self.assertEqual(pitcher_logs[0]["IP_outs"], 16)

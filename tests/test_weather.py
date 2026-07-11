@@ -37,11 +37,9 @@ def forecast_payload(forecast_time):
 
 
 class WeatherTests(unittest.TestCase):
-    @patch("src.weather.requests.get")
-    def test_published_cache_uses_cache_bust_and_returns_records(self, mock_get):
-        response = Mock()
-        response.raise_for_status.return_value = None
-        response.json.return_value = {
+    @patch("src.weather.get_json")
+    def test_published_cache_uses_cache_bust_and_returns_records(self, mock_get_json):
+        mock_get_json.return_value = {
             "records": [
                 {
                     "game_pk": 1,
@@ -49,34 +47,30 @@ class WeatherTests(unittest.TestCase):
                 }
             ]
         }
-        mock_get.return_value = response
 
         result = fetch_published_weather_cache(cache_bust="build-7")
 
         self.assertEqual(len(result), 1)
         self.assertEqual(
-            mock_get.call_args.kwargs["params"],
+            mock_get_json.call_args.kwargs["params"],
             {"v": "build-7"},
         )
 
-    @patch("src.weather.requests.get")
-    def test_published_cache_preserves_download_error(self, mock_get):
-        mock_get.side_effect = requests.ConnectionError("release unavailable")
+    @patch("src.weather.get_json")
+    def test_published_cache_preserves_download_error(self, mock_get_json):
+        mock_get_json.side_effect = requests.ConnectionError("release unavailable")
 
         result = fetch_published_weather_cache(cache_bust="build-8")
 
         self.assertTrue(result.empty)
         self.assertIn("release unavailable", result.attrs["weather_error"])
 
-    @patch("src.weather.requests.get")
-    def test_slate_forecasts_use_one_batched_request(self, mock_get):
-        response = Mock()
-        response.raise_for_status.return_value = None
-        response.json.return_value = [
+    @patch("src.weather.get_json")
+    def test_slate_forecasts_use_one_batched_request(self, mock_get_json):
+        mock_get_json.return_value = [
             forecast_payload("2026-06-08T19:00"),
             forecast_payload("2026-06-08T20:00"),
         ]
-        mock_get.return_value = response
         locations = [(39.7, -104.9), (33.8, -117.9)]
 
         result = fetch_hourly_forecasts(
@@ -85,9 +79,9 @@ class WeatherTests(unittest.TestCase):
             "2026-06-09",
         )
 
-        self.assertEqual(mock_get.call_count, 1)
+        self.assertEqual(mock_get_json.call_count, 1)
         self.assertEqual(set(result), set(locations))
-        params = mock_get.call_args.kwargs["params"]
+        params = mock_get_json.call_args.kwargs["params"]
         self.assertEqual(params["latitude"], "39.7,33.8")
         self.assertEqual(params["start_date"], "2026-06-08")
         self.assertEqual(params["end_date"], "2026-06-09")
@@ -218,28 +212,26 @@ class WeatherTests(unittest.TestCase):
         self.assertEqual(mock_met.call_count, 1)
 
     @patch("src.weather.time.sleep")
-    @patch("src.weather.requests.get")
-    def test_forecast_retries_transient_request_errors(self, mock_get, mock_sleep):
-        response = Mock()
-        response.raise_for_status.return_value = None
-        response.json.return_value = forecast_payload("2026-06-08T19:00")
-        mock_get.side_effect = [
+    @patch("src.weather.get_json")
+    def test_forecast_retries_transient_request_errors(
+        self,
+        mock_get_json,
+        mock_sleep,
+    ):
+        mock_get_json.side_effect = [
             requests.ConnectionError("temporary"),
-            response,
+            forecast_payload("2026-06-08T19:00"),
         ]
 
         result = fetch_hourly_forecast(39.7, -104.9, "2026-06-08")
 
         self.assertEqual(result, forecast_payload("2026-06-08T19:00"))
-        self.assertEqual(mock_get.call_count, 2)
+        self.assertEqual(mock_get_json.call_count, 2)
         mock_sleep.assert_called_once()
 
-    @patch("src.weather.requests.get")
-    def test_forecast_rejects_incomplete_provider_payload(self, mock_get):
-        response = Mock()
-        response.raise_for_status.return_value = None
-        response.json.return_value = {"hourly": {"time": []}}
-        mock_get.return_value = response
+    @patch("src.weather.get_json")
+    def test_forecast_rejects_incomplete_provider_payload(self, mock_get_json):
+        mock_get_json.return_value = {"hourly": {"time": []}}
 
         with self.assertRaisesRegex(ValueError, "no hourly forecast"):
             fetch_hourly_forecast(

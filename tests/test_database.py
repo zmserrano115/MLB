@@ -3,9 +3,13 @@ import io
 import tempfile
 from pathlib import Path
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from src import database
+
+
+class RawBytes(io.BytesIO):
+    pass
 
 
 class DatabaseTests(unittest.TestCase):
@@ -26,10 +30,14 @@ class DatabaseTests(unittest.TestCase):
         payload = b"SQLite format 3\x00" + (b"database-bytes" * 10)
         compressed = gzip.compress(payload)
         target = Path(self.temp_dir.name) / "downloaded.db"
+        response = Mock()
+        response.raw = RawBytes(compressed)
+        response.raise_for_status.return_value = None
+        response.close.return_value = None
 
         with patch(
-            "src.database.urllib.request.urlopen",
-            return_value=io.BytesIO(compressed),
+            "src.database.http_get",
+            return_value=response,
         ):
             database._download_database(
                 "https://example.test/mlb.db.gz",
@@ -37,6 +45,143 @@ class DatabaseTests(unittest.TestCase):
             )
 
         self.assertEqual(target.read_bytes(), payload)
+
+    def test_download_database_rejects_sha256_mismatch(self):
+        payload = b"SQLite format 3\x00" + (b"database-bytes" * 10)
+        response = Mock()
+        response.raw = RawBytes(payload)
+        response.raise_for_status.return_value = None
+        response.close.return_value = None
+        target = Path(self.temp_dir.name) / "downloaded.db"
+
+        with patch(
+            "src.database.http_get",
+            return_value=response,
+        ):
+            with self.assertRaisesRegex(ValueError, "SHA256"):
+                database._download_database(
+                    "https://example.test/mlb.db",
+                    target,
+                    expected_sha256="0" * 64,
+                )
+
+    def test_db_cache_key_reflects_database_identity(self):
+        first_key = database.db_cache_key()
+
+        with database.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO players (player_id, player_name, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (999, "Cache Key Player", database.now_text()),
+            )
+
+        second_key = database.db_cache_key()
+        self.assertNotEqual(first_key, second_key)
+        self.assertEqual(second_key[-1], database.SCHEMA_VERSION)
+
+    def test_requested_read_indexes_are_created(self):
+        expected_indexes = {
+            "idx_bpg_logs_batter_pitcher_date_game",
+            "idx_pitcher_logs_pitcher_opponent_date_game",
+            "idx_pitcher_logs_season_pitcher_date_game",
+            "idx_batter_pitch_type_stats_batch",
+            "idx_pitcher_pitch_type_stats_batch",
+            "idx_pitch_level_batter_pitcher_date",
+            "idx_pitch_level_pitcher_type_date",
+            "idx_pitch_level_batter_type_date",
+            "idx_pitch_level_game_pitch",
+            "idx_daily_bullpen_team_date",
+            "idx_daily_bullpen_game_pitcher",
+        }
+        with database.read_connection() as conn:
+            indexes = {
+                row["name"]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'index'"
+                )
+            }
+        self.assertTrue(expected_indexes.issubset(indexes))
+
+    def test_advanced_hvp_tables_are_created(self):
+        expected_tables = {
+            "pitch_level_events",
+            "plate_appearance_sequences",
+            "bvp_pitch_type_stats",
+            "daily_bullpen_projections",
+        }
+        with database.read_connection() as conn:
+            table_names = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            }
+            user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+        self.assertTrue(expected_tables.issubset(table_names))
+        self.assertEqual(user_version, database.SCHEMA_VERSION)
+
+    def test_pitch_level_events_and_sequences_upsert(self):
+        event = {
+            "game_pk": 1,
+            "game_date": "2026-07-01",
+            "season": 2026,
+            "at_bat_number": 4,
+            "pitch_number": 1,
+            "batter_id": 10,
+            "pitcher_id": 20,
+            "pitch_type": "FF",
+            "pitch_name": "Four-Seam Fastball",
+            "release_speed": 96.2,
+        }
+        self.assertEqual(database.save_pitch_level_events([event]), 1)
+        self.assertEqual(
+            database.save_pitch_level_events([{**event, "release_speed": 97.0}]),
+            1,
+        )
+        rows = database.get_pitch_level_events_for_matchup(10, 20)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["release_speed"], 97.0)
+
+        sequence = {
+            "game_pk": 1,
+            "game_date": "2026-07-01",
+            "season": 2026,
+            "at_bat_number": 4,
+            "batter_id": 10,
+            "pitcher_id": 20,
+            "pitch_count": 1,
+            "pitch_sequence": "FF",
+            "pa_result": "single",
+        }
+        database.save_plate_appearance_sequences([sequence])
+        sequence_rows = database.get_plate_appearance_sequences_for_matchup(10, 20)
+        self.assertEqual(len(sequence_rows), 1)
+        self.assertEqual(sequence_rows[0]["pitch_sequence"], "FF")
+
+    def test_daily_bullpen_projection_cache_upserts(self):
+        projection = {
+            "game_date": "2026-07-11",
+            "game_pk": 99,
+            "team_id": 147,
+            "pitcher_id": 20,
+            "projected_role": "Closer",
+            "availability_score": 82.0,
+            "availability_label": "Available",
+            "appearance_probability": 0.3,
+            "expected_batters_faced_range": "3-4",
+            "recent_workload": "fresh",
+            "projection_reason": "fresh recent workload",
+            "projection_timestamp": "2026-07-11T12:00:00Z",
+        }
+        database.save_daily_bullpen_projections([projection])
+        database.save_daily_bullpen_projections(
+            [{**projection, "availability_score": 74.0, "availability_label": "Likely"}]
+        )
+        rows = database.get_daily_bullpen_projection_from_db(99, 147)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["availability_label"], "Likely")
 
     def test_live_game_contacts_are_persisted_and_upserted(self):
         first_play = {
@@ -139,11 +284,47 @@ class DatabaseTests(unittest.TestCase):
             "R": 2,
             "ER": 2,
         }
+        pitch_type_log = {
+            "game_pk": 123,
+            "game_date": "2026-06-01",
+            "season": 2026,
+            "batter_id": 10,
+            "batting_team": "New York Yankees",
+            "pitcher_hand": "L",
+            "pitch_code": "FF",
+            "PA": 1,
+            "AB": 1,
+            "H": 1,
+            "singles": 0,
+            "doubles": 1,
+            "triples": 0,
+            "BB": 0,
+            "HBP": 0,
+            "SO": 0,
+            "HR": 0,
+            "SF": 0,
+            "TB": 2,
+        }
+        pitcher_pitch_type_log = {
+            "game_pk": 123,
+            "game_date": "2026-06-01",
+            "season": 2026,
+            "pitcher_id": 20,
+            "team": "Boston Red Sox",
+            "opponent": "New York Yankees",
+            "pitch_code": "FF",
+            "pitch_count": 10,
+            "total_speed": 965.0,
+            "measured_pitches": 10,
+        }
 
         database.save_completed_game(
             game=game,
             players={10: "Test Batter", 20: "Test Pitcher"},
             batter_pitcher_logs=[bvp_log],
+            batter_pitch_type_logs=[pitch_type_log],
+            pitcher_pitch_type_logs=[pitcher_pitch_type_log],
+            pitch_types={"FF": "Four-Seam Fastball"},
             pitcher_logs=[pitcher_log],
             plate_appearances_loaded=2,
         )
@@ -177,6 +358,43 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(pitcher_stats["starts"], 1)
         self.assertEqual(pitcher_stats["IP"], 5.1)
         self.assertEqual(pitcher_stats["projected_pitch_count"], 88)
+
+        pitch_type_stats = database.get_batter_pitch_type_stats_from_db(
+            10,
+            2026,
+            "L",
+        )
+        self.assertEqual(len(pitch_type_stats), 1)
+        self.assertEqual(pitch_type_stats[0]["PITCH"], "Four-Seam Fastball")
+        self.assertEqual(pitch_type_stats[0]["AB"], 1)
+        self.assertEqual(pitch_type_stats[0]["H"], 1)
+        self.assertEqual(pitch_type_stats[0]["2B"], 1)
+        self.assertEqual(pitch_type_stats[0]["AVG"], 1.000)
+        self.assertEqual(pitch_type_stats[0]["SLG"], 2.000)
+        self.assertEqual(pitch_type_stats[0]["ISO"], 1.000)
+        batch_pitch_type_stats = database.get_batter_pitch_type_stats_batch_from_db(
+            [10, 10],
+            2026,
+            "L",
+        )
+        self.assertEqual(len(batch_pitch_type_stats), 1)
+        self.assertEqual(batch_pitch_type_stats[0]["batter_id"], 10)
+
+        pitcher_pitch_mix = database.get_pitcher_pitch_type_stats_from_db(
+            20,
+            2026,
+        )
+        self.assertEqual(len(pitcher_pitch_mix), 1)
+        self.assertEqual(pitcher_pitch_mix[0]["PITCH"], "Four-Seam Fastball")
+        self.assertEqual(pitcher_pitch_mix[0]["COUNT"], 10)
+        self.assertEqual(pitcher_pitch_mix[0]["PERCENTAGE"], 100.0)
+        self.assertEqual(pitcher_pitch_mix[0]["AVG SPEED"], 96.5)
+        batch_pitcher_pitch_mix = database.get_pitcher_pitch_type_stats_batch_from_db(
+            [20, 20],
+            2026,
+        )
+        self.assertEqual(len(batch_pitcher_pitch_mix), 1)
+        self.assertEqual(batch_pitcher_pitch_mix[0]["pitcher_id"], 20)
 
         pitcher_season_logs = database.get_pitcher_season_game_logs_from_db(
             20,

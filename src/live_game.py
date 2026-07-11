@@ -2,8 +2,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 import pandas as pd
-import requests
 
+from src.api_client import get_json
 
 BOXSCORE_URL = "https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore"
 LIVE_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
@@ -152,16 +152,29 @@ def parse_game_boxscore(data):
                 }
             )
 
+    batting = pd.DataFrame(batting_rows)
+    if not batting.empty:
+        batting = batting.sort_values(
+            ["Side", "Lineup", "PA", "Player"],
+            ascending=[True, True, False, True],
+            na_position="last",
+        ).reset_index(drop=True)
+
+    pitching = pd.DataFrame(pitching_rows)
+
     return {
-        "batting": pd.DataFrame(batting_rows),
-        "pitching": pd.DataFrame(pitching_rows),
+        "batting": batting,
+        "pitching": pitching,
     }
 
 
 def get_game_boxscore(game_pk):
-    response = requests.get(BOXSCORE_URL.format(game_pk=int(game_pk)), timeout=20)
-    response.raise_for_status()
-    return parse_game_boxscore(response.json())
+    data = get_json(
+        BOXSCORE_URL.format(game_pk=int(game_pk)),
+        provider="MLB StatsAPI",
+        timeout=20,
+    )
+    return parse_game_boxscore(data)
 
 
 def _live_player(player):
@@ -326,6 +339,8 @@ def parse_pitch_event(event):
         "is_strike": bool(details.get("isStrike")),
         "is_ball": bool(details.get("isBall")),
         "is_in_play": bool(details.get("isInPlay")),
+        "is_out": bool(details.get("isOut")),
+        "count_after": _pitch_count(event),
         "zone": safe_int(details.get("zone"), default=None),
         "pitch_type": pitch_type.get("description") or pitch_type.get("code"),
         "pitch_code": pitch_type.get("code"),
@@ -335,6 +350,21 @@ def parse_pitch_event(event):
         "strike_zone_top": safe_float(pitch_data.get("strikeZoneTop")),
         "strike_zone_bottom": safe_float(pitch_data.get("strikeZoneBottom")),
     }
+
+
+def annotate_pitch_counts(pitch_events):
+    previous_count = None
+    for pitch in pitch_events:
+        count_after = _pitch_count({"count": pitch.get("count_after")})
+        count_before = (
+            dict(previous_count)
+            if previous_count is not None
+            else {"balls": 0, "strikes": 0, "outs": count_after["outs"]}
+        )
+        pitch["count_before"] = count_before
+        pitch["count_after"] = count_after
+        previous_count = count_after
+    return pitch_events
 
 
 def _play_runs_scored(play):
@@ -357,7 +387,9 @@ def parse_live_play(play):
         for event in play_events
         if event.get("isPitch")
     ]
-    parsed_pitch_events = [parse_pitch_event(event) for event in pitch_events]
+    parsed_pitch_events = annotate_pitch_counts(
+        [parse_pitch_event(event) for event in pitch_events]
+    )
     hit_data = next(
         (
             event.get("hitData")
@@ -446,14 +478,24 @@ def parse_live_game_feed(data):
     venue = game_data.get("venue") or {}
     field_info = venue.get("fieldInfo") or {}
     abs_challenges = game_data.get("absChallenges") or {}
-    current_pitch_events = [
-        parse_pitch_event(event)
-        for event in (current_play.get("playEvents") or [])
-        if event.get("isPitch")
-    ]
+    current_pitch_events = annotate_pitch_counts(
+        [
+            parse_pitch_event(event)
+            for event in (current_play.get("playEvents") or [])
+            if event.get("isPitch")
+        ]
+    )
 
     current_batter = matchup.get("batter") or offense.get("batter") or {}
     current_pitcher = matchup.get("pitcher") or defense.get("pitcher") or {}
+    current_pitcher_info = _live_pitcher(current_pitcher, boxscore)
+    pitch_hand = matchup.get("pitchHand") or current_pitcher.get("pitchHand") or {}
+    if pitch_hand:
+        current_pitcher_info["throwing_hand"] = (
+            pitch_hand.get("code")
+            or pitch_hand.get("description")
+            or pitch_hand.get("abbreviation")
+        )
     on_deck = offense.get("onDeck") or {}
     bases = {}
     for base_key, label in (
@@ -485,12 +527,7 @@ def parse_live_game_feed(data):
     recent_plays = completed_plays[-8:]
     contact_plays = [play for play in completed_plays if play.get("hit_data")]
     latest_batted_ball = contact_plays[-1] if contact_plays else None
-    recent_pitches = [
-        pitch
-        for play in completed_plays[-3:]
-        for pitch in (play.get("pitches") or [])
-    ]
-    current_pitches = current_pitch_events or recent_pitches[-12:]
+    current_pitches = current_pitch_events
 
     challenge_teams = {}
     for side in ("away", "home"):
@@ -545,9 +582,10 @@ def parse_live_game_feed(data):
         "current_pitches": current_pitches[-12:],
         "latest_pitch": current_pitches[-1] if current_pitches else None,
         "current_batter": _live_player_with_lineup(current_batter, lineup_lookup),
-        "current_pitcher": _live_pitcher(current_pitcher, boxscore),
+        "current_pitcher": current_pitcher_info,
         "on_deck": _live_player_with_lineup(on_deck, lineup_lookup),
         "bases": bases,
+        "completed_plays": completed_plays,
         "recent_plays": recent_plays,
         "contact_plays": contact_plays,
         "latest_completed_play": recent_plays[-1] if recent_plays else None,
@@ -558,12 +596,12 @@ def parse_live_game_feed(data):
 
 
 def get_live_game_feed(game_pk):
-    response = requests.get(
+    data = get_json(
         LIVE_FEED_URL.format(game_pk=int(game_pk)),
+        provider="MLB StatsAPI",
         timeout=20,
     )
-    response.raise_for_status()
-    return parse_live_game_feed(response.json())
+    return parse_live_game_feed(data)
 
 
 def parse_player_profile(data):
@@ -584,13 +622,13 @@ def parse_player_profile(data):
 
 
 def get_player_profile(player_id):
-    response = requests.get(
+    data = get_json(
         PLAYER_URL.format(player_id=int(player_id)),
         params={"hydrate": "currentTeam"},
+        provider="MLB StatsAPI",
         timeout=20,
     )
-    response.raise_for_status()
-    return parse_player_profile(response.json())
+    return parse_player_profile(data)
 
 
 def parse_player_game_log(data, group):
@@ -668,7 +706,7 @@ def parse_player_game_log(data, group):
 
 
 def get_player_game_log(player_id, group, season):
-    response = requests.get(
+    data = get_json(
         PLAYER_STATS_URL.format(player_id=int(player_id)),
         params={
             "stats": "gameLog",
@@ -676,10 +714,10 @@ def get_player_game_log(player_id, group, season):
             "season": int(season),
             "sportIds": 1,
         },
+        provider="MLB StatsAPI",
         timeout=20,
     )
-    response.raise_for_status()
-    return parse_player_game_log(response.json(), group)
+    return parse_player_game_log(data, group)
 
 
 def get_people_game_logs(player_ids, group, season):
@@ -694,7 +732,7 @@ def get_people_game_logs(player_ids, group, season):
         return pd.DataFrame()
 
     def load_chunk(chunk):
-        response = requests.get(
+        data = get_json(
             PEOPLE_URL,
             params={
                 "personIds": ",".join(str(player_id) for player_id in chunk),
@@ -703,12 +741,12 @@ def get_people_game_logs(player_ids, group, season):
                 ),
                 "sportIds": 1,
             },
+            provider="MLB StatsAPI",
             timeout=60,
         )
-        response.raise_for_status()
 
         frames = []
-        for person in response.json().get("people", []):
+        for person in data.get("people", []):
             frame = parse_player_game_log(
                 {"stats": person.get("stats", [])},
                 group,
@@ -748,7 +786,7 @@ def get_people_career_game_logs(
         return pd.DataFrame()
 
     def load_chunk(chunk):
-        response = requests.get(
+        data = get_json(
             PEOPLE_URL,
             params={
                 "personIds": ",".join(str(player_id) for player_id in chunk),
@@ -758,11 +796,11 @@ def get_people_career_game_logs(
                 ),
                 "sportIds": 1,
             },
+            provider="MLB StatsAPI",
             timeout=90,
         )
-        response.raise_for_status()
         frames = []
-        for person in response.json().get("people", []):
+        for person in data.get("people", []):
             frame = parse_player_game_log(
                 {"stats": person.get("stats", [])},
                 group,
@@ -827,7 +865,7 @@ def parse_team_schedule_results(data):
 
 
 def get_season_team_results(season, through_date):
-    response = requests.get(
+    data = get_json(
         SCHEDULE_URL,
         params={
             "sportId": 1,
@@ -836,10 +874,10 @@ def get_season_team_results(season, through_date):
             "endDate": str(through_date),
             "hydrate": "team",
         },
+        provider="MLB StatsAPI",
         timeout=30,
     )
-    response.raise_for_status()
-    return parse_team_schedule_results(response.json())
+    return parse_team_schedule_results(data)
 
 
 def get_game_results(game_pks):
@@ -855,17 +893,17 @@ def get_game_results(game_pks):
     frames = []
     for offset in range(0, len(clean_game_pks), 100):
         chunk = clean_game_pks[offset : offset + 100]
-        response = requests.get(
+        data = get_json(
             SCHEDULE_URL,
             params={
                 "sportId": 1,
                 "gamePks": ",".join(str(game_pk) for game_pk in chunk),
                 "hydrate": "team",
             },
+            provider="MLB StatsAPI",
             timeout=45,
         )
-        response.raise_for_status()
-        frame = parse_team_schedule_results(response.json())
+        frame = parse_team_schedule_results(data)
         if not frame.empty:
             frames.append(frame)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
@@ -911,18 +949,18 @@ def get_active_team_rosters(team_records, roster_date):
         return pd.DataFrame()
 
     def load_team(record):
-        response = requests.get(
+        data = get_json(
             ROSTER_URL.format(team_id=record["team_id"]),
             params={
                 "rosterType": "active",
                 "date": str(roster_date),
                 "hydrate": "person",
             },
+            provider="MLB StatsAPI",
             timeout=30,
         )
-        response.raise_for_status()
         return parse_team_roster(
-            response.json(),
+            data,
             team_id=record["team_id"],
             team_name=record["team_name"],
             team_abbr=record["team_abbr"],

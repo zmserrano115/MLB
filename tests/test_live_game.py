@@ -194,6 +194,7 @@ class LiveGameFeedTests(unittest.TestCase):
                         "matchup": {
                             "batter": {"id": 1, "fullName": "Current Batter"},
                             "pitcher": {"id": 9, "fullName": "Current Pitcher"},
+                            "pitchHand": {"code": "L"},
                         },
                         "playEvents": [
                             {
@@ -271,9 +272,12 @@ class LiveGameFeedTests(unittest.TestCase):
         self.assertEqual(parsed["current_pitcher"]["strikeouts"], 9)
         self.assertEqual(parsed["current_pitcher"]["hits_allowed"], 5)
         self.assertEqual(parsed["current_pitcher"]["era"], "2.91")
+        self.assertEqual(parsed["current_pitcher"]["throwing_hand"], "L")
         self.assertEqual(parsed["on_deck"]["name"], "On Deck Hitter")
         self.assertEqual(parsed["on_deck"]["lineup_number"], 3)
         self.assertEqual(parsed["fouls"], 2)
+        self.assertEqual(parsed["current_pitches"][0]["count_before"]["strikes"], 0)
+        self.assertEqual(parsed["current_pitches"][1]["count_before"]["strikes"], 1)
         self.assertEqual(parsed["bases"]["first"]["name"], "Runner One")
         self.assertIn(
             "/people/3/headshot/",
@@ -297,6 +301,84 @@ class LiveGameFeedTests(unittest.TestCase):
             parsed["recent_plays"][0]["count_before"]["strikes"],
             1,
         )
+        self.assertEqual(
+            parsed["recent_plays"][0]["pitches"][1]["count_before"]["strikes"],
+            1,
+        )
+        self.assertEqual(len(parsed["completed_plays"]), 1)
+
+    def test_current_strike_zone_does_not_reuse_completed_at_bat_pitches(self):
+        data = {
+            "gameData": {
+                "game": {"pk": 99},
+                "status": {
+                    "abstractGameState": "Live",
+                    "detailedState": "In Progress",
+                },
+                "teams": {
+                    "away": {"id": 10, "name": "Away Team"},
+                    "home": {"id": 20, "name": "Home Team"},
+                },
+            },
+            "liveData": {
+                "boxscore": {"teams": {"away": {"players": {}}, "home": {"players": {}}}},
+                "linescore": {
+                    "currentInning": 1,
+                    "currentInningOrdinal": "1st",
+                    "inningState": "Top",
+                    "teams": {"away": {"runs": 0}, "home": {"runs": 0}},
+                    "offense": {
+                        "batter": {"id": 2, "fullName": "New Batter"},
+                    },
+                },
+                "plays": {
+                    "currentPlay": {
+                        "count": {"balls": 0, "strikes": 0, "outs": 1},
+                        "matchup": {
+                            "batter": {"id": 2, "fullName": "New Batter"},
+                            "pitcher": {"id": 9, "fullName": "Current Pitcher"},
+                        },
+                        "playEvents": [],
+                    },
+                    "allPlays": [
+                        {
+                            "about": {
+                                "atBatIndex": 1,
+                                "inning": 1,
+                                "halfInning": "top",
+                                "isComplete": True,
+                            },
+                            "matchup": {
+                                "batter": {"id": 1, "fullName": "Old Batter"},
+                                "pitcher": {"id": 9, "fullName": "Current Pitcher"},
+                            },
+                            "result": {
+                                "event": "Strikeout",
+                                "eventType": "strikeout",
+                                "description": "Old Batter strikes out.",
+                            },
+                            "playEvents": [
+                                {
+                                    "isPitch": True,
+                                    "details": {
+                                        "description": "Called Strike",
+                                        "isStrike": True,
+                                        "zone": 5,
+                                    },
+                                    "count": {"balls": 0, "strikes": 1, "outs": 0},
+                                }
+                            ],
+                        }
+                    ],
+                },
+            },
+        }
+
+        parsed = parse_live_game_feed(data)
+
+        self.assertEqual(parsed["current_batter"]["name"], "New Batter")
+        self.assertEqual(parsed["current_pitches"], [])
+        self.assertIsNone(parsed["latest_pitch"])
 
     def test_play_result_classification_covers_common_events(self):
         self.assertEqual(

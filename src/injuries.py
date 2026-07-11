@@ -5,6 +5,8 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import requests
 
+from src.api_client import get as api_get
+
 
 STATS_API_BASE = "https://statsapi.mlb.com/api/v1"
 REQUEST_TIMEOUT = 12
@@ -33,13 +35,16 @@ def eligible_return_date(status_code, effective_date):
     return effective_date + timedelta(days=list_days)
 
 
-def _get_json(path, params, request_get):
-    response = request_get(
-        f"{STATS_API_BASE}/{path.lstrip('/')}",
-        params=params,
-        headers=REQUEST_HEADERS,
-        timeout=REQUEST_TIMEOUT,
-    )
+def _get_json(path, params, request_get=None):
+    request_get = request_get or api_get
+    kwargs = {
+        "params": params,
+        "headers": REQUEST_HEADERS,
+        "timeout": REQUEST_TIMEOUT,
+    }
+    if request_get is api_get:
+        kwargs["provider"] = "MLB StatsAPI"
+    response = request_get(f"{STATS_API_BASE}/{path.lstrip('/')}", **kwargs)
     response.raise_for_status()
     return response.json()
 
@@ -97,7 +102,7 @@ def _injury_tooltip(status_description, transaction, status_code, as_of_date):
     return ". ".join(piece.rstrip(".") for piece in pieces if piece) + "."
 
 
-def fetch_injury_report(team_ids, as_of_date, request_get=requests.get):
+def fetch_injury_report(team_ids, as_of_date, request_get=None):
     as_of_date = _as_date(as_of_date) or date.today()
     start_date = max(date(as_of_date.year, 1, 1), as_of_date - timedelta(days=180))
     team_ids = sorted({int(team_id) for team_id in team_ids if team_id})

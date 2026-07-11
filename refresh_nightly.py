@@ -31,6 +31,8 @@ def run_nightly_refresh(
     lookback_days=3,
     game_type="R",
     reprocess_existing=False,
+    refresh_pitch_data=False,
+    pitch_recheck_days=4,
 ):
     """Update only final-game BvP history and pitcher logs."""
     database.init_database()
@@ -77,6 +79,16 @@ def run_nightly_refresh(
     )
 
     print(message)
+
+    if refresh_pitch_data:
+        print("Refreshing rolling Statcast pitch-level data...")
+        from scripts.refresh_pitch_data import refresh_pitch_data_window
+
+        refresh_pitch_data_window(
+            through_date=end_date,
+            recheck_days=pitch_recheck_days,
+        )
+
     database.print_database_counts()
     return dict(totals)
 
@@ -106,6 +118,17 @@ def main():
     )
     parser.add_argument("--game-type", default="R")
     parser.add_argument("--reprocess-existing", action="store_true")
+    parser.add_argument(
+        "--refresh-pitch-data",
+        action="store_true",
+        help="Also refresh rolling Statcast pitch-level tables.",
+    )
+    parser.add_argument(
+        "--pitch-recheck-days",
+        type=int,
+        default=4,
+        help="Rolling correction window for --refresh-pitch-data.",
+    )
     parser.add_argument("--db", help="Optional SQLite path.")
     args = parser.parse_args()
 
@@ -122,6 +145,8 @@ def main():
             lookback_days=lookback_days,
             game_type=args.game_type,
             reprocess_existing=args.reprocess_existing,
+            refresh_pitch_data=args.refresh_pitch_data,
+            pitch_recheck_days=args.pitch_recheck_days,
         )
     except Exception as error:
         try:

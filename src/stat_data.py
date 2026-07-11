@@ -1,12 +1,16 @@
 # src/stat_data.py
 
 import pandas as pd
-import requests
 
+from src.api_client import get_json
 from src.database import (
+    get_batter_pitch_type_stats_batch_from_db,
+    get_batter_pitch_type_stats_from_db,
     get_batter_vs_pitcher_game_logs_from_db,
     get_batter_vs_pitcher_stats_batch_from_db,
     get_batter_vs_pitcher_stats_from_db,
+    get_pitcher_pitch_type_stats_batch_from_db,
+    get_pitcher_pitch_type_stats_from_db,
     get_pitcher_vs_team_game_logs_from_db,
 )
 
@@ -101,10 +105,12 @@ def get_mlb_stats(season, group):
         "hydrate": "team",
     }
 
-    response = requests.get(STATS_URL, params=params, timeout=30)
-    response.raise_for_status()
-
-    data = response.json()
+    data = get_json(
+        STATS_URL,
+        params=params,
+        provider="MLB StatsAPI",
+        timeout=30,
+    )
     splits = data.get("stats", [{}])[0].get("splits", [])
 
     rows = []
@@ -388,6 +394,42 @@ def get_hitter_vs_pitcher_stats_batch(matchup_pairs, season=None):
     return get_batter_vs_pitcher_stats_batch_from_db(matchup_pairs)
 
 
+def get_batter_pitch_type_stats(batter_id, season, pitcher_hand=None):
+    """
+    Loads exact hitter pitch-type splits aggregated from MLB StatsAPI pitch codes.
+    """
+    return get_batter_pitch_type_stats_from_db(
+        batter_id,
+        season,
+        pitcher_hand=pitcher_hand,
+    )
+
+
+def get_batter_pitch_type_stats_batch(batter_ids, season, pitcher_hand=None):
+    """
+    Loads hitter pitch-type splits for many players in one SQLite read.
+    """
+    return get_batter_pitch_type_stats_batch_from_db(
+        batter_ids,
+        season,
+        pitcher_hand=pitcher_hand,
+    )
+
+
+def get_pitcher_pitch_type_stats(pitcher_id, season):
+    """
+    Loads pitcher pitch-mix usage aggregated from MLB StatsAPI pitch events.
+    """
+    return get_pitcher_pitch_type_stats_from_db(pitcher_id, season)
+
+
+def get_pitcher_pitch_type_stats_batch(pitcher_ids, season):
+    """
+    Loads pitcher pitch-mix usage for many players in one SQLite read.
+    """
+    return get_pitcher_pitch_type_stats_batch_from_db(pitcher_ids, season)
+
+
 def preload_hitter_hand_splits(season):
     """
     Loads both handedness split tables in one request for instant tab changes.
@@ -397,7 +439,7 @@ def preload_hitter_hand_splits(season):
     if all(HAND_SPLIT_CACHE.get(cache_key) for cache_key in cache_keys):
         return
 
-    response = requests.get(
+    data = get_json(
         STATS_URL,
         params={
             "stats": "statSplits",
@@ -408,12 +450,12 @@ def preload_hitter_hand_splits(season):
             "playerPool": "ALL",
             "limit": 5000,
         },
+        provider="MLB StatsAPI",
         timeout=30,
     )
-    response.raise_for_status()
 
     split_cache = {"R": {}, "L": {}}
-    for split in response.json().get("stats", [{}])[0].get("splits", []):
+    for split in data.get("stats", [{}])[0].get("splits", []):
         player_id = split.get("player", {}).get("id")
         split_code = split.get("split", {}).get("code")
         pitcher_hand = "R" if split_code == "vr" else "L" if split_code == "vl" else None

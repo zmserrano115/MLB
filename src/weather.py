@@ -5,6 +5,8 @@ import time
 import pandas as pd
 import requests
 
+from src.api_client import get_json
+
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 FORECAST_HEADERS = {"User-Agent": "AllRiseAnalytics/1.0"}
@@ -301,14 +303,14 @@ def request_forecast(params, attempts=3, timeout=20):
     last_error = None
     for attempt in range(attempts):
         try:
-            response = requests.get(
+            payload = get_json(
                 FORECAST_URL,
                 params=params,
                 headers=FORECAST_HEADERS,
+                provider="Open-Meteo",
                 timeout=timeout,
+                attempts=1,
             )
-            response.raise_for_status()
-            payload = response.json()
             validate_forecast_payload(payload)
             return payload
         except (requests.RequestException, ValueError) as error:
@@ -448,17 +450,17 @@ def convert_met_forecast(payload, elevation_ft=None):
 
 
 def fetch_met_forecast(latitude, longitude, elevation_ft=None):
-    response = requests.get(
+    payload = get_json(
         MET_FORECAST_URL,
         params={
             "lat": round(float(latitude), 4),
             "lon": round(float(longitude), 4),
         },
         headers=MET_FORECAST_HEADERS,
+        provider="MET Norway",
         timeout=20,
     )
-    response.raise_for_status()
-    return convert_met_forecast(response.json(), elevation_ft=elevation_ft)
+    return convert_met_forecast(payload, elevation_ft=elevation_ft)
 
 
 def mlb_field_wind_direction(wind_text):
@@ -558,13 +560,13 @@ def fetch_mlb_game_weather(game):
     if game_pk is None:
         raise ValueError("MLB game ID unavailable")
 
-    response = requests.get(
+    payload = get_json(
         MLB_GAME_FEED_URL.format(game_pk=int(game_pk)),
         headers=FORECAST_HEADERS,
+        provider="MLB StatsAPI",
         timeout=20,
     )
-    response.raise_for_status()
-    weather = response.json().get("gameData", {}).get("weather", {})
+    weather = payload.get("gameData", {}).get("weather", {})
     return convert_mlb_game_weather(game, weather)
 
 
@@ -573,14 +575,13 @@ def fetch_published_weather_cache(
     cache_bust=None,
 ):
     try:
-        response = requests.get(
+        payload = get_json(
             cache_url,
             params={"v": cache_bust} if cache_bust else None,
             headers=FORECAST_HEADERS,
+            provider="GitHub release weather cache",
             timeout=30,
         )
-        response.raise_for_status()
-        payload = response.json()
         records = payload.get("records", [])
         return pd.DataFrame(records)
     except Exception as error:
