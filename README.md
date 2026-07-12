@@ -1,5 +1,11 @@
 # All Rise Analytics
 
+> The existing Streamlit application remains authoritative while the approved
+> strangler migration is developed in parallel. See
+> [`docs/architecture/`](docs/architecture/README.md) for the audited plan and
+> [`docs/runbooks/local-development.md`](docs/runbooks/local-development.md) for
+> the new local stack.
+
 This Streamlit app uses:
 
 - Retrosheet yearly CSV archives for historical 2005-2025 data.

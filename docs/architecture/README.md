@@ -1,6 +1,6 @@
 # Architecture migration dossier
 
-Status: audit and planning complete; implementation has not started.
+Status: audit complete; Phase 1 scaffold implemented with Docker verification pending.
 
 This directory is the approval gate for the All Rise Analytics strangler migration. The current Streamlit application remains the working product and is intentionally unchanged.
 
@@ -23,6 +23,7 @@ This directory is the approval gate for the All Rise Analytics strangler migrati
 | Live-game architecture | [02-target-architecture-and-migration-plan.md](02-target-architecture-and-migration-plan.md#live-game-plan) |
 | Local development and Cloud Run deployment | [02-target-architecture-and-migration-plan.md](02-target-architecture-and-migration-plan.md#local-development-plan) |
 | Test and acceptance plan | [02-target-architecture-and-migration-plan.md](02-target-architecture-and-migration-plan.md#test-plan) |
+| Phase 1 implementation status | [03-phase-1-scaffold-status.md](03-phase-1-scaffold-status.md) |
 
 ## Audit-stage verification
 

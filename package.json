@@ -1,0 +1,11 @@
+{
+  "name": "all-rise-analytics",
+  "private": true,
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "build": "pnpm --filter @all-rise/web build",
+    "lint": "pnpm --filter @all-rise/web lint",
+    "test": "pnpm --filter @all-rise/web test",
+    "typecheck": "pnpm --filter @all-rise/web typecheck"
+  }
+}

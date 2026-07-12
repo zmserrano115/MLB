@@ -1,11 +1,14 @@
 # Python cache
 __pycache__/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 *.py[cod]
 *$py.class
 
 # Virtual environments
 .venv/
+.venv-phase1/
 venv/
 env/
 
@@ -18,6 +21,11 @@ Thumbs.db
 
 # VS Code settings
 .vscode/
+node_modules/
+.pnpm-store/
+.next/
+*.tsbuildinfo
+.env
 
 # Local logs and obsolete CSV/cache outputs
 data/nightly_refresh_log.txt
