@@ -710,7 +710,7 @@ Every phase starts with a written objective/files/risks/preservation note and en
 - **Preservation:** endpoints begin shadow-only; Streamlit still serves users. SQLite adapter is explicitly non-production/read-only.
 - **Exit gate:** health/ready/version/data-status, typed bounded routes, error/failure tests, no production SQLite config, API image build.
 
-### Phase 4 - PostgreSQL and Alembic shadow migration
+### Phase 4 - PostgreSQL and Alembic shadow migration (complete)
 
 - **Objective:** implement normalized schema, migrations, bulk extraction/load, repository queries, and parity validation.
 - **Expected files:** SQLAlchemy models, Alembic revisions, PostgreSQL repositories, migration/validation scripts, GCS artifact metadata.
