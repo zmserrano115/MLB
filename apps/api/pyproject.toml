@@ -5,6 +5,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
   "all-rise-backend",
   "fastapi>=0.115,<1",
+  "redis>=6,<9",
   "uvicorn[standard]>=0.34,<1",
 ]
 
@@ -17,4 +18,3 @@ packages = ["src/all_rise_api"]
 
 [tool.uv.sources]
 all-rise-backend = { workspace = true }
-

@@ -702,7 +702,7 @@ Every phase starts with a written objective/files/risks/preservation note and en
 - **Preservation:** Streamlit continues importing old paths; compatibility tests compare old/new outputs exactly.
 - **Exit gate:** domain has no UI/I/O imports; golden tests, mypy/pyright, lint, full legacy suite pass.
 
-### Phase 3 - FastAPI and repository contracts
+### Phase 3 - FastAPI and repository contracts (complete)
 
 - **Objective:** create production middleware/config/lifespan/error contracts and read-only repository protocols.
 - **Expected files:** `apps/api`, backend application services/protocols, dev-only SQLite adapter, OpenAPI contract tests.

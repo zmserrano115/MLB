@@ -1,5 +1,5 @@
 from all_rise.config import Settings
-from all_rise_api.main import health, readiness
+from all_rise_api.main import create_app
 
 
 def test_settings_have_safe_local_defaults(monkeypatch) -> None:
@@ -14,6 +14,8 @@ def test_settings_have_safe_local_defaults(monkeypatch) -> None:
 
 
 def test_api_operations_shell() -> None:
-    assert health() == {"status": "ok", "service": "api"}
-    assert readiness()["status"] == "ready"
-
+    paths = create_app().openapi()["paths"]
+    assert "/health" in paths
+    assert "/ready" in paths
+    assert "/version" in paths
+    assert "/api/v1/data-status" in paths
