@@ -1,6 +1,8 @@
 .git
 .github
-.venv
+.venv*
+.codex_runtime
+.pnpm-store
 __pycache__
 .pytest_cache
 .mypy_cache
@@ -15,4 +17,3 @@ data/*.db
 data/*.db-wal
 data/*.db-shm
 data/retrosheet
-

@@ -1,6 +1,6 @@
 # Architecture migration dossier
 
-Status: audit complete; Phase 1 scaffold implemented with Docker verification pending.
+Status: audit and Phase 1 scaffold complete; Phase 2 is next.
 
 This directory is the approval gate for the All Rise Analytics strangler migration. The current Streamlit application remains the working product and is intentionally unchanged.
 

@@ -686,7 +686,7 @@ Every phase starts with a written objective/files/risks/preservation note and en
 - **Preservation:** no runtime, data, workflow, or deployment changes.
 - **Exit gate:** repository/UI/data audit, diagrams, plans, compile pass, 85 tests pass.
 
-### Phase 1 - Non-disruptive monorepo scaffold
+### Phase 1 - Non-disruptive monorepo scaffold (complete)
 
 - **Objective:** create folders, packaging, locked tooling, Compose skeleton, and compatibility conventions.
 - **Expected files:** root workspace/config files; `apps/*`, `packages/backend`, `services/worker`, `infra`, empty service health shells.
