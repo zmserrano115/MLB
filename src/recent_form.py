@@ -2,6 +2,8 @@ from html import escape
 
 import pandas as pd
 
+from all_rise.domain import recent_form as _domain_recent_form
+
 
 def recent_game_values(game_log_df, value_column, limit=5):
     if game_log_df is None or game_log_df.empty or value_column not in game_log_df:
@@ -162,3 +164,6 @@ def build_recent_bar_chart_html(
       </div>
     </div>
     """
+
+
+recent_game_values = _domain_recent_form.recent_game_values

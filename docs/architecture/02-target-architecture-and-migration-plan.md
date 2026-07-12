@@ -694,7 +694,7 @@ Every phase starts with a written objective/files/risks/preservation note and en
 - **Preservation:** root `app.py`, `src`, `components`, data paths, and current launch command remain authoritative. Do not move Streamlit yet.
 - **Exit gate:** legacy 85 tests/imports/browser smoke pass; API/web placeholder lint/type/tests; Compose starts Postgres/Redis/health shells.
 
-### Phase 2 - Shared backend domain extraction
+### Phase 2 - Shared backend domain extraction (complete)
 
 - **Objective:** move pure grading, scoring, pitch, bullpen, weather, live parsing, streak, and stats calculations behind typed interfaces.
 - **Expected files:** `packages/backend/.../domain`; compatibility re-exports in current `src`; golden characterization fixtures/tests.

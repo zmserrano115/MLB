@@ -3,6 +3,8 @@ from datetime import date
 
 import pandas as pd
 
+from all_rise.domain import live as _domain_live
+from all_rise.domain import streaks as _domain_streaks
 from src.api_client import get_json
 
 BOXSCORE_URL = "https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore"
@@ -1166,3 +1168,16 @@ def calculate_live_streak(
         "today_value": float(current_value) if has_current_value else None,
         "status": status,
     }
+
+
+# Compatibility aliases keep mixed provider access in this module while routing
+# pure parsing and streak calculations through the shared backend domain.
+safe_int = _domain_live.safe_int
+safe_float = _domain_live.safe_float
+classify_play_result = _domain_live.classify_play_result
+parse_pitch_event = _domain_live.parse_pitch_event
+annotate_pitch_counts = _domain_live.annotate_pitch_counts
+count_current_play_fouls = _domain_live.count_current_play_fouls
+is_final_state = _domain_streaks.is_final_state
+count_historical_streak = _domain_streaks.count_historical_streak
+calculate_live_streak = _domain_streaks.calculate_live_streak

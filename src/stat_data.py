@@ -2,6 +2,7 @@
 
 import pandas as pd
 
+from all_rise.domain import stats as _domain_stats
 from src.api_client import get_json
 from src.database import (
     get_batter_pitch_type_stats_batch_from_db,
@@ -541,3 +542,12 @@ def get_pitcher_vs_team_game_log(pitcher_id, opponent_team):
 
     rows = get_pitcher_vs_team_game_logs_from_db(pitcher_id, opponent_team)
     return pd.DataFrame(rows)
+
+
+# Compatibility aliases route numeric calculations through the shared domain;
+# provider and SQLite access remain in this legacy adapter.
+make_numeric = _domain_stats.make_numeric
+safe_number = _domain_stats.safe_number
+safe_int = _domain_stats.safe_int
+safe_divide = _domain_stats.safe_divide
+is_missing = _domain_stats.is_missing

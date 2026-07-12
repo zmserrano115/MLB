@@ -1,0 +1,44 @@
+{
+  "batting_input": {
+    "AB": 10,
+    "PA": 12,
+    "H": 4,
+    "2B": 1,
+    "3B": 0,
+    "HR": 1,
+    "BB": 2,
+    "HBP": 0,
+    "SF": 0,
+    "SO": 3
+  },
+  "batting_rates": {
+    "AVG": 0.4,
+    "OBP": 0.5,
+    "SLG": 0.8,
+    "OPS": 1.3,
+    "K%": 25.0,
+    "BB%": 16.666666666666668,
+    "BABIP": 0.5,
+    "TB": 8
+  },
+  "approximate_woba": 0.535,
+  "matchup_cases": [
+    {"at_bats": 0, "average": 0.4, "grade": "No History"},
+    {"at_bats": 10, "average": 0.45, "grade": "Strong Matchup"},
+    {"at_bats": 30, "average": 0.28, "grade": "Good Matchup"}
+  ],
+  "weather": {
+    "wind_out_mph": 12,
+    "air_density": 1.15,
+    "roof_type": "open",
+    "adjustments": [5.2, -1.04],
+    "direction_degrees": 281,
+    "cardinal": "W"
+  },
+  "live_play": {
+    "result": {"eventType": "home_run"},
+    "classification": "home_run"
+  },
+  "baseball_ip": {"input": "6.2", "innings": 6.666666666666667}
+}
+

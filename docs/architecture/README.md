@@ -1,6 +1,6 @@
 # Architecture migration dossier
 
-Status: audit and Phase 1 scaffold complete; Phase 2 is next.
+Status: audit, Phase 1, and Phase 2 complete; Phase 3 is next.
 
 This directory is the approval gate for the All Rise Analytics strangler migration. The current Streamlit application remains the working product and is intentionally unchanged.
 
@@ -24,6 +24,7 @@ This directory is the approval gate for the All Rise Analytics strangler migrati
 | Local development and Cloud Run deployment | [02-target-architecture-and-migration-plan.md](02-target-architecture-and-migration-plan.md#local-development-plan) |
 | Test and acceptance plan | [02-target-architecture-and-migration-plan.md](02-target-architecture-and-migration-plan.md#test-plan) |
 | Phase 1 implementation status | [03-phase-1-scaffold-status.md](03-phase-1-scaffold-status.md) |
+| Phase 2 implementation status | [04-phase-2-domain-status.md](04-phase-2-domain-status.md) |
 
 ## Audit-stage verification
 

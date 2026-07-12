@@ -5,6 +5,7 @@ import time
 import pandas as pd
 import requests
 
+from all_rise.domain import weather as _domain_weather
 from src.api_client import get_json
 
 
@@ -941,3 +942,19 @@ def preserve_previous_weather(current_df, previous_df):
         result.at[index, "weather_source"] = "Last successful forecast"
 
     return result
+
+
+# Compatibility exports: mixed provider I/O remains here while calculations live
+# in the shared backend domain. Internal calls also resolve through these aliases.
+weather_icon = _domain_weather.weather_icon
+field_wind_arrow = _domain_weather.field_wind_arrow
+safe_float = _domain_weather.safe_float
+unavailable_weather = _domain_weather.unavailable_weather
+parse_utc_datetime = _domain_weather.parse_utc_datetime
+cardinal_direction = _domain_weather.cardinal_direction
+project_wind_to_field = _domain_weather.project_wind_to_field
+calculate_air_density = _domain_weather.calculate_air_density
+roof_allows_weather = _domain_weather.roof_allows_weather
+calculate_weather_adjustments = _domain_weather.calculate_weather_adjustments
+weather_edge_label = _domain_weather.weather_edge_label
+pressure_at_elevation = _domain_weather.pressure_at_elevation
