@@ -14,6 +14,7 @@ from all_rise.models.core import (
     Player,
     ProcessingCheckpoint,
     RefreshRun,
+    RefreshRunItem,
     SourceArtifact,
     Team,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "Player",
     "ProcessingCheckpoint",
     "RefreshRun",
+    "RefreshRunItem",
     "SourceArtifact",
     "Team",
 ]

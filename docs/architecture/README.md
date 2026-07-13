@@ -1,6 +1,6 @@
 # Architecture migration dossier
 
-Status: audit and Phases 1-5 complete; Phase 6 is next.
+Status: audit and Phases 1-6 complete; Phase 7 is next.
 
 This directory is the approval gate for the All Rise Analytics strangler migration. The current Streamlit application remains the working product and is intentionally unchanged.
 
@@ -28,6 +28,7 @@ This directory is the approval gate for the All Rise Analytics strangler migrati
 | Phase 3 implementation status | [05-phase-3-api-status.md](05-phase-3-api-status.md) |
 | Phase 4 implementation status | [06-phase-4-postgresql-status.md](06-phase-4-postgresql-status.md) |
 | Phase 5 implementation status | [07-phase-5-redis-status.md](07-phase-5-redis-status.md) |
+| Phase 6 implementation status | [08-phase-6-workers-status.md](08-phase-6-workers-status.md) |
 
 ## Audit-stage verification
 

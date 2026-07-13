@@ -1,0 +1,31 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: all-rise-recover-stale
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/cloudsql-instances: ${CLOUD_SQL_INSTANCE}
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          serviceAccountName: ${JOB_SERVICE_ACCOUNT}
+          maxRetries: 1
+          timeoutSeconds: "300"
+          containers:
+            - image: ${WORKER_IMAGE}
+              command: ["python", "-m", "all_rise_worker.commands.recover_stale"]
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: all-rise-database-url
+                      key: latest
+                - name: ARTIFACT_STORE
+                  value: gcs
+                - name: GCS_BUCKET
+                  value: ${ARTIFACT_BUCKET}
+                - name: JOB_STALE_AFTER_SECONDS
+                  value: "300"

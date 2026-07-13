@@ -1,0 +1,43 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: all-rise-nightly-refresh
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/cloudsql-instances: ${CLOUD_SQL_INSTANCE}
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          serviceAccountName: ${JOB_SERVICE_ACCOUNT}
+          maxRetries: 0
+          timeoutSeconds: "1800"
+          containers:
+            - image: ${WORKER_IMAGE}
+              command: ["python", "-m", "all_rise_worker.commands.run_task"]
+              args:
+                - refresh_schedule
+                - --scope
+                - ${JOB_DATE}
+              env:
+                - name: TASK_PAYLOAD
+                  value: ${SCHEDULE_TASK_PAYLOAD}
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: all-rise-database-url
+                      key: latest
+                - name: ARTIFACT_STORE
+                  value: gcs
+                - name: GCS_BUCKET
+                  value: ${ARTIFACT_BUCKET}
+                - name: JOB_SOURCE_OWNERSHIP
+                  value: shadow
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 1Gi

@@ -726,7 +726,7 @@ Every phase starts with a written objective/files/risks/preservation note and en
 - **Preservation:** every cache miss/failure has a tested PostgreSQL path; feature flags permit bypass.
 - **Exit gate:** TTL/version/hit/miss/Redis-down/stampede tests, metrics, two API instances share cache.
 
-### Phase 6 - Workers, jobs, object storage, and corrected pipelines
+### Phase 6 - Workers, jobs, object storage, and corrected pipelines (complete)
 
 - **Objective:** replace daemon/GitHub-release refresh work with idempotent Dramatiq actors, Cloud Run Jobs, GCS artifacts, and status/checkpoints.
 - **Expected files:** `services/worker`, task commands, job manifests, artifact store, refresh/job tables, local worker tests.

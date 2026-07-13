@@ -1,0 +1,34 @@
+apiVersion: run.googleapis.com/v1
+kind: WorkerPool
+metadata:
+  name: all-rise-worker
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/cloudsql-instances: ${CLOUD_SQL_INSTANCE}
+    spec:
+      serviceAccountName: ${WORKER_SERVICE_ACCOUNT}
+      containers:
+        - image: ${WORKER_IMAGE}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: all-rise-database-url
+                  key: latest
+            - name: REDIS_BROKER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: all-rise-redis-broker-url
+                  key: latest
+            - name: ARTIFACT_STORE
+              value: gcs
+            - name: GCS_BUCKET
+              value: ${ARTIFACT_BUCKET}
+            - name: JOB_SOURCE_OWNERSHIP
+              value: shadow
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi

@@ -5,6 +5,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
   "all-rise-backend",
   "dramatiq[redis]>=1.17,<3",
+  "google-cloud-storage>=3,<4",
 ]
 
 [build-system]
@@ -16,4 +17,3 @@ packages = ["src/all_rise_worker"]
 
 [tool.uv.sources]
 all-rise-backend = { workspace = true }
-

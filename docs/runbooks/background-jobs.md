@@ -1,0 +1,76 @@
+# Background jobs runbook
+
+## Safety model
+
+PostgreSQL is the status authority. Redis only delivers actor messages. GCS/local artifacts are
+immutable, and a generation becomes visible only after its quality gate and database transaction
+succeed. Leave `JOB_SOURCE_OWNERSHIP=shadow` until a provider adapter has passed repeated parity
+runs and source ownership is explicitly approved.
+
+## Run a finite shadow task locally
+
+Start dependencies and migrate first:
+
+```powershell
+docker compose up -d postgres redis
+docker compose run --rm migrate
+```
+
+Pass JSON through the environment to avoid Windows shell quote rewriting:
+
+```powershell
+$env:TASK_PAYLOAD='{"date":"2026-07-13","source_version":"manual-v1"}'
+docker compose run --rm -e TASK_PAYLOAD worker python -m all_rise_worker.commands.run_task refresh_schedule --scope 2026-07-13
+```
+
+The command prints `succeeded`, `duplicate`, `in_progress`, `retry`, or `dead_letter`. Repeating
+the same task/payload derives the same idempotency key and must not execute it again.
+
+## Inspect status
+
+```sql
+SELECT id, task_name, source, scope, status, attempt, max_attempts,
+       heartbeat_at, next_retry_at, completed_at, dead_lettered_at, published_at,
+       error_code, message
+FROM refresh_runs
+ORDER BY id DESC
+LIMIT 50;
+
+SELECT run_id, item_key, status, attempt, error_code, message
+FROM refresh_run_items
+WHERE run_id = :run_id
+ORDER BY id;
+```
+
+For shadow work, `published_at` must remain null. Check `source_artifacts` for URI, SHA-256,
+size, generation, and inventory.
+
+## Recover stale work
+
+Run the recovery command on a five-minute Cloud Scheduler cadence (or manually):
+
+```powershell
+docker compose run --rm worker python -m all_rise_worker.commands.recover_stale
+```
+
+It marks expired running leases as retryable or dead-lettered after their last allowed attempt.
+It does not execute the task itself; the scheduler/actor redelivery performs the next claim.
+
+## Dead letters
+
+1. Inspect the run and all item errors.
+2. Verify the upstream version/artifact and fix the provider or normalization fault.
+3. Use a new idempotency key only when the source version, scope, or implementation genuinely
+   changed. Never edit a successful key or delete history merely to force a replay.
+4. Confirm the new run passes validation before changing source freshness or cache versions.
+
+## Production cutover checklist
+
+- Register and test the real adapter for the specific task.
+- Compare several shadow generations with the legacy owner, including late corrections.
+- Validate row counts, identities, ranges, checksums, per-item errors, and derived aggregates.
+- Confirm IAM: scheduler invoker only, worker Cloud SQL client, bucket object creator/viewer as
+  needed, Secret Manager accessor only for named secrets.
+- Assign exactly one writer for the source and record rollback ownership.
+- Add only that task to `JOB_ACTIVE_TASKS`; do not globally disable legacy workflows.
+- Observe freshness, dead letters, provider throttling, database load, and artifact growth.

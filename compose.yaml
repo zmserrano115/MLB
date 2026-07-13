@@ -8,6 +8,14 @@ x-app-environment: &app-environment
   REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
   REDIS_CACHE_URL: ${REDIS_CACHE_URL:-redis://redis:6379/0}
   REDIS_BROKER_URL: ${REDIS_BROKER_URL:-redis://redis:6379/1}
+  ARTIFACT_STORE: ${ARTIFACT_STORE:-local}
+  ARTIFACT_LOCAL_ROOT: ${ARTIFACT_LOCAL_ROOT:-/var/lib/all-rise/artifacts}
+  GCS_BUCKET: ${GCS_BUCKET:-}
+  JOB_SOURCE_OWNERSHIP: ${JOB_SOURCE_OWNERSHIP:-shadow}
+  JOB_ACTIVE_TASKS: ${JOB_ACTIVE_TASKS:-}
+  JOB_STALE_AFTER_SECONDS: ${JOB_STALE_AFTER_SECONDS:-300}
+  JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-5}
+  SCHEMA_REVISION: ${SCHEMA_REVISION:-0003_durable_job_execution}
 
 services:
   postgres:
@@ -74,6 +82,8 @@ services:
       context: .
       dockerfile: services/worker/Dockerfile
     environment: *app-environment
+    volumes:
+      - artifact-data:/var/lib/all-rise/artifacts
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -111,3 +121,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  artifact-data:

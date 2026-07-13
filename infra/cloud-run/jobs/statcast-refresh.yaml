@@ -1,0 +1,38 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: all-rise-statcast-refresh
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/cloudsql-instances: ${CLOUD_SQL_INSTANCE}
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          serviceAccountName: ${JOB_SERVICE_ACCOUNT}
+          maxRetries: 0
+          timeoutSeconds: "3600"
+          containers:
+            - image: ${WORKER_IMAGE}
+              command: ["python", "-m", "all_rise_worker.commands.run_task"]
+              args: ["refresh_statcast_window", "--scope", "${STATCAST_SCOPE}"]
+              env:
+                - name: TASK_PAYLOAD
+                  value: ${STATCAST_TASK_PAYLOAD}
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: all-rise-database-url
+                      key: latest
+                - name: ARTIFACT_STORE
+                  value: gcs
+                - name: GCS_BUCKET
+                  value: ${ARTIFACT_BUCKET}
+                - name: JOB_SOURCE_OWNERSHIP
+                  value: shadow
+              resources:
+                limits:
+                  cpu: "2"
+                  memory: 2Gi
