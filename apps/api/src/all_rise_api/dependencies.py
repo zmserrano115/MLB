@@ -6,33 +6,75 @@ from all_rise.application.operations import (
     OperationsService,
     build_operations_repository,
 )
+from all_rise.cache.circuit import CircuitBreakingRedis
+from all_rise.cache.metrics import InMemoryCacheMetrics
+from all_rise.cache.versioned import PassThroughCache, VersionedJsonCache
 from all_rise.config import Settings
 from fastapi import Request
 from redis import Redis
+from redis.backoff import NoBackoff
+from redis.retry import Retry
+
+from all_rise_api.middleware.rate_limit import AllowAllRateLimiter, RedisRateLimiter
 
 
-class RedisCacheProbe:
-    def __init__(self, redis_url: str) -> None:
-        self._client: Redis = Redis.from_url(
-            redis_url,
-            socket_connect_timeout=1.0,
-            socket_timeout=1.0,
-            decode_responses=True,
-        )
-
-    def ping(self) -> bool:
-        return bool(self._client.ping())
-
-    def close(self) -> None:
-        self._client.close()
-
-
-def create_operations_service(settings: Settings) -> OperationsService:
-    return OperationsService(
-        build_operations_repository(settings),
-        RedisCacheProbe(settings.redis_url),
-        expected_schema_revision=settings.schema_revision,
+def create_shared_cache(
+    settings: Settings,
+    client: CircuitBreakingRedis | None = None,
+) -> tuple[VersionedJsonCache | PassThroughCache, InMemoryCacheMetrics]:
+    metrics = InMemoryCacheMetrics()
+    if not settings.cache_enabled:
+        return PassThroughCache(), metrics
+    client = client or create_redis_client(settings)
+    return (
+        VersionedJsonCache(
+            client,
+            metrics=metrics,
+            lease_ttl_ms=settings.cache_lease_ttl_ms,
+        ),
+        metrics,
     )
+
+
+def create_operations_service(
+    settings: Settings,
+    client: CircuitBreakingRedis | None = None,
+) -> tuple[OperationsService, InMemoryCacheMetrics]:
+    cache, metrics = create_shared_cache(settings, client)
+    service = OperationsService(
+        build_operations_repository(settings),
+        cache,
+        expected_schema_revision=settings.schema_revision,
+        cache_ttl_seconds=settings.cache_default_ttl_seconds,
+        negative_ttl_seconds=settings.cache_negative_ttl_seconds,
+    )
+    return service, metrics
+
+
+def create_rate_limiter(
+    settings: Settings,
+    client: CircuitBreakingRedis | None = None,
+) -> RedisRateLimiter | AllowAllRateLimiter:
+    if not settings.rate_limit_enabled:
+        return AllowAllRateLimiter()
+    client = client or create_redis_client(settings)
+    return RedisRateLimiter(
+        client,
+        requests=settings.rate_limit_requests,
+        window_seconds=settings.rate_limit_window_seconds,
+    )
+
+
+def create_redis_client(settings: Settings) -> CircuitBreakingRedis:
+    timeout_seconds = settings.redis_timeout_ms / 1_000
+    client: Redis = Redis.from_url(
+        settings.resolved_cache_url,
+        socket_connect_timeout=timeout_seconds,
+        socket_timeout=timeout_seconds,
+        decode_responses=True,
+        retry=Retry(NoBackoff(), 0),
+    )
+    return CircuitBreakingRedis(client)
 
 
 def get_operations_service(request: Request) -> OperationsService:

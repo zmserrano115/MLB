@@ -31,6 +31,13 @@ def _positive_float(name: str, default: float) -> float:
     return value
 
 
+def _boolean(name: str, default: bool) -> bool:
+    raw = os.getenv(name, str(default)).strip().lower()
+    if raw not in {"true", "false"}:
+        raise ConfigurationError(f"{name} must be true or false")
+    return raw == "true"
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     app_env: str
@@ -44,6 +51,15 @@ class Settings:
     slow_request_ms: float
     db_pool_size: int
     db_max_overflow: int
+    redis_cache_url: str = ""
+    cache_enabled: bool = True
+    cache_default_ttl_seconds: int = 30
+    cache_negative_ttl_seconds: int = 5
+    cache_lease_ttl_ms: int = 5_000
+    redis_timeout_ms: int = 250
+    rate_limit_enabled: bool = True
+    rate_limit_requests: int = 120
+    rate_limit_window_seconds: int = 60
 
     @property
     def is_production(self) -> bool:
@@ -52,6 +68,10 @@ class Settings:
     @property
     def database_scheme(self) -> str:
         return urlparse(self.database_url).scheme.lower()
+
+    @property
+    def resolved_cache_url(self) -> str:
+        return self.redis_cache_url or self.redis_url
 
     def validate(self) -> Settings:
         allowed_environments = {"development", "test", "staging", "production"}
@@ -89,4 +109,15 @@ class Settings:
             slow_request_ms=_positive_float("SLOW_REQUEST_MS", 500.0),
             db_pool_size=_positive_int("DB_POOL_SIZE", 5),
             db_max_overflow=_positive_int("DB_MAX_OVERFLOW", 5),
+            redis_cache_url=os.getenv(
+                "REDIS_CACHE_URL", os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            ).strip(),
+            cache_enabled=_boolean("CACHE_ENABLED", True),
+            cache_default_ttl_seconds=_positive_int("CACHE_DEFAULT_TTL_SECONDS", 30),
+            cache_negative_ttl_seconds=_positive_int("CACHE_NEGATIVE_TTL_SECONDS", 5),
+            cache_lease_ttl_ms=_positive_int("CACHE_LEASE_TTL_MS", 5_000),
+            redis_timeout_ms=_positive_int("REDIS_TIMEOUT_MS", 250),
+            rate_limit_enabled=_boolean("RATE_LIMIT_ENABLED", True),
+            rate_limit_requests=_positive_int("RATE_LIMIT_REQUESTS", 120),
+            rate_limit_window_seconds=_positive_int("RATE_LIMIT_WINDOW_SECONDS", 60),
         ).validate()

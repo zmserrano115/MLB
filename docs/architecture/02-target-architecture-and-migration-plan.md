@@ -718,7 +718,7 @@ Every phase starts with a written objective/files/risks/preservation note and en
 - **Preservation:** freeze/copy SQLite read-only; no destructive source changes; API compares shadow results before serving.
 - **Exit gate:** blank-to-head and snapshot migration tests, counts/checksums/orphans, sampled parity, query plans/latency, backup/rollback rehearsal.
 
-### Phase 5 - Redis cache and resilience
+### Phase 5 - Redis cache and resilience (complete)
 
 - **Objective:** add versioned shared caching, stampede control, rate-limit interface, and degraded fallback.
 - **Expected files:** backend cache package, API dependencies/settings, Redis integration tests.

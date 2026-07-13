@@ -5,7 +5,7 @@ from typing import Annotated, Any
 
 from all_rise.application.operations import OperationsService
 from all_rise.config import Settings
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from all_rise_api.dependencies import get_operations_service, get_settings
 from all_rise_api.errors import ApiError
@@ -135,12 +135,16 @@ def build_version(
 )
 def data_status(
     request: Request,
+    response: Response,
     service: OperationsServiceDependency,
     limit: int = Query(default=20, ge=1, le=100),
 ) -> ApiEnvelope[list[DataStatusData]]:
-    records = service.data_status(limit=limit)
+    result = service.data_status_with_cache(limit=limit)
+    response.headers["x-cache-status"] = result.cache_outcome
     return ApiEnvelope(
-        data=[DataStatusData.model_validate(record, from_attributes=True) for record in records],
+        data=[
+            DataStatusData.model_validate(record, from_attributes=True) for record in result.records
+        ],
         meta=request_meta(
             request,
             pagination=PaginationMeta(limit=limit, next_cursor=None),

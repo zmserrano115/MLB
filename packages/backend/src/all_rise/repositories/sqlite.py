@@ -79,5 +79,11 @@ class SQLiteOperationsRepository:
             )
         ]
 
+    def get_data_version(self) -> str:
+        records = self.get_data_status(limit=1)
+        if not records:
+            return "empty"
+        return f"{records[0].source}:{records[0].watermark or ''}"
+
     def close(self) -> None:
         return None

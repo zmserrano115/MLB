@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from all_rise.application.operations import OperationsService
+from all_rise.cache.versioned import CacheLoadResult, CacheOutcome
 from all_rise.config import ConfigurationError, Settings
 from all_rise.repositories.protocols import (
     DataSourceStatusRecord,
@@ -32,6 +33,9 @@ class FakeRepository:
     def check_readiness(self) -> RepositoryReadiness:
         return self.readiness
 
+    def get_data_version(self) -> str:
+        return "test-version"
+
     def get_data_status(self, *, limit: int) -> list[DataSourceStatusRecord]:
         if self.fail_reads:
             raise RuntimeError("private database detail")
@@ -49,6 +53,17 @@ class FakeCache:
         if not self.available:
             raise ConnectionError("private redis detail")
         return True
+
+    def get_or_load(
+        self,
+        key: str,
+        loader,
+        *,
+        ttl_seconds: int,
+        negative_ttl_seconds: int,
+    ) -> CacheLoadResult:
+        del key, ttl_seconds, negative_ttl_seconds
+        return CacheLoadResult(loader(), CacheOutcome.MISS)
 
     def close(self) -> None:
         return None

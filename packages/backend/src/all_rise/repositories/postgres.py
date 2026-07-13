@@ -67,5 +67,20 @@ class PostgresOperationsRepository:
                 for row in rows
             ]
 
+    def get_data_version(self) -> str:
+        if not inspect(self._engine).has_table("data_source_status"):
+            return "empty"
+        statement = text(
+            """
+            SELECT COALESCE(
+                string_agg(source || ':' || COALESCE(watermark, ''), ',' ORDER BY source),
+                'empty'
+            )
+            FROM data_source_status
+            """
+        )
+        with self._engine.connect() as connection:
+            return str(connection.execute(statement).scalar_one())
+
     def close(self) -> None:
         self._engine.dispose()

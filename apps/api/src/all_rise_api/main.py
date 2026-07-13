@@ -9,8 +9,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from all_rise_api.api.v1.routes.operations import api_version, router
-from all_rise_api.dependencies import create_operations_service
+from all_rise_api.dependencies import (
+    create_operations_service,
+    create_rate_limiter,
+    create_redis_client,
+)
 from all_rise_api.errors import install_exception_handlers
+from all_rise_api.middleware.rate_limit import RateLimitMiddleware
 from all_rise_api.middleware.request_context import RequestContextMiddleware
 
 
@@ -27,11 +32,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-        service = create_operations_service(resolved_settings)
+        redis_client = (
+            create_redis_client(resolved_settings)
+            if resolved_settings.cache_enabled or resolved_settings.rate_limit_enabled
+            else None
+        )
+        service, cache_metrics = create_operations_service(resolved_settings, redis_client)
+        rate_limiter = create_rate_limiter(resolved_settings, redis_client)
         application.state.operations_service = service
+        application.state.cache_metrics = cache_metrics
+        application.state.rate_limiter = rate_limiter
         try:
             yield
         finally:
+            rate_limiter.close()
             service.close()
 
     application = FastAPI(
@@ -46,7 +60,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "OPTIONS"],
         allow_headers=["accept", "content-type", "if-none-match", "x-request-id"],
-        expose_headers=["etag", "x-request-id"],
+        expose_headers=["etag", "x-cache-status", "x-request-id", "x-rate-limit-remaining"],
+    )
+    application.add_middleware(
+        RateLimitMiddleware,
     )
     application.add_middleware(
         RequestContextMiddleware,
