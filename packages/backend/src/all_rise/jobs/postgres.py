@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -16,10 +17,15 @@ from all_rise.jobs.contracts import (
 )
 from all_rise.models import (
     DataSourceStatus,
+    Game,
+    Player,
     ProcessingCheckpoint,
     RefreshRun,
     RefreshRunItem,
     SourceArtifact,
+    Team,
+    Venue,
+    WeatherSnapshot,
 )
 
 
@@ -195,6 +201,7 @@ class PostgresJobStore:
             run.heartbeat_at = now
             if result.publication is not None:
                 publication = result.publication
+                self._publish_dataset(session, publication.dataset, publication.records, now)
                 checkpoint = insert(ProcessingCheckpoint).values(
                     source=publication.source,
                     scope=publication.scope,
@@ -234,6 +241,220 @@ class PostgresJobStore:
                     )
                 )
                 run.published_at = now
+
+    @classmethod
+    def _publish_dataset(
+        cls,
+        session: Session,
+        dataset: str | None,
+        records: tuple[dict[str, Any], ...],
+        now: datetime,
+    ) -> None:
+        if dataset is None:
+            if records:
+                raise ValueError("publication records require a dataset")
+            return
+        if dataset == "schedule":
+            cls._publish_schedule(session, records, now)
+            return
+        if dataset == "weather":
+            cls._publish_weather(session, records)
+            return
+        raise ValueError(f"unsupported publication dataset: {dataset}")
+
+    @classmethod
+    def _publish_schedule(
+        cls,
+        session: Session,
+        records: tuple[dict[str, Any], ...],
+        now: datetime,
+    ) -> None:
+        for record in records:
+            source_version = str(record["source_version"])[:64]
+            away_team = cls._upsert_team(
+                session, record["away_team"], source_version, now
+            )
+            home_team = cls._upsert_team(
+                session, record["home_team"], source_version, now
+            )
+            venue = cls._upsert_venue(session, record.get("venue"), now)
+            away_pitcher = cls._upsert_player(
+                session, record.get("away_probable_pitcher"), now
+            )
+            home_pitcher = cls._upsert_player(
+                session, record.get("home_probable_pitcher"), now
+            )
+            game_pk = int(record["mlb_game_pk"])
+            source_game_id = str(record["source_game_id"])
+            game = session.execute(
+                select(Game).where(
+                    or_(Game.mlb_game_pk == game_pk, Game.source_game_id == source_game_id)
+                )
+            ).scalar_one_or_none()
+            values = {
+                "source_game_id": source_game_id,
+                "mlb_game_pk": game_pk,
+                "legacy_game_pk": game_pk,
+                "source": "mlb-statsapi",
+                "source_version": source_version,
+                "game_date": _date(record["game_date"]),
+                "season": int(record.get("season") or _date(record["game_date"]).year),
+                "game_time_utc": _datetime(record.get("game_time_utc")),
+                "away_team_id": away_team.id,
+                "home_team_id": home_team.id,
+                "venue_id": venue.id if venue else None,
+                "away_probable_pitcher_id": away_pitcher.id if away_pitcher else None,
+                "home_probable_pitcher_id": home_pitcher.id if home_pitcher else None,
+                "game_status": _text(record.get("game_status")),
+                "away_score": _integer(record.get("away_score")),
+                "home_score": _integer(record.get("home_score")),
+                "source_updated_at": now,
+            }
+            if game is None:
+                session.add(Game(**values))
+            else:
+                for key, value in values.items():
+                    setattr(game, key, value)
+
+    @staticmethod
+    def _upsert_team(
+        session: Session,
+        record: dict[str, Any],
+        source_version: str,
+        now: datetime,
+    ) -> Team:
+        provider_id = int(record["provider_team_id"])
+        abbreviation = _text(record.get("abbreviation"))
+        team = session.execute(
+            select(Team).where(Team.provider_team_id == provider_id)
+        ).scalar_one_or_none()
+        if team is None and abbreviation:
+            team = session.execute(
+                select(Team).where(Team.abbreviation == abbreviation)
+            ).scalar_one_or_none()
+        if team is None:
+            team = Team(
+                source_key=f"mlb-team:{provider_id}",
+                abbreviation=abbreviation,
+                provider_team_id=provider_id,
+                name=str(record["name"]),
+                source_version=source_version,
+                updated_at=now,
+            )
+            session.add(team)
+            session.flush()
+            return team
+        if team.provider_team_id not in {None, provider_id}:
+            raise ValueError(f"team identity conflict for {abbreviation or provider_id}")
+        team.provider_team_id = provider_id
+        team.abbreviation = abbreviation or team.abbreviation
+        team.name = str(record["name"])
+        team.source_version = source_version
+        team.updated_at = now
+        session.flush()
+        return team
+
+    @staticmethod
+    def _upsert_venue(
+        session: Session, record: dict[str, Any] | None, now: datetime
+    ) -> Venue | None:
+        if not record or record.get("provider_venue_id") is None:
+            return None
+        provider_id = int(record["provider_venue_id"])
+        venue = session.execute(
+            select(Venue).where(Venue.provider_venue_id == provider_id)
+        ).scalar_one_or_none()
+        values = {
+            "provider_venue_id": provider_id,
+            "name": str(record.get("name") or "Venue TBD"),
+            "city": _text(record.get("city")),
+            "latitude": record.get("latitude"),
+            "longitude": record.get("longitude"),
+            "elevation_ft": record.get("elevation_ft"),
+            "roof_type": _text(record.get("roof_type")),
+            "center_field_azimuth": record.get("center_field_azimuth"),
+            "source_updated_at": now,
+        }
+        if venue is None:
+            venue = Venue(**values)
+            session.add(venue)
+        else:
+            for key, value in values.items():
+                setattr(venue, key, value)
+        session.flush()
+        return venue
+
+    @staticmethod
+    def _upsert_player(
+        session: Session, record: dict[str, Any] | None, now: datetime
+    ) -> Player | None:
+        if not record or record.get("provider_player_id") is None:
+            return None
+        provider_id = int(record["provider_player_id"])
+        player = session.execute(
+            select(Player).where(Player.provider_player_id == provider_id)
+        ).scalar_one_or_none()
+        if player is None:
+            player = Player(
+                provider_player_id=provider_id,
+                name=_text(record.get("name")),
+                active_status="active",
+                source_updated_at=now,
+            )
+            session.add(player)
+        else:
+            player.name = _text(record.get("name")) or player.name
+            player.active_status = "active"
+            player.source_updated_at = now
+        session.flush()
+        return player
+
+    @staticmethod
+    def _publish_weather(
+        session: Session, records: tuple[dict[str, Any], ...]
+    ) -> None:
+        for record in records:
+            game = session.execute(
+                select(Game).where(Game.source_game_id == str(record["source_game_id"]))
+            ).scalar_one_or_none()
+            if game is None:
+                raise ValueError(f"unknown game for weather: {record['source_game_id']}")
+            observed_at = _datetime(record["observed_at"])
+            if observed_at is None:
+                raise ValueError("weather observed_at is required")
+            source = str(record["source"])
+            snapshot = session.execute(
+                select(WeatherSnapshot).where(
+                    WeatherSnapshot.game_id == game.id,
+                    WeatherSnapshot.observed_at == observed_at,
+                    WeatherSnapshot.source == source,
+                )
+            ).scalar_one_or_none()
+            values = {
+                "game_id": game.id,
+                "observed_at": observed_at,
+                "forecast_for": _datetime(record.get("forecast_for")),
+                "source": source,
+                "source_version": _text(record.get("source_version")),
+                "condition": _text(record.get("condition")),
+                "temperature_f": record.get("temperature_f"),
+                "feels_like_f": record.get("feels_like_f"),
+                "humidity_percent": record.get("humidity_percent"),
+                "wind_speed_mph": record.get("wind_speed_mph"),
+                "wind_direction_degrees": record.get("wind_direction_degrees"),
+                "wind_out_mph": record.get("wind_out_mph"),
+                "precipitation_probability": record.get("precipitation_probability"),
+                "hitter_adjustment": record.get("hitter_adjustment"),
+                "pitcher_adjustment": record.get("pitcher_adjustment"),
+                "edge_label": _text(record.get("edge_label")),
+                "stale": bool(record.get("stale", False)),
+                "provider_residual": record.get("provider_residual"),
+            }
+            if snapshot is None:
+                session.add(WeatherSnapshot(**values))
+            else:
+                for key, value in values.items():
+                    setattr(snapshot, key, value)
 
     def fail(
         self,
@@ -308,3 +529,32 @@ class PostgresJobStore:
 
     def close(self) -> None:
         self._engine.dispose()
+
+
+def _text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _integer(value: Any) -> int | None:
+    return int(value) if value is not None else None
+
+
+def _date(value: Any) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(str(value))
+
+
+def _datetime(value: Any) -> datetime | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        result = value
+    else:
+        result = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    return result.replace(tzinfo=UTC) if result.tzinfo is None else result.astimezone(UTC)

@@ -4,8 +4,9 @@
 
 PostgreSQL is the status authority. Redis only delivers actor messages. GCS/local artifacts are
 immutable, and a generation becomes visible only after its quality gate and database transaction
-succeed. Leave `JOB_SOURCE_OWNERSHIP=shadow` until a provider adapter has passed repeated parity
-runs and source ownership is explicitly approved.
+succeed. Schedule rows, weather snapshots, their checkpoint, and their serving watermark commit
+atomically. Leave `JOB_SOURCE_OWNERSHIP=shadow`; activate a proven adapter with the narrow
+`JOB_ACTIVE_TASKS` allowlist only after source ownership is explicitly approved.
 
 ## Run a finite shadow task locally
 
@@ -25,6 +26,23 @@ docker compose run --rm -e TASK_PAYLOAD worker python -m all_rise_worker.command
 
 The command prints `succeeded`, `duplicate`, `in_progress`, `retry`, or `dead_letter`. Repeating
 the same task/payload derives the same idempotency key and must not execute it again.
+
+## Run a controlled active schedule/weather rehearsal
+
+The two provider adapters are registered but remain dormant by default. Activate only the task
+being rehearsed; do not set global ownership to `active`:
+
+```powershell
+$env:TASK_PAYLOAD='{"date":"2026-07-17","source_version":"schedule-20260717-v1"}'
+docker compose run --rm -e JOB_ACTIVE_TASKS=refresh_schedule -e TASK_PAYLOAD worker python -m all_rise_worker.commands.run_task refresh_schedule --scope 2026-07-17
+
+$env:TASK_PAYLOAD='{"start":"2026-07-17","end":"2026-07-17","source_version":"weather-20260717-v1"}'
+docker compose run --rm -e JOB_ACTIVE_TASKS=refresh_weather -e TASK_PAYLOAD worker python -m all_rise_worker.commands.run_task refresh_weather --scope 2026-07-17
+```
+
+Run schedule first because weather resolves only persisted games and venues. Weather windows are
+bounded to eight days. Use a new source version only for a genuinely new provider observation;
+an identical payload must return `duplicate`.
 
 ## Inspect status
 
@@ -66,11 +84,12 @@ It does not execute the task itself; the scheduler/actor redelivery performs the
 
 ## Production cutover checklist
 
-- Register and test the real adapter for the specific task.
+- Register and test the real adapter for the specific task. Schedule and weather are registered.
 - Compare several shadow generations with the legacy owner, including late corrections.
 - Validate row counts, identities, ranges, checksums, per-item errors, and derived aggregates.
 - Confirm IAM: scheduler invoker only, worker Cloud SQL client, bucket object creator/viewer as
   needed, Secret Manager accessor only for named secrets.
 - Assign exactly one writer for the source and record rollback ownership.
-- Add only that task to `JOB_ACTIVE_TASKS`; do not globally disable legacy workflows.
+- Add only that task to `JOB_ACTIVE_TASKS`; do not globally disable legacy workflows. The Cloud
+  Run templates expose separate schedule and weather allowlist placeholders.
 - Observe freshness, dead letters, provider throttling, database load, and artifact growth.

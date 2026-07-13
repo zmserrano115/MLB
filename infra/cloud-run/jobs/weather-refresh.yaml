@@ -1,7 +1,7 @@
 apiVersion: run.googleapis.com/v1
 kind: Job
 metadata:
-  name: all-rise-nightly-refresh
+  name: all-rise-weather-refresh
   annotations:
     run.googleapis.com/launch-stage: BETA
 spec:
@@ -20,12 +20,12 @@ spec:
             - image: ${WORKER_IMAGE}
               command: ["python", "-m", "all_rise_worker.commands.run_task"]
               args:
-                - refresh_schedule
+                - refresh_weather
                 - --scope
-                - ${JOB_DATE}
+                - ${WEATHER_SCOPE}
               env:
                 - name: TASK_PAYLOAD
-                  value: ${SCHEDULE_TASK_PAYLOAD}
+                  value: ${WEATHER_TASK_PAYLOAD}
                 - name: DATABASE_URL
                   valueFrom:
                     secretKeyRef:
@@ -38,7 +38,7 @@ spec:
                 - name: JOB_SOURCE_OWNERSHIP
                   value: shadow
                 - name: JOB_ACTIVE_TASKS
-                  value: ${SCHEDULE_ACTIVE_TASKS}
+                  value: ${WEATHER_ACTIVE_TASKS}
               resources:
                 limits:
                   cpu: "1"

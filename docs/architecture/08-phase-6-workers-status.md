@@ -73,5 +73,7 @@ GCS, and shadow ownership.
 - Redis-delivered Dramatiq execution: `succeeded` at attempt 1 while API `/ready` returned 200
   with PostgreSQL, Redis, and schema `0003_durable_job_execution` ready.
 
-The provider ownership flip is an operational cutover gate, not an implementation default.
-No Google Cloud resource was created and no legacy workflow was disabled.
+Phase 7 subsequently registered real schedule and weather adapters, while retaining this phase's
+shadow default and per-task allowlist gate. The provider ownership flip remains an operational
+cutover decision, not an implementation default. No Google Cloud resource was created and no
+legacy workflow was disabled.

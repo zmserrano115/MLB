@@ -8,6 +8,7 @@ from all_rise.jobs.artifacts import ArtifactStore, GcsArtifactStore, LocalArtifa
 from all_rise.jobs.executor import JobExecutor
 from all_rise.jobs.postgres import PostgresJobStore
 
+from all_rise_worker.adapters import build_adapters
 from all_rise_worker.catalog import build_registry
 
 
@@ -37,6 +38,6 @@ def get_executor() -> JobExecutor:
     return JobExecutor(
         PostgresJobStore(database_url),
         artifacts,
-        build_registry(),
+        build_registry(build_adapters(database_url)),
         stale_after_seconds=_positive_int("JOB_STALE_AFTER_SECONDS", 300),
     )

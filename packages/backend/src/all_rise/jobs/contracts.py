@@ -58,6 +58,8 @@ class Publication:
     watermark: str
     source_version: str
     detail: str | None = None
+    dataset: str | None = None
+    records: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

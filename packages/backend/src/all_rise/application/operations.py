@@ -9,7 +9,11 @@ from typing import Any, Protocol
 from all_rise.cache.versioned import CacheLoadResult, PassThroughCache, versioned_key
 from all_rise.config import Settings
 from all_rise.repositories.postgres import PostgresOperationsRepository
-from all_rise.repositories.protocols import ApplicationRepository, DataSourceStatusRecord, OperationsRepository
+from all_rise.repositories.protocols import (
+    ApplicationRepository,
+    DataSourceStatusRecord,
+    OperationsRepository,
+)
 from all_rise.repositories.sqlite import SQLiteOperationsRepository
 
 

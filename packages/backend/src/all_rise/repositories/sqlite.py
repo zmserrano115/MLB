@@ -98,7 +98,11 @@ class SQLiteOperationsRepository:
     ) -> list[GameRecord]:
         with self._connect() as connection:
             columns = self._game_columns(connection)
-            identity = "COALESCE(game_id, 'mlb:' || game_pk)" if "game_id" in columns else "'mlb:' || game_pk"
+            identity = (
+                "COALESCE(game_id, 'mlb:' || game_pk)"
+                if "game_id" in columns
+                else "'mlb:' || game_pk"
+            )
             filters = ["game_date = ?", f"(? IS NULL OR {identity} > ?)"]
             params: list[object] = [game_date, cursor, cursor]
             if team:
@@ -117,7 +121,11 @@ class SQLiteOperationsRepository:
     def get_game(self, game_id: str) -> GameRecord | None:
         with self._connect() as connection:
             columns = self._game_columns(connection)
-            identity = "COALESCE(game_id, 'mlb:' || game_pk)" if "game_id" in columns else "'mlb:' || game_pk"
+            identity = (
+                "COALESCE(game_id, 'mlb:' || game_pk)"
+                if "game_id" in columns
+                else "'mlb:' || game_pk"
+            )
             row = connection.execute(
                 f"SELECT * FROM games WHERE {identity} = ? LIMIT 1", (game_id,)
             ).fetchone()

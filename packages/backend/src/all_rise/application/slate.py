@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from hashlib import sha256
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from all_rise.application.operations import CacheProbe
 from all_rise.cache.versioned import versioned_key
@@ -14,7 +14,7 @@ RecordT = TypeVar("RecordT", GameRecord, GameWeatherRecord)
 
 
 @dataclass(frozen=True, slots=True)
-class SlateResult(Generic[RecordT]):
+class SlateResult[RecordT]:
     records: list[RecordT]
     data_version: str
     cache_outcome: str
@@ -23,7 +23,7 @@ class SlateResult(Generic[RecordT]):
 
 
 @dataclass(frozen=True, slots=True)
-class SlateItemResult(Generic[RecordT]):
+class SlateItemResult[RecordT]:
     record: RecordT | None
     data_version: str
     cache_outcome: str
