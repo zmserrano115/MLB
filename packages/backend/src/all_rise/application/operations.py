@@ -9,7 +9,7 @@ from typing import Any, Protocol
 from all_rise.cache.versioned import CacheLoadResult, PassThroughCache, versioned_key
 from all_rise.config import Settings
 from all_rise.repositories.postgres import PostgresOperationsRepository
-from all_rise.repositories.protocols import DataSourceStatusRecord, OperationsRepository
+from all_rise.repositories.protocols import ApplicationRepository, DataSourceStatusRecord, OperationsRepository
 from all_rise.repositories.sqlite import SQLiteOperationsRepository
 
 
@@ -121,7 +121,7 @@ class OperationsService:
         self._repository.close()
 
 
-def build_operations_repository(settings: Settings) -> OperationsRepository:
+def build_operations_repository(settings: Settings) -> ApplicationRepository:
     if settings.database_scheme == "sqlite":
         if settings.is_production:
             raise ValueError("SQLite cannot be used in production")

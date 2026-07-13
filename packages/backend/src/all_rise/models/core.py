@@ -39,6 +39,21 @@ class Team(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class Venue(Base):
+    __tablename__ = "venues"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider_venue_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
+    name: Mapped[str] = mapped_column(String(160))
+    city: Mapped[str | None] = mapped_column(String(120))
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+    elevation_ft: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    roof_type: Mapped[str | None] = mapped_column(String(64))
+    center_field_azimuth: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Player(Base):
     __tablename__ = "players"
 
@@ -69,12 +84,53 @@ class Game(Base):
     source_version: Mapped[str] = mapped_column(String(64))
     game_date: Mapped[date] = mapped_column(Date)
     season: Mapped[int] = mapped_column(Integer)
+    game_time_utc: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     away_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
     home_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
+    venue_id: Mapped[int | None] = mapped_column(ForeignKey("venues.id"))
     away_probable_pitcher_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"))
     home_probable_pitcher_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"))
     game_status: Mapped[str | None] = mapped_column(String(64))
+    away_score: Mapped[int | None] = mapped_column(Integer)
+    home_score: Mapped[int | None] = mapped_column(Integer)
     source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WeatherSnapshot(Base):
+    __tablename__ = "weather_snapshots"
+    __table_args__ = (
+        UniqueConstraint("game_id", "observed_at", "source"),
+        Index("ix_weather_game_observed", "game_id", "observed_at"),
+        CheckConstraint(
+            "humidity_percent IS NULL OR (humidity_percent >= 0 AND humidity_percent <= 100)",
+            name="ck_weather_humidity_range",
+        ),
+        CheckConstraint(
+            "precipitation_probability IS NULL OR "
+            "(precipitation_probability >= 0 AND precipitation_probability <= 100)",
+            name="ck_weather_precipitation_range",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    forecast_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source: Mapped[str] = mapped_column(String(64))
+    source_version: Mapped[str | None] = mapped_column(String(128))
+    condition: Mapped[str | None] = mapped_column(String(120))
+    temperature_f: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    feels_like_f: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    humidity_percent: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
+    wind_speed_mph: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    wind_direction_degrees: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    wind_out_mph: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    precipitation_probability: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
+    hitter_adjustment: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    pitcher_adjustment: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    edge_label: Mapped[str | None] = mapped_column(String(64))
+    stale: Mapped[bool] = mapped_column(Boolean, default=False)
+    provider_residual: Mapped[dict[str, Any] | None] = mapped_column(JSON_TYPE)
 
 
 class BatterPitcherGameLog(Base):

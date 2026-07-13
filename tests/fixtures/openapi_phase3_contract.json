@@ -4,6 +4,22 @@
       "methods": ["get"],
       "responses": ["200", "413", "422", "500"]
     },
+    "/api/v1/games": {
+      "methods": ["get"],
+      "responses": ["200", "304", "422", "500"]
+    },
+    "/api/v1/games/{game_id}": {
+      "methods": ["get"],
+      "responses": ["200", "304", "404", "422", "500"]
+    },
+    "/api/v1/games/{game_id}/weather": {
+      "methods": ["get"],
+      "responses": ["200", "304", "404", "422", "500"]
+    },
+    "/api/v1/weather": {
+      "methods": ["get"],
+      "responses": ["200", "304", "422", "500"]
+    },
     "/health": {
       "methods": ["get"],
       "responses": ["200", "500"]
@@ -18,17 +34,26 @@
     }
   },
   "schemas": [
+    "ApiEnvelope_GameData_",
     "ApiEnvelope_HealthData_",
     "ApiEnvelope_ReadinessData_",
     "ApiEnvelope_VersionData_",
+    "ApiEnvelope_WeatherData_",
     "ApiEnvelope_list_DataStatusData__",
+    "ApiEnvelope_list_GameData__",
+    "ApiEnvelope_list_WeatherData__",
     "ApiMeta",
     "DataStatusData",
     "ErrorBody",
     "ErrorEnvelope",
+    "GameData",
     "HealthData",
     "PaginationMeta",
+    "PitcherBrief",
     "ReadinessData",
-    "VersionData"
+    "TeamBrief",
+    "VenueBrief",
+    "VersionData",
+    "WeatherData"
   ]
 }

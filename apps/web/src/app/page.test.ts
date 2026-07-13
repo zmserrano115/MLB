@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { isEnvelope } from "../lib/api";
+import { canonicalDate, safeFilter, shiftDate } from "../lib/date-state";
 import { buildLegacyUrl, canonicalState, resolveLegacyRoute } from "../lib/route-state";
 
 describe("Phase 7 route state", () => {
@@ -68,5 +69,19 @@ describe("visual continuity", () => {
     expect(styles).toContain("#f3f5f7");
     expect(styles).not.toMatch(/#(?:f28a27|e47717|c74312|f6a85[0-9a-f]?|9a5b13|fff8e8)/);
     expect(styles).not.toContain("--ar-orange");
+  });
+});
+
+describe("slate URL state", () => {
+  it("keeps valid dates stable and shifts across month boundaries", () => {
+    expect(canonicalDate("2026-07-13")).toBe("2026-07-13");
+    expect(shiftDate("2026-07-01", -1)).toBe("2026-06-30");
+    expect(shiftDate("2026-12-31", 1)).toBe("2027-01-01");
+  });
+
+  it("rejects impossible dates and strips control characters from filters", () => {
+    expect(canonicalDate("2026-02-31")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(canonicalDate("2026-02-31")).not.toBe("2026-02-31");
+    expect(safeFilter("NY\u0000Y", 5)).toBe("NYY");
   });
 });

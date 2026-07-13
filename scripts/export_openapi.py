@@ -20,7 +20,7 @@ def main() -> None:
         redis_url="redis://localhost:6379/15",
         cors_allowed_origins=("http://localhost:3000",),
         build_sha="contract",
-        schema_revision="0003_durable_job_execution",
+        schema_revision="0004_slate_weather_read_models",
         max_body_bytes=1_048_576,
         slow_request_ms=500,
         db_pool_size=1,

@@ -1,4 +1,10 @@
-import type { ApiEnvelope, DataStatus, Readiness } from "@all-rise/shared-types";
+import type {
+  ApiEnvelope,
+  DataStatus,
+  Game,
+  Readiness,
+  Weather,
+} from "@all-rise/shared-types";
 
 type ApiSuccess<T> = { ok: true; value: ApiEnvelope<T>; cacheStatus: string | null };
 type ApiFailure = { ok: false; message: string; status: number | null };
@@ -43,4 +49,31 @@ export function getReadiness() {
 
 export function getDataStatus() {
   return apiGet<DataStatus[]>("/api/v1/data-status?limit=20");
+}
+
+export function getGames(filters: {
+  date: string;
+  team?: string;
+  status?: string;
+  cursor?: string;
+}) {
+  const query = new URLSearchParams({ date: filters.date, limit: "50" });
+  if (filters.team) query.set("team", filters.team);
+  if (filters.status) query.set("status", filters.status);
+  if (filters.cursor) query.set("cursor", filters.cursor);
+  return apiGet<Game[]>(`/api/v1/games?${query}`);
+}
+
+export function getGame(gameId: string) {
+  return apiGet<Game>(`/api/v1/games/${encodeURIComponent(gameId)}`);
+}
+
+export function getWeather(filters: { date: string; gameId?: string }) {
+  const query = new URLSearchParams({ date: filters.date, limit: "50" });
+  if (filters.gameId) query.set("game_id", filters.gameId);
+  return apiGet<Weather[]>(`/api/v1/weather?${query}`);
+}
+
+export function getGameWeather(gameId: string) {
+  return apiGet<Weather>(`/api/v1/games/${encodeURIComponent(gameId)}/weather`);
 }

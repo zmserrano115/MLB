@@ -21,6 +21,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Games */
+        get: operations["games_api_v1_games_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game */
+        get: operations["game_api_v1_games__game_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/weather": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game Weather */
+        get: operations["game_weather_api_v1_games__game_id__weather_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/weather": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Weather */
+        get: operations["weather_api_v1_weather_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -76,6 +144,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ApiEnvelope[GameData] */
+        ApiEnvelope_GameData_: {
+            data: components["schemas"]["GameData"];
+            meta: components["schemas"]["ApiMeta"];
+        };
         /** ApiEnvelope[HealthData] */
         ApiEnvelope_HealthData_: {
             data: components["schemas"]["HealthData"];
@@ -91,10 +164,27 @@ export interface components {
             data: components["schemas"]["VersionData"];
             meta: components["schemas"]["ApiMeta"];
         };
+        /** ApiEnvelope[WeatherData] */
+        ApiEnvelope_WeatherData_: {
+            data: components["schemas"]["WeatherData"];
+            meta: components["schemas"]["ApiMeta"];
+        };
         /** ApiEnvelope[list[DataStatusData]] */
         ApiEnvelope_list_DataStatusData__: {
             /** Data */
             data: components["schemas"]["DataStatusData"][];
+            meta: components["schemas"]["ApiMeta"];
+        };
+        /** ApiEnvelope[list[GameData]] */
+        ApiEnvelope_list_GameData__: {
+            /** Data */
+            data: components["schemas"]["GameData"][];
+            meta: components["schemas"]["ApiMeta"];
+        };
+        /** ApiEnvelope[list[WeatherData]] */
+        ApiEnvelope_list_WeatherData__: {
+            /** Data */
+            data: components["schemas"]["WeatherData"][];
             meta: components["schemas"]["ApiMeta"];
         };
         /** ApiMeta */
@@ -144,6 +234,29 @@ export interface components {
         ErrorEnvelope: {
             error: components["schemas"]["ErrorBody"];
         };
+        /** GameData */
+        GameData: {
+            away_probable_pitcher?: components["schemas"]["PitcherBrief"] | null;
+            away_team: components["schemas"]["TeamBrief"];
+            /**
+             * Game Date
+             * Format: date
+             */
+            game_date: string;
+            /** Game Id */
+            game_id: string;
+            /** Game Time Utc */
+            game_time_utc?: string | null;
+            home_probable_pitcher?: components["schemas"]["PitcherBrief"] | null;
+            home_team: components["schemas"]["TeamBrief"];
+            /** Season */
+            season: number;
+            /** Source Updated At */
+            source_updated_at?: string | null;
+            /** Status */
+            status?: string | null;
+            venue?: components["schemas"]["VenueBrief"] | null;
+        };
         /** HealthData */
         HealthData: {
             /**
@@ -166,6 +279,13 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PitcherBrief */
+        PitcherBrief: {
+            /** Name */
+            name?: string | null;
+            /** Player Id */
+            player_id: string;
+        };
         /** ReadinessData */
         ReadinessData: {
             /** Cache Status */
@@ -182,6 +302,24 @@ export interface components {
              */
             status: "ready" | "not-ready";
         };
+        /** TeamBrief */
+        TeamBrief: {
+            /** Abbreviation */
+            abbreviation?: string | null;
+            /** Name */
+            name: string;
+            /** Score */
+            score?: number | null;
+        };
+        /** VenueBrief */
+        VenueBrief: {
+            /** City */
+            city?: string | null;
+            /** Name */
+            name: string;
+            /** Roof Type */
+            roof_type?: string | null;
+        };
         /** VersionData */
         VersionData: {
             /** Api Version */
@@ -196,6 +334,53 @@ export interface components {
              * @constant
              */
             service: "api";
+        };
+        /** WeatherData */
+        WeatherData: {
+            /** Available */
+            available: boolean;
+            away_team: components["schemas"]["TeamBrief"];
+            /** Condition */
+            condition?: string | null;
+            /** Edge Label */
+            edge_label?: string | null;
+            /** Feels Like F */
+            feels_like_f?: number | null;
+            /** Forecast For */
+            forecast_for?: string | null;
+            /**
+             * Game Date
+             * Format: date
+             */
+            game_date: string;
+            /** Game Id */
+            game_id: string;
+            /** Game Time Utc */
+            game_time_utc?: string | null;
+            /** Hitter Adjustment */
+            hitter_adjustment?: number | null;
+            home_team: components["schemas"]["TeamBrief"];
+            /** Humidity Percent */
+            humidity_percent?: number | null;
+            /** Observed At */
+            observed_at?: string | null;
+            /** Pitcher Adjustment */
+            pitcher_adjustment?: number | null;
+            /** Precipitation Probability */
+            precipitation_probability?: number | null;
+            /** Source */
+            source?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Temperature F */
+            temperature_f?: number | null;
+            venue?: components["schemas"]["VenueBrief"] | null;
+            /** Wind Direction Degrees */
+            wind_direction_degrees?: number | null;
+            /** Wind Out Mph */
+            wind_out_mph?: number | null;
+            /** Wind Speed Mph */
+            wind_speed_mph?: number | null;
         };
     };
     responses: never;
@@ -234,6 +419,218 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    games_api_v1_games_get: {
+        parameters: {
+            query: {
+                date: string;
+                team?: string | null;
+                status?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_list_GameData__"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    game_api_v1_games__game_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_GameData_"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    game_weather_api_v1_games__game_id__weather_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_WeatherData_"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    weather_api_v1_weather_get: {
+        parameters: {
+            query: {
+                date: string;
+                game_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_list_WeatherData__"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Unprocessable Entity */
             422: {

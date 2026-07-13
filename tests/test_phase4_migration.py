@@ -125,6 +125,9 @@ def test_model_metadata_contains_normalized_phase4_boundary() -> None:
         "processing_checkpoints",
         "data_source_status",
         "source_artifacts",
+        "venues",
+        "weather_snapshots",
     }.issubset(Base.metadata.tables)
     assert Base.metadata.tables["games"].c.source_game_id.type.length == 80
+    assert Base.metadata.tables["weather_snapshots"].c.source.type.length == 64
     assert Base.metadata.tables["games"].c.legacy_game_pk.type.python_type is int

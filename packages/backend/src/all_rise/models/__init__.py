@@ -17,6 +17,8 @@ from all_rise.models.core import (
     RefreshRunItem,
     SourceArtifact,
     Team,
+    Venue,
+    WeatherSnapshot,
 )
 
 __all__ = [
@@ -36,4 +38,6 @@ __all__ = [
     "RefreshRunItem",
     "SourceArtifact",
     "Team",
+    "Venue",
+    "WeatherSnapshot",
 ]

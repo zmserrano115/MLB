@@ -1,8 +1,9 @@
 # Architecture migration dossier
 
 Status: audit and Phases 1-6 complete; Phase 7 is in progress. The shared
-Next.js shell and Methodology page are complete, while analytical pages remain
-on their context-preserving legacy routes.
+Next.js shell, Methodology, and persisted Games/Weather preview are complete.
+Legacy routes remain available for full live/current provider-backed coverage
+and for analytical pages not yet migrated.
 
 This directory is the approval gate for the All Rise Analytics strangler migration. The current Streamlit application remains the working product and is intentionally unchanged.
 

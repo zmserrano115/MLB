@@ -6,6 +6,7 @@ from all_rise.application.operations import (
     OperationsService,
     build_operations_repository,
 )
+from all_rise.application.slate import SlateService
 from all_rise.cache.circuit import CircuitBreakingRedis
 from all_rise.cache.metrics import InMemoryCacheMetrics
 from all_rise.cache.versioned import PassThroughCache, VersionedJsonCache
@@ -51,6 +52,28 @@ def create_operations_service(
     return service, metrics
 
 
+def create_application_services(
+    settings: Settings,
+    client: CircuitBreakingRedis | None = None,
+) -> tuple[OperationsService, SlateService, InMemoryCacheMetrics]:
+    cache, metrics = create_shared_cache(settings, client)
+    repository = build_operations_repository(settings)
+    operations = OperationsService(
+        repository,
+        cache,
+        expected_schema_revision=settings.schema_revision,
+        cache_ttl_seconds=settings.cache_default_ttl_seconds,
+        negative_ttl_seconds=settings.cache_negative_ttl_seconds,
+    )
+    slate = SlateService(
+        repository,
+        cache,
+        cache_ttl_seconds=settings.cache_default_ttl_seconds,
+        negative_ttl_seconds=settings.cache_negative_ttl_seconds,
+    )
+    return operations, slate, metrics
+
+
 def create_rate_limiter(
     settings: Settings,
     client: CircuitBreakingRedis | None = None,
@@ -79,6 +102,10 @@ def create_redis_client(settings: Settings) -> CircuitBreakingRedis:
 
 def get_operations_service(request: Request) -> OperationsService:
     return cast(OperationsService, request.app.state.operations_service)
+
+
+def get_slate_service(request: Request) -> SlateService:
+    return cast(SlateService, request.app.state.slate_service)
 
 
 def get_settings(request: Request) -> Settings:

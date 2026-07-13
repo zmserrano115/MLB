@@ -1,8 +1,9 @@
 # All Rise Analytics
 
-> The Next.js shell and Methodology page are active in the migration stack.
-> Streamlit remains authoritative for analytical pages while the approved
-> strangler migration continues route by route. See
+> The Next.js shell, Methodology, and persisted Games/Weather preview are active
+> in the migration stack. Streamlit remains available for complete live/current
+> coverage and analytical pages still moving through the approved strangler
+> migration. See
 > [`docs/architecture/`](docs/architecture/README.md) for the audited plan and
 > [`docs/runbooks/local-development.md`](docs/runbooks/local-development.md) for
 > the new local stack.

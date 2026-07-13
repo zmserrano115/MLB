@@ -2,7 +2,9 @@ import type { components } from "./openapi";
 
 export type ApiMeta = components["schemas"]["ApiMeta"];
 export type DataStatus = components["schemas"]["DataStatusData"];
+export type Game = components["schemas"]["GameData"];
 export type Readiness = components["schemas"]["ReadinessData"];
+export type Weather = components["schemas"]["WeatherData"];
 
 export type ApiEnvelope<T> = {
   data: T;

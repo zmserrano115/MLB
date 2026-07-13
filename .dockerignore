@@ -4,12 +4,14 @@
 .codex_runtime
 .pnpm-store
 __pycache__
+**/__pycache__
 .pytest_cache
 .mypy_cache
 .ruff_cache
 node_modules
 .next
 *.pyc
+**/*.pyc
 *.log
 .env
 .streamlit/secrets.toml

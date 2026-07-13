@@ -15,7 +15,7 @@ x-app-environment: &app-environment
   JOB_ACTIVE_TASKS: ${JOB_ACTIVE_TASKS:-}
   JOB_STALE_AFTER_SECONDS: ${JOB_STALE_AFTER_SECONDS:-300}
   JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-5}
-  SCHEMA_REVISION: ${SCHEMA_REVISION:-0003_durable_job_execution}
+  SCHEMA_REVISION: ${SCHEMA_REVISION:-0004_slate_weather_read_models}
 
 services:
   postgres:

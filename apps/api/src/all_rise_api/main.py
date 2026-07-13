@@ -8,9 +8,10 @@ from all_rise.config import Settings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from all_rise_api.api.v1.routes.operations import api_version, router
+from all_rise_api.api.v1.routes.operations import api_version, router as operations_router
+from all_rise_api.api.v1.routes.slate import router as slate_router
 from all_rise_api.dependencies import (
-    create_operations_service,
+    create_application_services,
     create_rate_limiter,
     create_redis_client,
 )
@@ -37,9 +38,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if resolved_settings.cache_enabled or resolved_settings.rate_limit_enabled
             else None
         )
-        service, cache_metrics = create_operations_service(resolved_settings, redis_client)
+        service, slate_service, cache_metrics = create_application_services(
+            resolved_settings, redis_client
+        )
         rate_limiter = create_rate_limiter(resolved_settings, redis_client)
         application.state.operations_service = service
+        application.state.slate_service = slate_service
         application.state.cache_metrics = cache_metrics
         application.state.rate_limiter = rate_limiter
         try:
@@ -71,7 +75,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         slow_request_ms=resolved_settings.slow_request_ms,
     )
     install_exception_handlers(application)
-    application.include_router(router)
+    application.include_router(operations_router)
+    application.include_router(slate_router)
     return application
 
 
