@@ -2,6 +2,14 @@
   "name": "@all-rise/shared-types",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "openapi-typescript openapi.json -o src/openapi.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.10.1"
+  }
 }
-

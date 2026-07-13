@@ -1,7 +1,8 @@
 # All Rise Analytics
 
-> The existing Streamlit application remains authoritative while the approved
-> strangler migration is developed in parallel. See
+> The Next.js shell and Methodology page are active in the migration stack.
+> Streamlit remains authoritative for analytical pages while the approved
+> strangler migration continues route by route. See
 > [`docs/architecture/`](docs/architecture/README.md) for the audited plan and
 > [`docs/runbooks/local-development.md`](docs/runbooks/local-development.md) for
 > the new local stack.

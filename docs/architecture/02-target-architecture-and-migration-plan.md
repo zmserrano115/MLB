@@ -734,7 +734,7 @@ Every phase starts with a written objective/files/risks/preservation note and en
 - **Preservation:** GitHub Actions remain active until shadow jobs repeatedly match; no dual writer without source ownership.
 - **Exit gate:** duplicate/crash/retry/partial-failure tests, multi-window Statcast equivalence, source validation, worker/API concurrency, container builds.
 
-### Phase 7 - Next.js shell and page-by-page migration
+### Phase 7 - Next.js shell and page-by-page migration (in progress)
 
 - **Objective:** recreate All Rise design and move static/simple pages through complex analytical pages.
 - **Expected files:** `apps/web`, `packages/ui`, generated shared types/client, visual/E2E tests.

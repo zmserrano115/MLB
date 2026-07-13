@@ -16,6 +16,17 @@ COPY apps/web/eslint.config.mjs apps/web/next-env.d.ts apps/web/next.config.ts a
 COPY packages ./packages
 RUN corepack enable && pnpm --filter @all-rise/web build
 
+FROM dependencies AS validation
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/src ./apps/web/src
+COPY apps/web/public ./apps/web/public
+COPY apps/web/eslint.config.mjs apps/web/next-env.d.ts apps/web/next.config.ts apps/web/tsconfig.json ./apps/web/
+COPY packages ./packages
+RUN pnpm --filter @all-rise/web typecheck \
+    && pnpm --filter @all-rise/web lint \
+    && pnpm --filter @all-rise/web test
+
 FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \

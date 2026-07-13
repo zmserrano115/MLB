@@ -97,6 +97,8 @@ services:
     environment:
       API_BASE_URL: ${API_BASE_URL:-http://api:8000}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+      LEGACY_BASE_URL: ${LEGACY_BASE_URL:-http://localhost:8501}
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
     ports:
       - "3000:3000"
     depends_on:

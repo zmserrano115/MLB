@@ -1,0 +1,26 @@
+:root {
+  --ar-bg: #f3f5f7;
+  --ar-nav: #06172b;
+  --ar-nav-raised: #0b2a4a;
+  --ar-panel: #ffffff;
+  --ar-text: #111827;
+  --ar-heading: #10243b;
+  --ar-muted: #526171;
+  --ar-muted-2: #7b8794;
+  --ar-line: #d8dee6;
+  --ar-blue: #245f96;
+  --ar-accent: #245f96;
+  --ar-success: #187347;
+  --ar-success-bg: #edf8f2;
+  --ar-warning: #245f96;
+  --ar-warning-bg: #edf3f8;
+  --ar-danger: #b42318;
+  --ar-danger-bg: #fff1f1;
+  --ar-font-body: "Manrope", "Segoe UI", Helvetica, Arial, sans-serif;
+  --ar-font-display: "Bebas Neue", "Arial Narrow", Impact, sans-serif;
+  --ar-shadow-panel: 0 10px 30px rgb(15 35 55 / 8%);
+  --ar-radius-sm: 0.375rem;
+  --ar-radius-md: 0.75rem;
+  --ar-radius-lg: 1rem;
+  --ar-content: 80rem;
+}

@@ -1,6 +1,8 @@
 # Architecture migration dossier
 
-Status: audit and Phases 1-6 complete; Phase 7 is next.
+Status: audit and Phases 1-6 complete; Phase 7 is in progress. The shared
+Next.js shell and Methodology page are complete, while analytical pages remain
+on their context-preserving legacy routes.
 
 This directory is the approval gate for the All Rise Analytics strangler migration. The current Streamlit application remains the working product and is intentionally unchanged.
 
@@ -29,6 +31,7 @@ This directory is the approval gate for the All Rise Analytics strangler migrati
 | Phase 4 implementation status | [06-phase-4-postgresql-status.md](06-phase-4-postgresql-status.md) |
 | Phase 5 implementation status | [07-phase-5-redis-status.md](07-phase-5-redis-status.md) |
 | Phase 6 implementation status | [08-phase-6-workers-status.md](08-phase-6-workers-status.md) |
+| Phase 7 implementation status | [09-phase-7-nextjs-status.md](09-phase-7-nextjs-status.md) |
 
 ## Audit-stage verification
 
