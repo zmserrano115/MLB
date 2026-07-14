@@ -1,0 +1,2 @@
+bucket = "replace-with-terraform-state-bucket"
+prefix = "all-rise/staging/foundations"

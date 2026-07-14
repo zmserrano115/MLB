@@ -27,6 +27,16 @@ node_modules/
 *.tsbuildinfo
 .env
 
+# Terraform local state and reviewed plans
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+backend.hcl
+crash.log
+crash.*.log
+
 # Local logs and obsolete CSV/cache outputs
 data/nightly_refresh_log.txt
 streamlit.err.log

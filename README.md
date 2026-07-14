@@ -1,9 +1,9 @@
 # All Rise Analytics
 
-> The Next.js shell, Methodology, and persisted Games/Weather preview are active
-> in the migration stack. Streamlit remains available for complete live/current
-> coverage and analytical pages still moving through the approved strangler
-> migration. See
+> The native Next.js/API/worker migration stack now covers the slate, weather,
+> research, analytics, and live Game Center. The parameterized Phase 9 GCP
+> foundations are ready for a reviewed staging plan. Streamlit remains the
+> rollback target until the Cloud Run canary and observation gates pass. See
 > [`docs/architecture/`](docs/architecture/README.md) for the audited plan and
 > [`docs/runbooks/local-development.md`](docs/runbooks/local-development.md) for
 > the new local stack.

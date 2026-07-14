@@ -1,0 +1,27 @@
+project_id  = "replace-with-staging-project"
+environment = "staging"
+region      = "us-central1"
+primary_zone   = "us-central1-a"
+secondary_zone = "us-central1-b"
+
+# Must be globally unique. Null derives project-environment-all-rise-artifacts.
+artifact_bucket_name = null
+
+# Keep deletion protection enabled. Staging may use ZONAL/BASIC only after cost review.
+deletion_protection       = true
+database_availability_type = "REGIONAL"
+redis_tier                 = "STANDARD_HA"
+
+# Add after Phase 9.2 deploys stable HTTPS hosts.
+staging_api_host = null
+staging_web_host = null
+
+# Optional operational notifications and budget.
+notification_email = null
+billing_account_id = null
+monthly_budget_usd = 250
+
+labels = {
+  owner       = "data-platform"
+  cost_center = "all-rise"
+}

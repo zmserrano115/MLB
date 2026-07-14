@@ -1,9 +1,8 @@
 # Architecture migration dossier
 
-Status: audit and Phases 1-6 complete; Phase 7 is in progress. The shared
-Next.js shell, Methodology, and persisted Games/Weather preview are complete.
-Legacy routes remain available for full live/current provider-backed coverage
-and for analytical pages not yet migrated.
+Status: Phases 1-8 complete. Phase 9.1 parameterized GCP foundations are
+implemented and locally validated; their cost-bearing staging apply gate is pending.
+The legacy deployment remains the rollback target until the Phase 9 canary completes.
 
 This directory is the approval gate for the All Rise Analytics strangler migration. The current Streamlit application remains the working product and is intentionally unchanged.
 
@@ -33,6 +32,8 @@ This directory is the approval gate for the All Rise Analytics strangler migrati
 | Phase 5 implementation status | [07-phase-5-redis-status.md](07-phase-5-redis-status.md) |
 | Phase 6 implementation status | [08-phase-6-workers-status.md](08-phase-6-workers-status.md) |
 | Phase 7 implementation status | [09-phase-7-nextjs-status.md](09-phase-7-nextjs-status.md) |
+| Phase 8 implementation status | [10-phase-8-live-status.md](10-phase-8-live-status.md) |
+| Phase 9.1 foundation status | [11-phase-9-foundation-status.md](11-phase-9-foundation-status.md) |
 
 ## Audit-stage verification
 
