@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,6 +263,30 @@ class ResearchRepository(Protocol):
         season: int | None,
         limit: int,
     ) -> list[PlayerGameLogRecord]: ...
+
+    def get_advanced_matchup(
+        self, *, batter_id: str, pitcher_id: str, season: int | None, limit: int
+    ) -> dict[str, Any]: ...
+
+    def get_pitcher_opponent(
+        self, *, pitcher_id: str, team: str | None, season: int | None, limit: int
+    ) -> dict[str, Any]: ...
+
+    def get_bullpen_projection(
+        self, *, game_id: str, team: str | None, batter_id: str | None
+    ) -> list[dict[str, Any]]: ...
+
+    def get_streaks(
+        self, *, through_date: str | None, group: str, metric: str, limit: int
+    ) -> list[dict[str, Any]]: ...
+
+    def get_player_leaderboard(
+        self, *, season: int | None, group: str, sort: str, query: str | None, limit: int
+    ) -> list[dict[str, Any]]: ...
+
+    def get_team_leaderboard(
+        self, *, season: int | None, group: str, sort: str, limit: int
+    ) -> list[dict[str, Any]]: ...
 
 
 class ApplicationRepository(OperationsRepository, SlateRepository, ResearchRepository, Protocol):

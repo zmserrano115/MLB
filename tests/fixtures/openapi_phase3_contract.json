@@ -58,6 +58,28 @@
         "500"
       ]
     },
+    "/api/v1/matchups/bullpen": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "422",
+        "500"
+      ]
+    },
+    "/api/v1/matchups/pitcher-vs-opponent": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "422",
+        "500"
+      ]
+    },
     "/api/v1/players": {
       "methods": [
         "get"
@@ -77,6 +99,50 @@
         "200",
         "304",
         "404",
+        "422",
+        "500"
+      ]
+    },
+    "/api/v1/research/batter-vs-pitcher": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "422",
+        "500"
+      ]
+    },
+    "/api/v1/stats/players": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "422",
+        "500"
+      ]
+    },
+    "/api/v1/stats/teams": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "422",
+        "500"
+      ]
+    },
+    "/api/v1/streaks": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
         "422",
         "500"
       ]
@@ -122,33 +188,50 @@
     }
   },
   "schemas": [
+    "AdvancedMatchupData",
+    "ApiEnvelope_AdvancedMatchupData_",
     "ApiEnvelope_BatterPitcherMatchupData_",
     "ApiEnvelope_GameData_",
     "ApiEnvelope_HealthData_",
+    "ApiEnvelope_PitcherOpponentData_",
     "ApiEnvelope_PlayerProfileData_",
     "ApiEnvelope_ReadinessData_",
     "ApiEnvelope_VersionData_",
     "ApiEnvelope_WeatherData_",
+    "ApiEnvelope_list_BullpenProjectionData__",
     "ApiEnvelope_list_DataStatusData__",
     "ApiEnvelope_list_GameData__",
     "ApiEnvelope_list_PlayerData__",
+    "ApiEnvelope_list_PlayerLeaderboardData__",
+    "ApiEnvelope_list_StreakData__",
+    "ApiEnvelope_list_TeamLeaderboardData__",
     "ApiEnvelope_list_WeatherData__",
     "ApiMeta",
     "BatterPitcherMatchupData",
     "BattingSummaryData",
+    "BullpenProjectionData",
     "DataStatusData",
     "ErrorBody",
     "ErrorEnvelope",
     "GameData",
     "HealthData",
     "PaginationMeta",
+    "PitchCoverageData",
+    "PitchSequenceData",
+    "PitchTypeData",
     "PitcherBrief",
+    "PitcherOpponentData",
+    "PitcherOpponentLogData",
+    "PitcherOpponentSplitData",
     "PitchingSummaryData",
     "PlayerData",
     "PlayerGameLogData",
+    "PlayerLeaderboardData",
     "PlayerProfileData",
     "ReadinessData",
+    "StreakData",
     "TeamBrief",
+    "TeamLeaderboardData",
     "VenueBrief",
     "VersionData",
     "WeatherData"

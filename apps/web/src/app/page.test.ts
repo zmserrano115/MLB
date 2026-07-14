@@ -44,6 +44,16 @@ describe("Phase 7 route state", () => {
       date: "2026-07-13bad",
     });
   });
+
+  it("preserves pitcher-opponent state and recognizes every migrated analytics route", () => {
+    const opponent = resolveLegacyRoute(["matchups", "pitcher-vs-opponent"]);
+    expect(canonicalState(opponent!, { pitcher: "543037", team: "NYY", season: "2026" }))
+      .toEqual({ pitcher: "543037", team: "NYY", season: "2026" });
+    expect(resolveLegacyRoute(["matchups", "bullpen"])?.title).toBe("Projected bullpen");
+    expect(resolveLegacyRoute(["streaks"])?.title).toBe("Streaks");
+    expect(resolveLegacyRoute(["stats", "players"])?.title).toBe("Player stats");
+    expect(resolveLegacyRoute(["stats", "teams"])?.title).toBe("Team stats");
+  });
 });
 
 describe("API envelope guard", () => {
@@ -70,6 +80,23 @@ describe("visual continuity", () => {
     expect(styles).toContain("#f3f5f7");
     expect(styles).not.toMatch(/#(?:f28a27|e47717|c74312|f6a85[0-9a-f]?|9a5b13|fff8e8)/);
     expect(styles).not.toContain("--ar-orange");
+  });
+
+  it("ships native accessible pages for every remaining Phase 7 route", () => {
+    const pages = [
+      "research/batter-vs-pitcher/page.tsx",
+      "matchups/pitcher-vs-opponent/page.tsx",
+      "matchups/bullpen/page.tsx",
+      "streaks/page.tsx",
+      "stats/players/page.tsx",
+      "stats/teams/page.tsx",
+    ];
+    for (const page of pages) {
+      const source = readFileSync(new URL(page, import.meta.url), "utf8");
+      expect(source).toContain('id="main-content"');
+      expect(source).toMatch(/<h2|PageHeader/);
+      expect(source).not.toContain("LegacyFallback");
+    }
   });
 });
 

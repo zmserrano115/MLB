@@ -1,12 +1,18 @@
 import type {
+  AdvancedMatchup,
   ApiEnvelope,
+  BullpenProjection,
   DataStatus,
   Game,
   Matchup,
   Player,
+  PlayerLeaderboard,
   PlayerProfile,
+  PitcherOpponent,
   Readiness,
   Weather,
+  Streak,
+  TeamLeaderboard,
 } from "@all-rise/shared-types";
 
 type ApiSuccess<T> = { ok: true; value: ApiEnvelope<T>; cacheStatus: string | null };
@@ -118,4 +124,64 @@ export function getBatterPitcherMatchup(filters: {
   });
   if (filters.season) query.set("season", String(filters.season));
   return apiGet<Matchup>(`/api/v1/matchups/batter-vs-pitcher?${query}`);
+}
+
+export function getAdvancedMatchup(filters: {
+  batterId: string;
+  pitcherId: string;
+  season?: number;
+}) {
+  const query = new URLSearchParams({
+    batter_id: filters.batterId,
+    pitcher_id: filters.pitcherId,
+    limit: "25",
+  });
+  if (filters.season) query.set("season", String(filters.season));
+  return apiGet<AdvancedMatchup>(`/api/v1/research/batter-vs-pitcher?${query}`);
+}
+
+export function getPitcherOpponent(filters: {
+  pitcherId: string;
+  team?: string;
+  season?: number;
+}) {
+  const query = new URLSearchParams({ pitcher_id: filters.pitcherId, limit: "25" });
+  if (filters.team) query.set("team", filters.team);
+  if (filters.season) query.set("season", String(filters.season));
+  return apiGet<PitcherOpponent>(`/api/v1/matchups/pitcher-vs-opponent?${query}`);
+}
+
+export function getBullpenProjection(filters: {
+  gameId: string;
+  team?: string;
+  batterId?: string;
+}) {
+  const query = new URLSearchParams({ game_id: filters.gameId });
+  if (filters.team) query.set("team", filters.team);
+  if (filters.batterId) query.set("batter_id", filters.batterId);
+  return apiGet<BullpenProjection[]>(`/api/v1/matchups/bullpen?${query}`);
+}
+
+export function getStreaks(filters: { date?: string; group: string; metric: string }) {
+  const query = new URLSearchParams({ group: filters.group, metric: filters.metric, limit: "50" });
+  if (filters.date) query.set("date", filters.date);
+  return apiGet<Streak[]>(`/api/v1/streaks?${query}`);
+}
+
+export function getPlayerLeaderboard(filters: {
+  season?: number;
+  group: string;
+  sort: string;
+  query?: string;
+}) {
+  const query = new URLSearchParams({ group: filters.group, sort: filters.sort, limit: "75" });
+  if (filters.season) query.set("season", String(filters.season));
+  if (filters.query) query.set("query", filters.query);
+  return apiGet<PlayerLeaderboard[]>(`/api/v1/stats/players?${query}`);
+}
+
+export function getTeamLeaderboard(filters: { season?: number; group: string; sort: string }) {
+  const query = new URLSearchParams({ group: filters.group, sort: filters.sort, limit: "30" });
+  if (filters.season) query.set("season", String(filters.season));
+  return apiGet<TeamLeaderboard[]>(`/api/v1/stats/teams?${query}`);
 }

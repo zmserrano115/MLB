@@ -89,6 +89,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matchups/bullpen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bullpen Projection */
+        get: operations["bullpen_projection_api_v1_matchups_bullpen_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matchups/pitcher-vs-opponent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pitcher Opponent Matchup */
+        get: operations["pitcher_opponent_matchup_api_v1_matchups_pitcher_vs_opponent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/players": {
         parameters: {
             query?: never;
@@ -115,6 +149,74 @@ export interface paths {
         };
         /** Player Profile */
         get: operations["player_profile_api_v1_players__player_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/research/batter-vs-pitcher": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Advanced Batter Pitcher Matchup */
+        get: operations["advanced_batter_pitcher_matchup_api_v1_research_batter_vs_pitcher_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/players": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Player Leaderboard */
+        get: operations["player_leaderboard_api_v1_stats_players_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Team Leaderboard */
+        get: operations["team_leaderboard_api_v1_stats_teams_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/streaks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Streaks */
+        get: operations["streaks_api_v1_streaks_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -195,6 +297,19 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdvancedMatchupData */
+        AdvancedMatchupData: {
+            coverage: components["schemas"]["PitchCoverageData"];
+            /** Pitch Types */
+            pitch_types: components["schemas"]["PitchTypeData"][];
+            /** Sequences */
+            sequences: components["schemas"]["PitchSequenceData"][];
+        };
+        /** ApiEnvelope[AdvancedMatchupData] */
+        ApiEnvelope_AdvancedMatchupData_: {
+            data: components["schemas"]["AdvancedMatchupData"];
+            meta: components["schemas"]["ApiMeta"];
+        };
         /** ApiEnvelope[BatterPitcherMatchupData] */
         ApiEnvelope_BatterPitcherMatchupData_: {
             data: components["schemas"]["BatterPitcherMatchupData"];
@@ -208,6 +323,11 @@ export interface components {
         /** ApiEnvelope[HealthData] */
         ApiEnvelope_HealthData_: {
             data: components["schemas"]["HealthData"];
+            meta: components["schemas"]["ApiMeta"];
+        };
+        /** ApiEnvelope[PitcherOpponentData] */
+        ApiEnvelope_PitcherOpponentData_: {
+            data: components["schemas"]["PitcherOpponentData"];
             meta: components["schemas"]["ApiMeta"];
         };
         /** ApiEnvelope[PlayerProfileData] */
@@ -230,6 +350,12 @@ export interface components {
             data: components["schemas"]["WeatherData"];
             meta: components["schemas"]["ApiMeta"];
         };
+        /** ApiEnvelope[list[BullpenProjectionData]] */
+        ApiEnvelope_list_BullpenProjectionData__: {
+            /** Data */
+            data: components["schemas"]["BullpenProjectionData"][];
+            meta: components["schemas"]["ApiMeta"];
+        };
         /** ApiEnvelope[list[DataStatusData]] */
         ApiEnvelope_list_DataStatusData__: {
             /** Data */
@@ -246,6 +372,24 @@ export interface components {
         ApiEnvelope_list_PlayerData__: {
             /** Data */
             data: components["schemas"]["PlayerData"][];
+            meta: components["schemas"]["ApiMeta"];
+        };
+        /** ApiEnvelope[list[PlayerLeaderboardData]] */
+        ApiEnvelope_list_PlayerLeaderboardData__: {
+            /** Data */
+            data: components["schemas"]["PlayerLeaderboardData"][];
+            meta: components["schemas"]["ApiMeta"];
+        };
+        /** ApiEnvelope[list[StreakData]] */
+        ApiEnvelope_list_StreakData__: {
+            /** Data */
+            data: components["schemas"]["StreakData"][];
+            meta: components["schemas"]["ApiMeta"];
+        };
+        /** ApiEnvelope[list[TeamLeaderboardData]] */
+        ApiEnvelope_list_TeamLeaderboardData__: {
+            /** Data */
+            data: components["schemas"]["TeamLeaderboardData"][];
             meta: components["schemas"]["ApiMeta"];
         };
         /** ApiEnvelope[list[WeatherData]] */
@@ -351,6 +495,43 @@ export interface components {
             /** Walks */
             walks: number;
         };
+        /** BullpenProjectionData */
+        BullpenProjectionData: {
+            /** Appearance Probability */
+            appearance_probability?: number | null;
+            /** Availability Label */
+            availability_label?: string | null;
+            /** Availability Score */
+            availability_score?: number | null;
+            /** Batter Hits */
+            batter_hits?: number | null;
+            /** Batter Home Runs */
+            batter_home_runs?: number | null;
+            /** Batter Pa */
+            batter_pa?: number | null;
+            /** Batter Strikeouts */
+            batter_strikeouts?: number | null;
+            /** Expected Batters Faced Max */
+            expected_batters_faced_max?: number | null;
+            /** Expected Batters Faced Min */
+            expected_batters_faced_min?: number | null;
+            /** Game Id */
+            game_id: string;
+            /** Generation */
+            generation: string;
+            /** Pitcher Id */
+            pitcher_id: number;
+            /** Pitcher Name */
+            pitcher_name?: string | null;
+            /** Projected Role */
+            projected_role?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Recent Workload */
+            recent_workload?: string | null;
+            /** Team */
+            team?: string | null;
+        };
         /** DataStatusData */
         DataStatusData: {
             /** Detail */
@@ -428,12 +609,142 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** PitchCoverageData */
+        PitchCoverageData: {
+            /** Games */
+            games: number;
+            /** Last Game Date */
+            last_game_date?: string | null;
+            /** Pitch Count */
+            pitch_count: number;
+        };
+        /** PitchSequenceData */
+        PitchSequenceData: {
+            /** At Bat Number */
+            at_bat_number: number;
+            /** Barrel */
+            barrel?: boolean | null;
+            /** Estimated Distance */
+            estimated_distance?: number | null;
+            /**
+             * Game Date
+             * Format: date
+             */
+            game_date: string;
+            /** Game Id */
+            game_id: string;
+            /** Hard Hit */
+            hard_hit?: boolean | null;
+            /** Launch Angle */
+            launch_angle?: number | null;
+            /** Launch Speed */
+            launch_speed?: number | null;
+            /** Pitch Count */
+            pitch_count: number;
+            /** Pitch Sequence */
+            pitch_sequence: string;
+            /** Result */
+            result?: string | null;
+        };
+        /** PitchTypeData */
+        PitchTypeData: {
+            /** Average Velocity */
+            average_velocity?: number | null;
+            /** Barrel Percentage */
+            barrel_percentage?: number | null;
+            /** Expected Woba */
+            expected_woba?: number | null;
+            /** Hard Hit Percentage */
+            hard_hit_percentage?: number | null;
+            /** Last Game Date */
+            last_game_date?: string | null;
+            /** Pitch Count */
+            pitch_count: number;
+            /** Pitch Name */
+            pitch_name?: string | null;
+            /** Pitch Type */
+            pitch_type: string;
+            /** Season */
+            season: number;
+            /** Whiff Percentage */
+            whiff_percentage?: number | null;
+        };
         /** PitcherBrief */
         PitcherBrief: {
             /** Name */
             name?: string | null;
             /** Player Id */
             player_id: string;
+        };
+        /** PitcherOpponentData */
+        PitcherOpponentData: {
+            /** Game Logs */
+            game_logs: components["schemas"]["PitcherOpponentLogData"][];
+            /** Splits */
+            splits: components["schemas"]["PitcherOpponentSplitData"][];
+        };
+        /** PitcherOpponentLogData */
+        PitcherOpponentLogData: {
+            /** Batters Faced */
+            batters_faced: number;
+            /** Earned Runs */
+            earned_runs: number;
+            /**
+             * Game Date
+             * Format: date
+             */
+            game_date: string;
+            /** Game Id */
+            game_id: string;
+            /** Hits */
+            hits: number;
+            /** Home Runs */
+            home_runs: number;
+            /** Innings Outs */
+            innings_outs: number;
+            /** Is Starter */
+            is_starter: boolean;
+            /** Opponent */
+            opponent?: string | null;
+            /** Pitch Count */
+            pitch_count?: number | null;
+            /** Runs */
+            runs: number;
+            /** Season */
+            season: number;
+            /** Strikeouts */
+            strikeouts: number;
+            /** Walks */
+            walks: number;
+        };
+        /** PitcherOpponentSplitData */
+        PitcherOpponentSplitData: {
+            /** Batters Faced */
+            batters_faced: number;
+            /** Earned Runs */
+            earned_runs: number;
+            /** Games */
+            games: number;
+            /** Hits */
+            hits: number;
+            /** Home Runs */
+            home_runs: number;
+            /** Innings Outs */
+            innings_outs: number;
+            /** Last Game Date */
+            last_game_date?: string | null;
+            /** Opponent */
+            opponent?: string | null;
+            /** Pitcher Id */
+            pitcher_id: number;
+            /** Pitcher Name */
+            pitcher_name?: string | null;
+            /** Runs */
+            runs: number;
+            /** Strikeouts */
+            strikeouts: number;
+            /** Walks */
+            walks: number;
         };
         /** PitchingSummaryData */
         PitchingSummaryData: {
@@ -532,6 +843,49 @@ export interface components {
             /** Walks */
             walks?: number | null;
         };
+        /** PlayerLeaderboardData */
+        PlayerLeaderboardData: {
+            /** Ab */
+            ab?: number | null;
+            /** Average */
+            average?: number | null;
+            /** Era */
+            era?: number | null;
+            /** Games */
+            games: number;
+            /** Hits */
+            hits?: number | null;
+            /** Home Runs */
+            home_runs?: number | null;
+            /** Innings Outs */
+            innings_outs?: number | null;
+            /** Last Game Date */
+            last_game_date?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Ops */
+            ops?: number | null;
+            /** Pa */
+            pa?: number | null;
+            /** Player Id */
+            player_id: number;
+            /** Rbi */
+            rbi?: number | null;
+            /** Season */
+            season: number;
+            /** Starts */
+            starts?: number | null;
+            /** Strikeouts */
+            strikeouts: number;
+            /** Team */
+            team?: string | null;
+            /** Total Bases */
+            total_bases?: number | null;
+            /** Walks */
+            walks: number;
+            /** Whip */
+            whip?: number | null;
+        };
         /** PlayerProfileData */
         PlayerProfileData: {
             batting?: components["schemas"]["BattingSummaryData"] | null;
@@ -558,6 +912,28 @@ export interface components {
              */
             status: "ready" | "not-ready";
         };
+        /** StreakData */
+        StreakData: {
+            /** Group */
+            group: string;
+            /** Last Game Date */
+            last_game_date?: string | null;
+            /** Metric */
+            metric: string;
+            /** Streak */
+            streak: number;
+            /** Subject Id */
+            subject_id?: string | null;
+            /** Subject Name */
+            subject_name?: string | null;
+            /** Team */
+            team?: string | null;
+            /**
+             * Through Date
+             * Format: date
+             */
+            through_date: string;
+        };
         /** TeamBrief */
         TeamBrief: {
             /** Abbreviation */
@@ -566,6 +942,51 @@ export interface components {
             name: string;
             /** Score */
             score?: number | null;
+        };
+        /** TeamLeaderboardData */
+        TeamLeaderboardData: {
+            /** Abbreviation */
+            abbreviation?: string | null;
+            /** Average */
+            average?: number | null;
+            /** Earned Runs Allowed */
+            earned_runs_allowed: number;
+            /** Era */
+            era?: number | null;
+            /** Games */
+            games: number;
+            /** Hits */
+            hits: number;
+            /** Hits Allowed */
+            hits_allowed: number;
+            /** Home Runs */
+            home_runs: number;
+            /** Home Runs Allowed */
+            home_runs_allowed: number;
+            /** Innings Outs */
+            innings_outs: number;
+            /** Last Game Date */
+            last_game_date?: string | null;
+            /** Name */
+            name: string;
+            /** Pa */
+            pa: number;
+            /** Runs */
+            runs: number;
+            /** Runs Allowed */
+            runs_allowed: number;
+            /** Season */
+            season: number;
+            /** Strikeouts */
+            strikeouts: number;
+            /** Strikeouts Pitched */
+            strikeouts_pitched: number;
+            /** Team Id */
+            team_id?: number | null;
+            /** Walks */
+            walks: number;
+            /** Walks Allowed */
+            walks_allowed: number;
         };
         /** VenueBrief */
         VenueBrief: {
@@ -918,6 +1339,105 @@ export interface operations {
             };
         };
     };
+    bullpen_projection_api_v1_matchups_bullpen_get: {
+        parameters: {
+            query: {
+                game_id: string;
+                team?: string | null;
+                batter_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_list_BullpenProjectionData__"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    pitcher_opponent_matchup_api_v1_matchups_pitcher_vs_opponent_get: {
+        parameters: {
+            query: {
+                pitcher_id: string;
+                team?: string | null;
+                season?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_PitcherOpponentData_"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     players_api_v1_players_get: {
         parameters: {
             query?: {
@@ -1008,6 +1528,207 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    advanced_batter_pitcher_matchup_api_v1_research_batter_vs_pitcher_get: {
+        parameters: {
+            query: {
+                batter_id: string;
+                pitcher_id: string;
+                season?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_AdvancedMatchupData_"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    player_leaderboard_api_v1_stats_players_get: {
+        parameters: {
+            query?: {
+                season?: number | null;
+                group?: "batting" | "pitching";
+                sort?: string;
+                query?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_list_PlayerLeaderboardData__"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    team_leaderboard_api_v1_stats_teams_get: {
+        parameters: {
+            query?: {
+                season?: number | null;
+                group?: "batting" | "pitching";
+                sort?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_list_TeamLeaderboardData__"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    streaks_api_v1_streaks_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+                group?: "batter" | "pitcher" | "team";
+                metric?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_list_StreakData__"];
+                };
+            };
+            /** @description The persisted data version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Unprocessable Entity */
             422: {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 from typing import Any, cast
@@ -42,6 +43,14 @@ class PlayerProfileResult:
 class MatchupResult:
     matchup: BatterPitcherMatchupRecord | None
     game_logs: list[PlayerGameLogRecord]
+    data_version: str
+    cache_outcome: str
+    stale: bool
+
+
+@dataclass(frozen=True, slots=True)
+class AnalyticsResult:
+    data: Any
     data_version: str
     cache_outcome: str
     stale: bool
@@ -192,6 +201,90 @@ class ResearchService:
         rows = cast(list[dict[str, Any]], raw_logs) if isinstance(raw_logs, list) else []
         logs = [PlayerGameLogRecord(**row) for row in rows]
         return MatchupResult(matchup, logs, version, cached.outcome.value, cached.stale)
+
+    def advanced_matchup(
+        self, *, batter_id: str, pitcher_id: str, season: int | None, limit: int
+    ) -> AnalyticsResult:
+        return self._analytics(
+            "advanced-hvp",
+            (batter_id, pitcher_id, season, limit),
+            lambda: self._repository.get_advanced_matchup(
+                batter_id=batter_id, pitcher_id=pitcher_id, season=season, limit=limit
+            ),
+        )
+
+    def pitcher_opponent(
+        self, *, pitcher_id: str, team: str | None, season: int | None, limit: int
+    ) -> AnalyticsResult:
+        return self._analytics(
+            "pitcher-opponent",
+            (pitcher_id, team, season, limit),
+            lambda: self._repository.get_pitcher_opponent(
+                pitcher_id=pitcher_id, team=team, season=season, limit=limit
+            ),
+        )
+
+    def bullpen_projection(
+        self, *, game_id: str, team: str | None, batter_id: str | None
+    ) -> AnalyticsResult:
+        return self._analytics(
+            "bullpen",
+            (game_id, team, batter_id),
+            lambda: self._repository.get_bullpen_projection(
+                game_id=game_id, team=team, batter_id=batter_id
+            ),
+        )
+
+    def streaks(
+        self, *, through_date: str | None, group: str, metric: str, limit: int
+    ) -> AnalyticsResult:
+        return self._analytics(
+            "streaks",
+            (through_date, group, metric, limit),
+            lambda: self._repository.get_streaks(
+                through_date=through_date, group=group, metric=metric, limit=limit
+            ),
+        )
+
+    def player_leaderboard(
+        self,
+        *,
+        season: int | None,
+        group: str,
+        sort: str,
+        query: str | None,
+        limit: int,
+    ) -> AnalyticsResult:
+        return self._analytics(
+            "player-leaders",
+            (season, group, sort, query, limit),
+            lambda: self._repository.get_player_leaderboard(
+                season=season, group=group, sort=sort, query=query, limit=limit
+            ),
+        )
+
+    def team_leaderboard(
+        self, *, season: int | None, group: str, sort: str, limit: int
+    ) -> AnalyticsResult:
+        return self._analytics(
+            "team-leaders",
+            (season, group, sort, limit),
+            lambda: self._repository.get_team_leaderboard(
+                season=season, group=group, sort=sort, limit=limit
+            ),
+        )
+
+    def _analytics(
+        self, namespace: str, parts: tuple[object, ...], loader: Callable[[], Any]
+    ) -> AnalyticsResult:
+        version = self._version()
+        cached = self._cache.get_or_load(
+            self._key(namespace, parts, version),
+            loader,
+            ttl_seconds=self._cache_ttl_seconds,
+            negative_ttl_seconds=self._negative_ttl_seconds,
+        )
+        return AnalyticsResult(cached.value, version, cached.outcome.value, cached.stale)
 
     def _version(self) -> str:
         return sha256(self._repository.get_data_version().encode()).hexdigest()[:16]

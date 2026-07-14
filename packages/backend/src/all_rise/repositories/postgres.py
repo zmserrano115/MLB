@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import create_engine, inspect, text
@@ -402,6 +404,323 @@ class PostgresOperationsRepository:
             ).mappings()
             return [_player_game_log(row, "batting") for row in rows]
 
+    def get_advanced_matchup(
+        self,
+        *,
+        batter_id: str,
+        pitcher_id: str,
+        season: int | None,
+        limit: int,
+    ) -> dict[str, Any]:
+        params = {
+            "batter_id": int(batter_id),
+            "pitcher_id": int(pitcher_id),
+            "season": season,
+            "limit": limit,
+        }
+        pitch_types = text(
+            """
+            SELECT s.season, s.pitch_type, s.pitch_name, s.pitch_count,
+                   s.average_velocity, s.whiff_percentage, s.hard_hit_percentage,
+                   s.barrel_percentage, s.expected_woba, s.last_game_date
+            FROM batter_pitch_type_summaries s
+            JOIN players batter ON batter.id = s.batter_id
+            JOIN players pitcher ON pitcher.id = s.pitcher_id
+            WHERE batter.provider_player_id = :batter_id
+              AND pitcher.provider_player_id = :pitcher_id
+              AND (CAST(:season AS INTEGER) IS NULL
+                   OR s.season = CAST(:season AS INTEGER))
+            ORDER BY s.pitch_count DESC, s.pitch_type LIMIT :limit
+            """
+        )
+        sequences = text(
+            """
+            SELECT g.source_game_id AS game_id, s.game_date, s.at_bat_number,
+                   s.result, s.pitch_count, s.pitch_sequence, s.launch_speed,
+                   s.launch_angle, s.estimated_distance, s.barrel, s.hard_hit
+            FROM plate_appearance_sequences s
+            JOIN players batter ON batter.id = s.batter_id
+            JOIN players pitcher ON pitcher.id = s.pitcher_id
+            JOIN games g ON g.id = s.game_id
+            WHERE batter.provider_player_id = :batter_id
+              AND pitcher.provider_player_id = :pitcher_id
+              AND (CAST(:season AS INTEGER) IS NULL
+                   OR s.season = CAST(:season AS INTEGER))
+            ORDER BY s.game_date DESC, s.at_bat_number DESC LIMIT :limit
+            """
+        )
+        coverage = text(
+            """
+            SELECT COUNT(*) AS pitch_count, COUNT(DISTINCT e.game_id) AS games,
+                   MAX(e.game_date) AS last_game_date
+            FROM pitch_events e
+            JOIN players batter ON batter.id = e.batter_id
+            JOIN players pitcher ON pitcher.id = e.pitcher_id
+            WHERE batter.provider_player_id = :batter_id
+              AND pitcher.provider_player_id = :pitcher_id
+              AND (CAST(:season AS INTEGER) IS NULL
+                   OR e.season = CAST(:season AS INTEGER))
+            """
+        )
+        with self._engine.connect() as connection:
+            coverage_row = connection.execute(coverage, params).mappings().one()
+            return {
+                "coverage": _plain_row(coverage_row),
+                "pitch_types": [
+                    _plain_row(row) for row in connection.execute(pitch_types, params).mappings()
+                ],
+                "sequences": [
+                    _plain_row(row) for row in connection.execute(sequences, params).mappings()
+                ],
+            }
+
+    def get_pitcher_opponent(
+        self,
+        *,
+        pitcher_id: str,
+        team: str | None,
+        season: int | None,
+        limit: int,
+    ) -> dict[str, Any]:
+        conditions = [
+            "p.provider_player_id = :pitcher_id",
+            "(CAST(:season AS INTEGER) IS NULL OR pg.season = CAST(:season AS INTEGER))",
+            "(CAST(:team AS TEXT) IS NULL "
+            "OR upper(opponent.abbreviation) = upper(CAST(:team AS TEXT)) "
+            "OR upper(opponent.name) = upper(CAST(:team AS TEXT)))",
+        ]
+        params = {
+            "pitcher_id": int(pitcher_id),
+            "team": team,
+            "season": season,
+            "limit": limit,
+        }
+        summary = text(
+            f"""
+            SELECT p.provider_player_id AS pitcher_id, p.name AS pitcher_name,
+                   opponent.abbreviation AS opponent, COUNT(*) AS games,
+                   SUM(pg.innings_outs) AS innings_outs,
+                   SUM(pg.batters_faced) AS batters_faced,
+                   SUM(pg.strikeouts) AS strikeouts, SUM(pg.walks) AS walks,
+                   SUM(pg.hits) AS hits, SUM(pg.home_runs) AS home_runs,
+                   SUM(pg.runs) AS runs, SUM(pg.earned_runs) AS earned_runs,
+                   MAX(pg.game_date) AS last_game_date
+            FROM pitcher_game_logs pg
+            JOIN players p ON p.id = pg.pitcher_id
+            LEFT JOIN teams opponent ON opponent.id = pg.opponent_team_id
+            WHERE {" AND ".join(conditions)}
+            GROUP BY p.provider_player_id, p.name, opponent.abbreviation
+            ORDER BY COUNT(*) DESC, opponent.abbreviation NULLS LAST
+            LIMIT :limit
+            """
+        )
+        logs = text(
+            f"""
+            SELECT g.source_game_id AS game_id, pg.game_date, pg.season,
+                   opponent.abbreviation AS opponent, pg.is_starter,
+                   pg.innings_outs, pg.pitch_count, pg.batters_faced,
+                   pg.hits, pg.walks, pg.strikeouts, pg.home_runs,
+                   pg.runs, pg.earned_runs
+            FROM pitcher_game_logs pg
+            JOIN players p ON p.id = pg.pitcher_id
+            JOIN games g ON g.id = pg.game_id
+            LEFT JOIN teams opponent ON opponent.id = pg.opponent_team_id
+            WHERE {" AND ".join(conditions)}
+            ORDER BY pg.game_date DESC, g.source_game_id DESC LIMIT :limit
+            """
+        )
+        with self._engine.connect() as connection:
+            return {
+                "splits": [
+                    _plain_row(row) for row in connection.execute(summary, params).mappings()
+                ],
+                "game_logs": [
+                    _plain_row(row) for row in connection.execute(logs, params).mappings()
+                ],
+            }
+
+    def get_bullpen_projection(
+        self, *, game_id: str, team: str | None, batter_id: str | None
+    ) -> list[dict[str, Any]]:
+        statement = text(
+            """
+            SELECT g.source_game_id AS game_id, t.abbreviation AS team,
+                   p.provider_player_id AS pitcher_id, p.name AS pitcher_name,
+                   item.projected_role, item.availability_score,
+                   item.availability_label, item.appearance_probability,
+                   item.expected_batters_faced_min, item.expected_batters_faced_max,
+                   item.recent_workload, item.reason, run.generation,
+                   bvp.pa AS batter_pa, bvp.hits AS batter_hits,
+                   bvp.home_runs AS batter_home_runs, bvp.strikeouts AS batter_strikeouts
+            FROM bullpen_projection_items item
+            JOIN bullpen_projection_runs run ON run.id = item.run_id
+            JOIN games g ON g.id = item.game_id
+            JOIN teams t ON t.id = item.team_id
+            JOIN players p ON p.id = item.pitcher_id
+            LEFT JOIN players batter ON batter.provider_player_id = CAST(:batter_id AS BIGINT)
+            LEFT JOIN batter_pitcher_summaries bvp
+              ON bvp.batter_id = batter.id AND bvp.pitcher_id = p.id
+            WHERE g.source_game_id = :game_id
+              AND (CAST(:team AS TEXT) IS NULL
+                   OR upper(t.abbreviation) = upper(CAST(:team AS TEXT)))
+              AND run.id = (
+                  SELECT latest.id FROM bullpen_projection_runs latest
+                  JOIN bullpen_projection_items latest_item ON latest_item.run_id = latest.id
+                  WHERE latest_item.game_id = g.id
+                  ORDER BY latest.active DESC, latest.created_at DESC LIMIT 1
+              )
+            ORDER BY item.appearance_probability DESC NULLS LAST, p.name
+            """
+        )
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                statement, {"game_id": game_id, "team": team, "batter_id": batter_id}
+            ).mappings()
+            return [_plain_row(row) for row in rows]
+
+    def get_streaks(
+        self,
+        *,
+        through_date: str | None,
+        group: str,
+        metric: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        statement = text(
+            """
+            SELECT s.through_date, s.group_name AS "group", s.metric,
+                   COALESCE(p.provider_player_id::text, t.provider_team_id::text) AS subject_id,
+                   COALESCE(p.name, t.name) AS subject_name, t.abbreviation AS team,
+                   s.streak, s.last_game_date
+            FROM streak_summaries s
+            LEFT JOIN players p ON p.id = s.player_id
+            LEFT JOIN teams t ON t.id = s.team_id
+            WHERE s.group_name = :group AND s.metric = :metric
+              AND s.through_date = COALESCE(
+                  CAST(:through_date AS DATE),
+                  (SELECT MAX(latest.through_date) FROM streak_summaries latest
+                   WHERE latest.group_name = :group AND latest.metric = :metric)
+              )
+            ORDER BY s.streak DESC, subject_name LIMIT :limit
+            """
+        )
+        with self._engine.connect() as connection:
+            rows = connection.execute(
+                statement,
+                {"through_date": through_date, "group": group, "metric": metric, "limit": limit},
+            ).mappings()
+            return [_plain_row(row) for row in rows]
+
+    def get_player_leaderboard(
+        self,
+        *,
+        season: int | None,
+        group: str,
+        sort: str,
+        query: str | None,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        if group == "pitching":
+            sort_column = {
+                "strikeouts": "s.strikeouts",
+                "era": "s.earned_run_average",
+                "whip": "s.whip",
+                "innings": "s.innings_outs",
+            }.get(sort, "s.strikeouts")
+            statement = text(
+                f"""
+                SELECT s.season, p.provider_player_id AS player_id, p.name,
+                       s.games, s.starts, s.innings_outs, s.strikeouts,
+                       s.earned_run_average AS era, s.whip, s.walks, s.home_runs,
+                       s.last_game_date
+                FROM pitcher_season_summaries s JOIN players p ON p.id = s.pitcher_id
+                WHERE s.season = COALESCE(CAST(:season AS INTEGER),
+                    (SELECT MAX(season) FROM pitcher_season_summaries))
+                  AND (CAST(:query AS TEXT) IS NULL OR p.name ILIKE CAST(:query AS TEXT))
+                ORDER BY {sort_column} {"ASC" if sort in {"era", "whip"} else "DESC"}
+                         NULLS LAST, p.name LIMIT :limit
+                """
+            )
+        else:
+            sort_column = {
+                "home_runs": "s.home_runs",
+                "hits": "s.hits",
+                "rbi": "s.rbi",
+                "average": "(s.hits::numeric / NULLIF(s.ab, 0))",
+                "ops": "((s.hits + s.walks + s.hit_by_pitch)::numeric / NULLIF(s.pa, 0) "
+                "+ s.total_bases::numeric / NULLIF(s.ab, 0))",
+            }.get(sort, "s.home_runs")
+            statement = text(
+                f"""
+                SELECT s.season, p.provider_player_id AS player_id, p.name,
+                       t.abbreviation AS team, s.games, s.pa, s.ab, s.hits,
+                       s.home_runs, s.rbi, s.walks, s.strikeouts, s.total_bases,
+                       ROUND(s.hits::numeric / NULLIF(s.ab, 0), 3) AS average,
+                       ROUND((s.hits + s.walks + s.hit_by_pitch)::numeric / NULLIF(s.pa, 0)
+                           + s.total_bases::numeric / NULLIF(s.ab, 0), 3) AS ops,
+                       s.last_game_date
+                FROM batter_season_summaries s JOIN players p ON p.id = s.batter_id
+                LEFT JOIN teams t ON t.id = s.team_id
+                WHERE s.season = COALESCE(CAST(:season AS INTEGER),
+                    (SELECT MAX(season) FROM batter_season_summaries))
+                  AND (CAST(:query AS TEXT) IS NULL OR p.name ILIKE CAST(:query AS TEXT))
+                ORDER BY {sort_column} DESC NULLS LAST, p.name LIMIT :limit
+                """
+            )
+        params = {
+            "season": season,
+            "query": f"%{query}%" if query else None,
+            "limit": limit,
+        }
+        with self._engine.connect() as connection:
+            return [_plain_row(row) for row in connection.execute(statement, params).mappings()]
+
+    def get_team_leaderboard(
+        self, *, season: int | None, group: str, sort: str, limit: int
+    ) -> list[dict[str, Any]]:
+        batting_sorts = {
+            "runs": "s.runs",
+            "home_runs": "s.home_runs",
+            "average": "s.hits::numeric / NULLIF(s.pa - s.walks, 0)",
+            "strikeout_rate": "s.strikeouts::numeric / NULLIF(s.pa, 0)",
+        }
+        pitching_sorts = {
+            "era": "s.earned_runs_allowed * 27.0 / NULLIF(s.innings_outs, 0)",
+            "strikeouts": "s.strikeouts_pitched",
+            "runs_allowed": "s.runs_allowed",
+            "walks_allowed": "s.walks_allowed",
+        }
+        sort_column = (
+            pitching_sorts.get(sort, "s.earned_runs_allowed * 27.0 / NULLIF(s.innings_outs, 0)")
+            if group == "pitching"
+            else batting_sorts.get(sort, "s.runs")
+        )
+        ascending = sort in {"era", "runs_allowed", "walks_allowed", "strikeout_rate"}
+        statement = text(
+            f"""
+            SELECT s.season, t.provider_team_id AS team_id, t.name,
+                   t.abbreviation, s.games, s.pa, s.runs, s.hits, s.walks,
+                   s.strikeouts, s.home_runs, s.innings_outs, s.runs_allowed,
+                   s.earned_runs_allowed, s.hits_allowed, s.walks_allowed,
+                   s.strikeouts_pitched, s.home_runs_allowed,
+                   ROUND(s.hits::numeric / NULLIF(s.pa - s.walks, 0), 3) AS average,
+                   ROUND(s.earned_runs_allowed * 27.0 / NULLIF(s.innings_outs, 0), 2) AS era,
+                   s.last_game_date
+            FROM team_season_summaries s JOIN teams t ON t.id = s.team_id
+            WHERE s.season = COALESCE(CAST(:season AS INTEGER),
+                (SELECT MAX(season) FROM team_season_summaries))
+            ORDER BY {sort_column} {"ASC" if ascending else "DESC"} NULLS LAST, t.name
+            LIMIT :limit
+            """
+        )
+        with self._engine.connect() as connection:
+            return [
+                _plain_row(row)
+                for row in connection.execute(
+                    statement, {"season": season, "limit": limit}
+                ).mappings()
+            ]
+
     def close(self) -> None:
         self._engine.dispose()
 
@@ -551,6 +870,18 @@ def _player_record(row: Mapping[Any, Any]) -> PlayerRecord:
 
 def _ratio(numerator: int, denominator: int) -> float | None:
     return round(numerator / denominator, 5) if denominator else None
+
+
+def _plain_row(row: Mapping[Any, Any]) -> dict[str, Any]:
+    plain: dict[str, Any] = {}
+    for key, value in row.items():
+        if isinstance(value, Decimal):
+            plain[str(key)] = float(value)
+        elif isinstance(value, (date, datetime)):
+            plain[str(key)] = value.isoformat()
+        else:
+            plain[str(key)] = value
+    return plain
 
 
 def _batting_summary(row: Mapping[Any, Any]) -> BattingSummaryRecord:

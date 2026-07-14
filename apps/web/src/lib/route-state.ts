@@ -35,6 +35,13 @@ const routeDefinitions: Readonly<Record<string, LegacyRoute>> = {
     allowedState: ["game", "batter", "team"],
     legacyDefaults: { matchup_table: "Projected Bullpen" },
   },
+  "matchups/pitcher-vs-opponent": {
+    title: "Pitcher vs opponent",
+    description: "Opponent workload, strikeout, and game-log research.",
+    view: "Matchups",
+    allowedState: ["pitcher", "team", "season"],
+    legacyDefaults: { matchup_table: "Pitcher Matchups" },
+  },
   "research/batter-vs-pitcher": {
     title: "Advanced HVP",
     description: "Pitch sequence, contact quality, direct history, and pitch-type context.",

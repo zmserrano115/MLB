@@ -17,6 +17,8 @@ import psycopg
 from psycopg import Cursor
 from psycopg.types.json import Jsonb
 
+from all_rise.migration.analytics_sql import PHASE7_REBUILD_SQL
+
 REQUIRED_TABLES = {
     "batter_pitcher_game_logs",
     "daily_bullpen_projections",
@@ -447,6 +449,13 @@ def _rebuild_summaries(target: Cursor[Any], generation: str) -> None:
         """,
         (generation,),
     )
+
+
+def _rebuild_phase7_read_models(target: Cursor[Any], generation: str) -> None:
+    for table in ("batter_season_summaries", "team_season_summaries", "streak_summaries"):
+        target.execute(f'TRUNCATE TABLE "{table}" RESTART IDENTITY')
+    for statement in PHASE7_REBUILD_SQL:
+        target.execute(statement, {"generation": generation})
     target.execute(
         """
         INSERT INTO pitcher_season_summaries (
@@ -479,6 +488,122 @@ def _load_small_tables(
         "live_game_contacts_without_game": 0,
         "bullpen_projections_without_game": 0,
     }
+    source_tables = {
+        str(row[0]) for row in source.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    if "pitch_level_events" in source_tables:
+        for row in source.execute(
+            "SELECT * FROM pitch_level_events ORDER BY game_pk, at_bat_number, pitch_number"
+        ):
+            game_id = game_map.get(int(row["game_pk"]))
+            batter_id = player_map.get(int(row["batter_id"]))
+            pitcher_id = player_map.get(int(row["pitcher_id"]))
+            if not game_id or not batter_id or not pitcher_id:
+                continue
+            target.execute(
+                """
+                INSERT INTO pitch_events (
+                    game_id, game_date, season, at_bat_number, pitch_number,
+                    batter_id, pitcher_id, pitch_type, pitch_name, description,
+                    event, release_speed, plate_x, plate_z, launch_speed,
+                    launch_angle, estimated_distance, estimated_woba, barrel,
+                    hard_hit, balls, strikes, source_updated_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                """,
+                (
+                    game_id,
+                    row["game_date"],
+                    row["season"],
+                    row["at_bat_number"],
+                    row["pitch_number"],
+                    batter_id,
+                    pitcher_id,
+                    row["pitch_type"],
+                    row["pitch_name"],
+                    row["pitch_description"],
+                    row["event"],
+                    row["release_speed"],
+                    row["plate_x"],
+                    row["plate_z"],
+                    row["launch_speed"],
+                    row["launch_angle"],
+                    row["estimated_distance"],
+                    row["estimated_woba"],
+                    bool(row["barrel"]) if row["barrel"] is not None else None,
+                    bool(row["hard_hit"]) if row["hard_hit"] is not None else None,
+                    row["balls"],
+                    row["strikes"],
+                    row["updated_at"],
+                ),
+            )
+    if "plate_appearance_sequences" in source_tables:
+        for row in source.execute(
+            "SELECT * FROM plate_appearance_sequences ORDER BY game_pk, at_bat_number"
+        ):
+            game_id = game_map.get(int(row["game_pk"]))
+            batter_id = player_map.get(int(row["batter_id"]))
+            pitcher_id = player_map.get(int(row["pitcher_id"]))
+            if not game_id or not batter_id or not pitcher_id:
+                continue
+            target.execute(
+                """
+                INSERT INTO plate_appearance_sequences (
+                    game_id, game_date, season, at_bat_number, batter_id,
+                    pitcher_id, result, pitch_count, pitch_sequence, launch_speed,
+                    launch_angle, estimated_distance, barrel, hard_hit
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    game_id,
+                    row["game_date"],
+                    row["season"],
+                    row["at_bat_number"],
+                    batter_id,
+                    pitcher_id,
+                    row["pa_result"],
+                    row["pitch_count"],
+                    row["pitch_sequence"],
+                    row["launch_speed"],
+                    row["launch_angle"],
+                    row["estimated_distance"],
+                    bool(row["barrel"]) if row["barrel"] is not None else None,
+                    bool(row["hard_hit"]) if row["hard_hit"] is not None else None,
+                ),
+            )
+    if "bvp_pitch_type_stats" in source_tables:
+        for row in source.execute("SELECT * FROM bvp_pitch_type_stats"):
+            batter_id = player_map.get(int(row["batter_id"]))
+            pitcher_id = player_map.get(int(row["pitcher_id"]))
+            if not batter_id or not pitcher_id:
+                continue
+            target.execute(
+                """
+                INSERT INTO batter_pitch_type_summaries (
+                    season, batter_id, pitcher_id, pitch_type, pitch_name,
+                    pitch_count, average_velocity, whiff_percentage,
+                    hard_hit_percentage, barrel_percentage, expected_woba,
+                    last_game_date, generation
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    row["season"],
+                    batter_id,
+                    pitcher_id,
+                    row["pitch_type"],
+                    row["pitch_name"],
+                    row["pitch_count"],
+                    row["avg_velocity"],
+                    row["whiff_pct"],
+                    row["hard_hit_pct"],
+                    row["barrel_pct"],
+                    row["xwOBA"],
+                    row["last_game_date"],
+                    generation,
+                ),
+            )
     for row in source.execute("SELECT * FROM live_game_contacts ORDER BY game_pk, play_key"):
         if int(row["game_pk"]) not in game_map:
             quarantined["live_game_contacts_without_game"] += 1
@@ -618,6 +743,12 @@ TARGET_COUNT_TABLES = (
     "batter_pitcher_summaries",
     "pitcher_game_logs",
     "pitcher_season_summaries",
+    "pitch_events",
+    "plate_appearance_sequences",
+    "batter_pitch_type_summaries",
+    "batter_season_summaries",
+    "team_season_summaries",
+    "streak_summaries",
     "live_game_contacts",
     "bullpen_projection_items",
     "refresh_runs",
@@ -648,6 +779,14 @@ def _reconcile(
         ),
         "refresh_runs": audit.table_counts["refresh_log"],
     }
+    optional_fact_tables = {
+        "pitch_events": "pitch_level_events",
+        "plate_appearance_sequences": "plate_appearance_sequences",
+        "batter_pitch_type_summaries": "bvp_pitch_type_stats",
+    }
+    for target_table, source_table in optional_fact_tables.items():
+        if source_table in audit.table_counts:
+            expected[target_table] = audit.table_counts[source_table]
     mismatches = {
         table: target_counts[table] - count
         for table, count in expected.items()
@@ -802,6 +941,7 @@ def migrate_snapshot(
         _copy_bvp(source, target, game_map, player_map, team_map, chunk_size=chunk_size)
         _copy_pitchers(source, target, game_map, player_map, team_map, chunk_size=chunk_size)
         _rebuild_summaries(target, audit.generation)
+        _rebuild_phase7_read_models(target, audit.generation)
         quarantined = _load_small_tables(
             source, target, game_map, player_map, team_provider_map, audit.generation
         )

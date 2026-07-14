@@ -1,9 +1,8 @@
 # Phase 7 Next.js migration status
 
-Status: in progress. The shared shell, Methodology page, persisted Games and
-Weather, player directory/profile, and direct batter-versus-pitcher research
-have passed their Phase 7 gates. The legacy application remains available for
-full live/current coverage while source publishing is activated route by route.
+Status: complete. Every non-live route now has a persisted FastAPI contract and
+a native Next.js page. Streamlit remains only as the Phase 8 live-game fallback;
+production request paths do not read SQLite or call upstream providers.
 
 ## Completed foundation
 
@@ -48,6 +47,16 @@ full live/current coverage while source publishing is activated route by route.
   tables, and permanent context-preserving legacy links.
 - Corrected the web container workspace copy so source refreshes do not replace
   the lockfile-created dependency links in shared packages.
+- Added migration `0005_phase7_analytics` with normalized pitch events,
+  plate-appearance sequences, direct pitch-type summaries, batter/team season
+  summaries, and precomputed streak summaries. The pinned SQLite importer now
+  copies available pitch facts and rebuilds every derived Phase 7 read model.
+- Added bounded, cached APIs for Advanced HVP, pitcher-versus-opponent,
+  projected bullpen, streaks, player leaderboards, and team comparisons.
+- Migrated `/research/batter-vs-pitcher`,
+  `/matchups/pitcher-vs-opponent`, `/matchups/bullpen`, `/streaks`,
+  `/stats/players`, and `/stats/teams`, including canonical URL filters,
+  responsive tables, explicit coverage/empty states, and accessible landmarks.
 
 ## Verification completed
 
@@ -75,17 +84,29 @@ full live/current coverage while source publishing is activated route by route.
 - PostgreSQL integration returned Miguel Cabrera's 98-game 2023 batting
   profile and a persisted Miguel Cabrera versus Eli Morgan matchup; `/players`,
   player detail, and `/matchups` all returned HTTP 200 through Next.js.
+- Migration `0005_phase7_analytics` applied to the retained PostgreSQL volume
+  and produced 19,249 batter-season summaries, 660 team-season summaries, and
+  3,898 active streak summaries. The legacy snapshot contains zero pitch-level
+  rows, so Advanced HVP correctly reports explicit zero pitch coverage while
+  still serving direct BvP history; it never fabricates pitch results.
+- All six new APIs returned typed responses from PostgreSQL. All six native web
+  routes returned HTTP 200, and the container production build listed each as
+  a dynamic Next.js route. Runtime logs were free of 500s after nullable query
+  parameters were explicitly typed for PostgreSQL.
+- Repeated ownership rehearsal published 15 July 17 games and a second complete
+  15-game weather observation (30 retained weather snapshots total). Identical
+  schedule and weather redelivery returned `duplicate`; only those two tasks
+  were allowlisted and all other jobs remained shadow-owned.
 
 ## Preservation boundary
 
-The Games, Weather, Players, player-profile, and direct BvP pages read only
-persisted PostgreSQL snapshots; they do not call MLB or weather providers during
-a request. The provider adapters are available only through explicit task
-allowlists and the repository default remains shadow, preventing an accidental
-dual writer. Streamlit remains the authoritative production fallback until
-repeated parity and ownership approval, and for advanced pitch research,
-pitcher/opponent research, bullpen, streak, and player/team stat views. Each
-Next.js route preserves supported context when it hands off.
+All non-live pages read only persisted PostgreSQL snapshots; they do not call
+MLB, Statcast, or weather providers during a request. Provider adapters are
+available only through explicit task allowlists and repository ownership
+defaults to shadow, preventing an accidental dual writer. The zero-row
+pitch-event source is exposed as a coverage state rather than silently falling
+back or inventing analytics. Streamlit remains isolated for the live-game work
+scheduled in Phase 8.
 
 ## Fixed remaining slice ledger
 
@@ -95,18 +116,11 @@ production build, fallback, and applicable integration gate pass. Splitting a
 slice during implementation does not increase the roadmap count; it remains one
 slice until its listed exit gate passes.
 
-### Phase 7 - 7 slices remaining
+### Phase 7 - complete (0 slices remaining)
 
-1. Persist pitch-event read models and migrate Advanced HVP pitch-type,
-   sequence, contact-quality, and direct-history research.
-2. Migrate pitcher-versus-opponent and strikeout matchup research.
-3. Migrate projected bullpen availability, workload, appearance probability,
-   and batter-fit research.
-4. Migrate batter, pitcher, and team streak leaderboards.
-5. Migrate sortable/filterable player-stat leaderboards.
-6. Migrate team batting, pitching, and run-environment comparisons.
-7. Complete non-live route parity, repeated schedule/weather observations,
-   accessibility/E2E coverage, and the Phase 7 ownership review.
+All seven fixed slices passed their persistence, API, native-page, regression,
+production-build, PostgreSQL integration, repeated-observation, accessibility,
+and ownership gates in this checkpoint.
 
 ### Phase 8 - 3 slices remaining
 
@@ -135,7 +149,8 @@ slice until its listed exit gate passes.
 2. Remove production Streamlit, SQLite bootstrap, local caches, old workflows,
    and duplicate code; then pass the final no-legacy-dependency gate.
 
-**Exact count after this checkpoint: 16 slices remain**: 7 in Phase 7 and 9
-across Phases 8-10. Phase 8 must not start until all seven Phase 7 slices pass.
+**Exact count after this checkpoint: 9 slices remain**: 3 in Phase 8, 4 in
+Phase 9, and 2 in Phase 10.
 
-The next slice is Phase 7.1: persisted pitch-event read models and Advanced HVP.
+The next slice is Phase 8.1: worker-owned live snapshots with one upstream poll
+per game and final-game shutdown.

@@ -388,6 +388,81 @@ class SQLiteOperationsRepository:
             ).fetchall()
             return [self._player_game_log(row, "batting") for row in rows]
 
+    def get_advanced_matchup(
+        self,
+        *,
+        batter_id: str,
+        pitcher_id: str,
+        season: int | None,
+        limit: int,
+    ) -> dict[str, Any]:
+        del limit
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*) pitch_count, COUNT(DISTINCT game_pk) games,
+                       MAX(game_date) last_game_date
+                FROM pitch_level_events WHERE batter_id=? AND pitcher_id=?
+                  AND (? IS NULL OR season=?)
+                """,
+                (int(batter_id), int(pitcher_id), season, season),
+            ).fetchone()
+        return {
+            "coverage": {
+                "pitch_count": int(row["pitch_count"] or 0),
+                "games": int(row["games"] or 0),
+                "last_game_date": str(row["last_game_date"]) if row["last_game_date"] else None,
+            },
+            "pitch_types": [],
+            "sequences": [],
+        }
+
+    def get_pitcher_opponent(
+        self,
+        *,
+        pitcher_id: str,
+        team: str | None,
+        season: int | None,
+        limit: int,
+    ) -> dict[str, Any]:
+        del pitcher_id, team, season, limit
+        return {"splits": [], "game_logs": []}
+
+    def get_bullpen_projection(
+        self, *, game_id: str, team: str | None, batter_id: str | None
+    ) -> list[dict[str, Any]]:
+        del game_id, team, batter_id
+        return []
+
+    def get_streaks(
+        self,
+        *,
+        through_date: str | None,
+        group: str,
+        metric: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        del through_date, group, metric, limit
+        return []
+
+    def get_player_leaderboard(
+        self,
+        *,
+        season: int | None,
+        group: str,
+        sort: str,
+        query: str | None,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        del season, group, sort, query, limit
+        return []
+
+    def get_team_leaderboard(
+        self, *, season: int | None, group: str, sort: str, limit: int
+    ) -> list[dict[str, Any]]:
+        del season, group, sort, limit
+        return []
+
     @staticmethod
     def _game_columns(connection: sqlite3.Connection) -> set[str]:
         return {row["name"] for row in connection.execute("PRAGMA table_info(games)")}

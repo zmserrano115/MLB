@@ -104,7 +104,7 @@ class Settings:
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0").strip(),
             cors_allowed_origins=origins,
             build_sha=os.getenv("BUILD_SHA", "development").strip(),
-            schema_revision=os.getenv("SCHEMA_REVISION", "0004_slate_weather_read_models").strip(),
+            schema_revision=os.getenv("SCHEMA_REVISION", "0005_phase7_analytics").strip(),
             max_body_bytes=_positive_int("MAX_REQUEST_BODY_BYTES", 1_048_576),
             slow_request_ms=_positive_float("SLOW_REQUEST_MS", 500.0),
             db_pool_size=_positive_int("DB_POOL_SIZE", 5),

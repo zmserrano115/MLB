@@ -12,12 +12,18 @@ from all_rise_api.dependencies import get_research_service
 from all_rise_api.errors import ApiError
 from all_rise_api.schemas.common import ApiEnvelope, ErrorEnvelope, PaginationMeta
 from all_rise_api.schemas.research import (
+    AdvancedMatchupData,
     BatterPitcherMatchupData,
     BattingSummaryData,
+    BullpenProjectionData,
+    PitcherOpponentData,
     PitchingSummaryData,
     PlayerData,
     PlayerGameLogData,
+    PlayerLeaderboardData,
     PlayerProfileData,
+    StreakData,
+    TeamLeaderboardData,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["research"])
@@ -140,6 +146,176 @@ def batter_pitcher_matchup(
     payload["game_logs"] = [asdict(log) for log in result.game_logs]
     return ApiEnvelope(
         data=BatterPitcherMatchupData.model_validate(payload),
+        meta=request_meta(request, data_version=result.data_version).model_copy(
+            update={"stale": result.stale}
+        ),
+    )
+
+
+@router.get(
+    "/research/batter-vs-pitcher",
+    response_model=ApiEnvelope[AdvancedMatchupData],
+    responses=READ_RESPONSES,
+)
+def advanced_batter_pitcher_matchup(
+    request: Request,
+    response: Response,
+    service: ResearchServiceDependency,
+    batter_id: str = Query(min_length=1, max_length=20, pattern=r"^\d+$"),
+    pitcher_id: str = Query(min_length=1, max_length=20, pattern=r"^\d+$"),
+    season: int | None = Query(default=None, ge=1876, le=2200),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> ApiEnvelope[AdvancedMatchupData] | Response:
+    result = service.advanced_matchup(
+        batter_id=batter_id, pitcher_id=pitcher_id, season=season, limit=limit
+    )
+    not_modified = conditional_response(request, response, result.data_version)
+    if not_modified:
+        return not_modified
+    response.headers["x-cache-status"] = result.cache_outcome
+    return ApiEnvelope(
+        data=AdvancedMatchupData.model_validate(result.data),
+        meta=request_meta(request, data_version=result.data_version).model_copy(
+            update={"stale": result.stale}
+        ),
+    )
+
+
+@router.get(
+    "/matchups/pitcher-vs-opponent",
+    response_model=ApiEnvelope[PitcherOpponentData],
+    responses=READ_RESPONSES,
+)
+def pitcher_opponent_matchup(
+    request: Request,
+    response: Response,
+    service: ResearchServiceDependency,
+    pitcher_id: str = Query(min_length=1, max_length=20, pattern=r"^\d+$"),
+    team: str | None = Query(default=None, min_length=2, max_length=80),
+    season: int | None = Query(default=None, ge=1876, le=2200),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> ApiEnvelope[PitcherOpponentData] | Response:
+    result = service.pitcher_opponent(pitcher_id=pitcher_id, team=team, season=season, limit=limit)
+    not_modified = conditional_response(request, response, result.data_version)
+    if not_modified:
+        return not_modified
+    response.headers["x-cache-status"] = result.cache_outcome
+    return ApiEnvelope(
+        data=PitcherOpponentData.model_validate(result.data),
+        meta=request_meta(request, data_version=result.data_version).model_copy(
+            update={"stale": result.stale}
+        ),
+    )
+
+
+@router.get(
+    "/matchups/bullpen",
+    response_model=ApiEnvelope[list[BullpenProjectionData]],
+    responses=READ_RESPONSES,
+)
+def bullpen_projection(
+    request: Request,
+    response: Response,
+    service: ResearchServiceDependency,
+    game_id: str = Query(min_length=3, max_length=80),
+    team: str | None = Query(default=None, min_length=2, max_length=16),
+    batter_id: str | None = Query(default=None, min_length=1, max_length=20, pattern=r"^\d+$"),
+) -> ApiEnvelope[list[BullpenProjectionData]] | Response:
+    result = service.bullpen_projection(game_id=game_id, team=team, batter_id=batter_id)
+    not_modified = conditional_response(request, response, result.data_version)
+    if not_modified:
+        return not_modified
+    response.headers["x-cache-status"] = result.cache_outcome
+    rows = result.data if isinstance(result.data, list) else []
+    return ApiEnvelope(
+        data=[BullpenProjectionData.model_validate(row) for row in rows],
+        meta=request_meta(request, data_version=result.data_version).model_copy(
+            update={"stale": result.stale}
+        ),
+    )
+
+
+@router.get(
+    "/streaks",
+    response_model=ApiEnvelope[list[StreakData]],
+    responses=READ_RESPONSES,
+)
+def streaks(
+    request: Request,
+    response: Response,
+    service: ResearchServiceDependency,
+    through_date: str | None = Query(default=None, alias="date", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    group: Literal["batter", "pitcher", "team"] = Query(default="batter"),
+    metric: str = Query(default="hit", min_length=2, max_length=48, pattern=r"^[a-z0-9_]+$"),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> ApiEnvelope[list[StreakData]] | Response:
+    result = service.streaks(through_date=through_date, group=group, metric=metric, limit=limit)
+    not_modified = conditional_response(request, response, result.data_version)
+    if not_modified:
+        return not_modified
+    response.headers["x-cache-status"] = result.cache_outcome
+    rows = result.data if isinstance(result.data, list) else []
+    return ApiEnvelope(
+        data=[StreakData.model_validate(row) for row in rows],
+        meta=request_meta(request, data_version=result.data_version).model_copy(
+            update={"stale": result.stale}
+        ),
+    )
+
+
+@router.get(
+    "/stats/players",
+    response_model=ApiEnvelope[list[PlayerLeaderboardData]],
+    responses=READ_RESPONSES,
+)
+def player_leaderboard(
+    request: Request,
+    response: Response,
+    service: ResearchServiceDependency,
+    season: int | None = Query(default=None, ge=1876, le=2200),
+    group: Literal["batting", "pitching"] = Query(default="batting"),
+    sort: str = Query(default="home_runs", min_length=2, max_length=32, pattern=r"^[a-z_]+$"),
+    query: str | None = Query(default=None, min_length=1, max_length=80),
+    limit: int = Query(default=50, ge=1, le=100),
+) -> ApiEnvelope[list[PlayerLeaderboardData]] | Response:
+    result = service.player_leaderboard(
+        season=season, group=group, sort=sort, query=query, limit=limit
+    )
+    not_modified = conditional_response(request, response, result.data_version)
+    if not_modified:
+        return not_modified
+    response.headers["x-cache-status"] = result.cache_outcome
+    rows = result.data if isinstance(result.data, list) else []
+    return ApiEnvelope(
+        data=[PlayerLeaderboardData.model_validate(row) for row in rows],
+        meta=request_meta(request, data_version=result.data_version).model_copy(
+            update={"stale": result.stale}
+        ),
+    )
+
+
+@router.get(
+    "/stats/teams",
+    response_model=ApiEnvelope[list[TeamLeaderboardData]],
+    responses=READ_RESPONSES,
+)
+def team_leaderboard(
+    request: Request,
+    response: Response,
+    service: ResearchServiceDependency,
+    season: int | None = Query(default=None, ge=1876, le=2200),
+    group: Literal["batting", "pitching"] = Query(default="batting"),
+    sort: str = Query(default="runs", min_length=2, max_length=32, pattern=r"^[a-z_]+$"),
+    limit: int = Query(default=30, ge=1, le=100),
+) -> ApiEnvelope[list[TeamLeaderboardData]] | Response:
+    result = service.team_leaderboard(season=season, group=group, sort=sort, limit=limit)
+    not_modified = conditional_response(request, response, result.data_version)
+    if not_modified:
+        return not_modified
+    response.headers["x-cache-status"] = result.cache_outcome
+    rows = result.data if isinstance(result.data, list) else []
+    return ApiEnvelope(
+        data=[TeamLeaderboardData.model_validate(row) for row in rows],
         meta=request_meta(request, data_version=result.data_version).model_copy(
             update={"stale": result.stale}
         ),

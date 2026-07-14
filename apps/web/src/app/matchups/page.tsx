@@ -53,6 +53,12 @@ export default async function MatchupsPage({ searchParams }: PageProps) {
         <LegacyFallback href={legacyUrl} label="complete Matchups" />
       </PageHeader>
 
+      <nav className="segment-nav" aria-label="Matchup research">
+        <Link aria-current="page" href="/matchups">Batter vs pitcher</Link>
+        <Link href="/matchups/pitcher-vs-opponent">Pitcher vs opponent</Link>
+        <Link href="/matchups/bullpen">Projected bullpen</Link>
+      </nav>
+
       <form className="filter-bar research-filter" action="/matchups">
         <label>
           <span>Batter MLB ID</span>

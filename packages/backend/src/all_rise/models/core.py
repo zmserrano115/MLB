@@ -242,6 +242,145 @@ class PitcherSeasonSummary(Base):
     generation: Mapped[str] = mapped_column(String(64))
 
 
+class PitchEvent(Base):
+    __tablename__ = "pitch_events"
+    __table_args__ = (
+        UniqueConstraint("game_id", "at_bat_number", "pitch_number"),
+        Index("ix_pitch_events_matchup_date", "batter_id", "pitcher_id", "game_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
+    game_date: Mapped[date] = mapped_column(Date)
+    season: Mapped[int] = mapped_column(Integer)
+    at_bat_number: Mapped[int] = mapped_column(Integer)
+    pitch_number: Mapped[int] = mapped_column(Integer)
+    batter_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    pitcher_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    pitch_type: Mapped[str | None] = mapped_column(String(8))
+    pitch_name: Mapped[str | None] = mapped_column(String(80))
+    description: Mapped[str | None] = mapped_column(String(120))
+    event: Mapped[str | None] = mapped_column(String(120))
+    release_speed: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    plate_x: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    plate_z: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    launch_speed: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    launch_angle: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    estimated_distance: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
+    estimated_woba: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    barrel: Mapped[bool | None] = mapped_column(Boolean)
+    hard_hit: Mapped[bool | None] = mapped_column(Boolean)
+    balls: Mapped[int | None] = mapped_column(Integer)
+    strikes: Mapped[int | None] = mapped_column(Integer)
+    source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PlateAppearanceSequence(Base):
+    __tablename__ = "plate_appearance_sequences"
+    __table_args__ = (
+        UniqueConstraint("game_id", "at_bat_number"),
+        Index("ix_pa_sequences_matchup_date", "batter_id", "pitcher_id", "game_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
+    game_date: Mapped[date] = mapped_column(Date)
+    season: Mapped[int] = mapped_column(Integer)
+    at_bat_number: Mapped[int] = mapped_column(Integer)
+    batter_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    pitcher_id: Mapped[int] = mapped_column(ForeignKey("players.id"))
+    result: Mapped[str | None] = mapped_column(String(120))
+    pitch_count: Mapped[int] = mapped_column(Integer)
+    pitch_sequence: Mapped[str] = mapped_column(Text)
+    launch_speed: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    launch_angle: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    estimated_distance: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
+    barrel: Mapped[bool | None] = mapped_column(Boolean)
+    hard_hit: Mapped[bool | None] = mapped_column(Boolean)
+
+
+class BatterPitchTypeSummary(Base):
+    __tablename__ = "batter_pitch_type_summaries"
+
+    season: Mapped[int] = mapped_column(Integer, primary_key=True)
+    batter_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    pitcher_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    pitch_type: Mapped[str] = mapped_column(String(8), primary_key=True)
+    pitch_name: Mapped[str | None] = mapped_column(String(80))
+    pitch_count: Mapped[int] = mapped_column(Integer)
+    average_velocity: Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    whiff_percentage: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    hard_hit_percentage: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    barrel_percentage: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    expected_woba: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    last_game_date: Mapped[date | None] = mapped_column(Date)
+    generation: Mapped[str] = mapped_column(String(64))
+
+
+class BatterSeasonSummary(Base):
+    __tablename__ = "batter_season_summaries"
+
+    season: Mapped[int] = mapped_column(Integer, primary_key=True)
+    batter_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
+    team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"))
+    games: Mapped[int] = mapped_column(Integer)
+    pa: Mapped[int] = mapped_column(BigInteger)
+    ab: Mapped[int] = mapped_column(BigInteger)
+    hits: Mapped[int] = mapped_column(BigInteger)
+    doubles: Mapped[int] = mapped_column(BigInteger)
+    triples: Mapped[int] = mapped_column(BigInteger)
+    walks: Mapped[int] = mapped_column(BigInteger)
+    hit_by_pitch: Mapped[int] = mapped_column(BigInteger)
+    strikeouts: Mapped[int] = mapped_column(BigInteger)
+    home_runs: Mapped[int] = mapped_column(BigInteger)
+    rbi: Mapped[int] = mapped_column(BigInteger)
+    total_bases: Mapped[int] = mapped_column(BigInteger)
+    last_game_date: Mapped[date | None] = mapped_column(Date)
+    generation: Mapped[str] = mapped_column(String(64))
+
+
+class TeamSeasonSummary(Base):
+    __tablename__ = "team_season_summaries"
+
+    season: Mapped[int] = mapped_column(Integer, primary_key=True)
+    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), primary_key=True)
+    games: Mapped[int] = mapped_column(Integer)
+    pa: Mapped[int] = mapped_column(BigInteger)
+    runs: Mapped[int] = mapped_column(BigInteger)
+    hits: Mapped[int] = mapped_column(BigInteger)
+    walks: Mapped[int] = mapped_column(BigInteger)
+    strikeouts: Mapped[int] = mapped_column(BigInteger)
+    home_runs: Mapped[int] = mapped_column(BigInteger)
+    innings_outs: Mapped[int] = mapped_column(BigInteger)
+    runs_allowed: Mapped[int] = mapped_column(BigInteger)
+    earned_runs_allowed: Mapped[int] = mapped_column(BigInteger)
+    hits_allowed: Mapped[int] = mapped_column(BigInteger)
+    walks_allowed: Mapped[int] = mapped_column(BigInteger)
+    strikeouts_pitched: Mapped[int] = mapped_column(BigInteger)
+    home_runs_allowed: Mapped[int] = mapped_column(BigInteger)
+    last_game_date: Mapped[date | None] = mapped_column(Date)
+    generation: Mapped[str] = mapped_column(String(64))
+
+
+class StreakSummary(Base):
+    __tablename__ = "streak_summaries"
+    __table_args__ = (
+        UniqueConstraint("through_date", "group_name", "metric", "subject_key"),
+        Index("ix_streak_leaderboard", "through_date", "group_name", "metric", "streak"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    through_date: Mapped[date] = mapped_column(Date)
+    group_name: Mapped[str] = mapped_column(String(24))
+    metric: Mapped[str] = mapped_column(String(48))
+    subject_key: Mapped[str] = mapped_column(String(80))
+    player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"))
+    team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"))
+    streak: Mapped[int] = mapped_column(Integer)
+    last_game_date: Mapped[date | None] = mapped_column(Date)
+    generation: Mapped[str] = mapped_column(String(64))
+
+
 class LiveGameContact(Base):
     __tablename__ = "live_game_contacts"
     __table_args__ = (UniqueConstraint("game_id", "play_key"),)
@@ -332,9 +471,7 @@ class RefreshRunItem(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(
-        ForeignKey("refresh_runs.id", ondelete="CASCADE")
-    )
+    run_id: Mapped[int] = mapped_column(ForeignKey("refresh_runs.id", ondelete="CASCADE"))
     item_key: Mapped[str] = mapped_column(String(192))
     status: Mapped[str] = mapped_column(String(32))
     attempt: Mapped[int] = mapped_column(Integer)
