@@ -16,6 +16,7 @@ from all_rise.repositories.protocols import (
     DataSourceStatusRecord,
     GameRecord,
     GameWeatherRecord,
+    LiveSnapshotRecord,
     PitchingSummaryRecord,
     PlayerGameLogRecord,
     PlayerRecord,
@@ -163,6 +164,30 @@ class PostgresOperationsRepository:
         with self._engine.connect() as connection:
             row = connection.execute(statement, {"game_id": game_id}).mappings().first()
             return _weather_record(row) if row else None
+
+    def get_live_snapshot(self, game_id: str) -> LiveSnapshotRecord | None:
+        statement = text(
+            """
+            SELECT g.source_game_id AS game_id, s.version, s.observed_at,
+                   s.is_final, s.payload_size_bytes, s.snapshot
+            FROM live_game_snapshots s
+            JOIN games g ON g.id = s.game_id
+            WHERE g.source_game_id = :game_id
+            ORDER BY s.observed_at DESC, s.id DESC LIMIT 1
+            """
+        )
+        with self._engine.connect() as connection:
+            row = connection.execute(statement, {"game_id": game_id}).mappings().first()
+        if row is None:
+            return None
+        return LiveSnapshotRecord(
+            game_id=str(row["game_id"]),
+            version=str(row["version"]),
+            observed_at=str(row["observed_at"]),
+            is_final=bool(row["is_final"]),
+            payload_size_bytes=int(row["payload_size_bytes"]),
+            snapshot=dict(row["snapshot"]),
+        )
 
     def get_players(
         self,

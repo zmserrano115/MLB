@@ -34,6 +34,17 @@
         "500"
       ]
     },
+    "/api/v1/games/{game_id}/live": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "404",
+        "422"
+      ]
+    },
     "/api/v1/games/{game_id}/weather": {
       "methods": [
         "get"
@@ -193,6 +204,7 @@
     "ApiEnvelope_BatterPitcherMatchupData_",
     "ApiEnvelope_GameData_",
     "ApiEnvelope_HealthData_",
+    "ApiEnvelope_LiveGameData_",
     "ApiEnvelope_PitcherOpponentData_",
     "ApiEnvelope_PlayerProfileData_",
     "ApiEnvelope_ReadinessData_",
@@ -215,6 +227,7 @@
     "ErrorEnvelope",
     "GameData",
     "HealthData",
+    "LiveGameData",
     "PaginationMeta",
     "PitchCoverageData",
     "PitchSequenceData",

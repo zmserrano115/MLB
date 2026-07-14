@@ -13,6 +13,7 @@ import type {
   Weather,
   Streak,
   TeamLeaderboard,
+  LiveGame,
 } from "@all-rise/shared-types";
 
 type ApiSuccess<T> = { ok: true; value: ApiEnvelope<T>; cacheStatus: string | null };
@@ -85,6 +86,10 @@ export function getWeather(filters: { date: string; gameId?: string }) {
 
 export function getGameWeather(gameId: string) {
   return apiGet<Weather>(`/api/v1/games/${encodeURIComponent(gameId)}/weather`);
+}
+
+export function getLiveGame(gameId: string) {
+  return apiGet<LiveGame>(`/api/v1/games/${encodeURIComponent(gameId)}/live`);
 }
 
 export function getPlayers(filters: {

@@ -98,6 +98,23 @@
         "title": "ApiEnvelope[HealthData]",
         "type": "object"
       },
+      "ApiEnvelope_LiveGameData_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LiveGameData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ApiEnvelope[LiveGameData]",
+        "type": "object"
+      },
       "ApiEnvelope_PitcherOpponentData_": {
         "additionalProperties": false,
         "properties": {
@@ -1081,6 +1098,154 @@
           }
         },
         "title": "HealthData",
+        "type": "object"
+      },
+      "LiveGameData": {
+        "additionalProperties": false,
+        "properties": {
+          "abstract_state": {
+            "title": "Abstract State",
+            "type": "string"
+          },
+          "bases": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Bases",
+            "type": "object"
+          },
+          "boxscore": {
+            "additionalProperties": true,
+            "title": "Boxscore",
+            "type": "object"
+          },
+          "count": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Count",
+            "type": "object"
+          },
+          "detailed_state": {
+            "title": "Detailed State",
+            "type": "string"
+          },
+          "feed_timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feed Timestamp"
+          },
+          "game_id": {
+            "title": "Game Id",
+            "type": "string"
+          },
+          "half_inning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Half Inning"
+          },
+          "inning": {
+            "default": 0,
+            "title": "Inning",
+            "type": "integer"
+          },
+          "inning_ordinal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inning Ordinal"
+          },
+          "is_final": {
+            "title": "Is Final",
+            "type": "boolean"
+          },
+          "matchup": {
+            "additionalProperties": true,
+            "title": "Matchup",
+            "type": "object"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "payload_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 131072.0,
+            "title": "Payload Size Bytes",
+            "type": "integer"
+          },
+          "pitches": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "maxItems": 12,
+            "title": "Pitches",
+            "type": "array"
+          },
+          "recent_plays": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "maxItems": 8,
+            "title": "Recent Plays",
+            "type": "array"
+          },
+          "teams": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Teams",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "game_id",
+          "version",
+          "observed_at",
+          "abstract_state",
+          "detailed_state",
+          "is_final",
+          "count",
+          "teams",
+          "bases",
+          "matchup",
+          "pitches",
+          "recent_plays",
+          "boxscore",
+          "payload_size_bytes"
+        ],
+        "title": "LiveGameData",
         "type": "object"
       },
       "PaginationMeta": {
@@ -3029,6 +3194,82 @@
         "summary": "Game",
         "tags": [
           "slate"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/live": {
+      "get": {
+        "operationId": "live_game_api_v1_games__game_id__live_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "maxLength": 80,
+              "minLength": 3,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_LiveGameData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "The persisted live version has not changed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Live Game",
+        "tags": [
+          "live"
         ]
       }
     },

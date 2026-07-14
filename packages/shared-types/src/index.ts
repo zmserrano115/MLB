@@ -14,6 +14,7 @@ export type Readiness = components["schemas"]["ReadinessData"];
 export type Weather = components["schemas"]["WeatherData"];
 export type Streak = components["schemas"]["StreakData"];
 export type TeamLeaderboard = components["schemas"]["TeamLeaderboardData"];
+export type LiveGame = components["schemas"]["LiveGameData"];
 
 export type ApiEnvelope<T> = {
   data: T;

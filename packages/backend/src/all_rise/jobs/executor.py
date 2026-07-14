@@ -161,7 +161,12 @@ class JobExecutor:
                     f"{result.max_failed_items}"
                 )
             self._store.succeed(claim.run_id, claim.attempt, result, now=self._clock())
-            return ExecutionResult(ExecutionState.SUCCEEDED, claim.run_id, claim.attempt)
+            return ExecutionResult(
+                ExecutionState.SUCCEEDED,
+                claim.run_id,
+                claim.attempt,
+                result_payload=result.payload,
+            )
         except Exception as exc:
             retryable = isinstance(exc, RetryableTaskError)
             delay_ms = retry_delay_ms(request.idempotency_key, claim.attempt)

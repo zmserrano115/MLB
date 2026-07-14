@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from typing import Any
+from uuid import uuid4
 
 import dramatiq
 from all_rise.jobs import ExecutionState, TaskRequest
@@ -39,6 +41,23 @@ def execute_task(
         )
     if result.state is ExecutionState.DEAD_LETTER:
         raise RuntimeError(result.message or "task entered dead letter state")
+    if (
+        task_name == "poll_live_game"
+        and result.state is ExecutionState.SUCCEEDED
+        and result.result_payload
+        and result.result_payload.get("continue_polling") is True
+    ):
+        execute_task.send_with_options(
+            args=(
+                task_name,
+                f"live:{scope}:{uuid4().hex}",
+                source,
+                scope,
+                payload,
+                max_attempts,
+            ),
+            delay=int(os.getenv("LIVE_POLL_INTERVAL_SECONDS", "5")) * 1_000,
+        )
 
 
 @dramatiq.actor(max_retries=0)

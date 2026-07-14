@@ -18,6 +18,8 @@ from all_rise.jobs.contracts import (
 from all_rise.models import (
     DataSourceStatus,
     Game,
+    LiveGameEvent,
+    LiveGameSnapshot,
     Player,
     ProcessingCheckpoint,
     RefreshRun,
@@ -260,6 +262,9 @@ class PostgresJobStore:
         if dataset == "weather":
             cls._publish_weather(session, records)
             return
+        if dataset == "live_game":
+            cls._publish_live_game(session, records)
+            return
         raise ValueError(f"unsupported publication dataset: {dataset}")
 
     @classmethod
@@ -271,19 +276,11 @@ class PostgresJobStore:
     ) -> None:
         for record in records:
             source_version = str(record["source_version"])[:64]
-            away_team = cls._upsert_team(
-                session, record["away_team"], source_version, now
-            )
-            home_team = cls._upsert_team(
-                session, record["home_team"], source_version, now
-            )
+            away_team = cls._upsert_team(session, record["away_team"], source_version, now)
+            home_team = cls._upsert_team(session, record["home_team"], source_version, now)
             venue = cls._upsert_venue(session, record.get("venue"), now)
-            away_pitcher = cls._upsert_player(
-                session, record.get("away_probable_pitcher"), now
-            )
-            home_pitcher = cls._upsert_player(
-                session, record.get("home_probable_pitcher"), now
-            )
+            away_pitcher = cls._upsert_player(session, record.get("away_probable_pitcher"), now)
+            home_pitcher = cls._upsert_player(session, record.get("home_probable_pitcher"), now)
             game_pk = int(record["mlb_game_pk"])
             source_game_id = str(record["source_game_id"])
             game = session.execute(
@@ -410,9 +407,7 @@ class PostgresJobStore:
         return player
 
     @staticmethod
-    def _publish_weather(
-        session: Session, records: tuple[dict[str, Any], ...]
-    ) -> None:
+    def _publish_weather(session: Session, records: tuple[dict[str, Any], ...]) -> None:
         for record in records:
             game = session.execute(
                 select(Game).where(Game.source_game_id == str(record["source_game_id"]))
@@ -455,6 +450,65 @@ class PostgresJobStore:
             else:
                 for key, value in values.items():
                     setattr(snapshot, key, value)
+
+    @staticmethod
+    def _publish_live_game(session: Session, records: tuple[dict[str, Any], ...]) -> None:
+        for record in records:
+            game = session.execute(
+                select(Game).where(Game.source_game_id == str(record["game_id"]))
+            ).scalar_one_or_none()
+            if game is None:
+                raise ValueError(f"unknown game for live snapshot: {record['game_id']}")
+            observed_at = _datetime(record["observed_at"])
+            if observed_at is None:
+                raise ValueError("live observed_at is required")
+            values = {
+                "game_id": game.id,
+                "version": str(record["version"]),
+                "observed_at": observed_at,
+                "feed_timestamp": _text(record.get("feed_timestamp")),
+                "abstract_state": str(record["abstract_state"]),
+                "detailed_state": str(record["detailed_state"]),
+                "is_final": bool(record["is_final"]),
+                "payload_size_bytes": int(record["payload_size_bytes"]),
+                "snapshot": record["snapshot"],
+            }
+            statement = insert(LiveGameSnapshot).values(**values)
+            session.execute(
+                statement.on_conflict_do_update(
+                    index_elements=[LiveGameSnapshot.game_id, LiveGameSnapshot.version],
+                    set_={key: value for key, value in values.items() if key != "game_id"},
+                )
+            )
+            snapshot = record["snapshot"]
+            teams = snapshot.get("teams", {})
+            game.game_status = str(record["detailed_state"])
+            game.away_score = _integer(teams.get("away", {}).get("runs"))
+            game.home_score = _integer(teams.get("home", {}).get("runs"))
+            game.source_updated_at = observed_at
+            for event in record.get("events", []):
+                event_values = {
+                    "game_id": game.id,
+                    "event_key": str(event["event_key"]),
+                    "sequence": int(event["sequence"]),
+                    "inning": _integer(event.get("inning")),
+                    "half_inning": _text(event.get("half_inning")),
+                    "event_type": str(event["event_type"]),
+                    "description": _text(event.get("description")),
+                    "payload": event.get("payload") or {},
+                    "source_updated_at": _datetime(event.get("source_updated_at")),
+                }
+                event_statement = insert(LiveGameEvent).values(**event_values)
+                session.execute(
+                    event_statement.on_conflict_do_update(
+                        index_elements=[LiveGameEvent.game_id, LiveGameEvent.event_key],
+                        set_={
+                            key: value
+                            for key, value in event_values.items()
+                            if key not in {"game_id", "event_key"}
+                        },
+                    )
+                )
 
     def fail(
         self,

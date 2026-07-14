@@ -15,7 +15,8 @@ x-app-environment: &app-environment
   JOB_ACTIVE_TASKS: ${JOB_ACTIVE_TASKS:-}
   JOB_STALE_AFTER_SECONDS: ${JOB_STALE_AFTER_SECONDS:-300}
   JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-5}
-  SCHEMA_REVISION: ${SCHEMA_REVISION:-0005_phase7_analytics}
+  LIVE_POLL_INTERVAL_SECONDS: ${LIVE_POLL_INTERVAL_SECONDS:-5}
+  SCHEMA_REVISION: ${SCHEMA_REVISION:-0006_phase8_live_game}
 
 services:
   postgres:
@@ -99,6 +100,8 @@ services:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
       LEGACY_BASE_URL: ${LEGACY_BASE_URL:-http://localhost:8501}
       SITE_URL: ${SITE_URL:-http://localhost:3000}
+      LIVE_GAME_CENTER_ENABLED: ${LIVE_GAME_CENTER_ENABLED:-true}
+      LIVE_LEGACY_FALLBACK_ENABLED: ${LIVE_LEGACY_FALLBACK_ENABLED:-true}
     ports:
       - "3000:3000"
     depends_on:

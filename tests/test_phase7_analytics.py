@@ -43,4 +43,4 @@ def test_phase7_migration_bootstraps_summaries_from_authoritative_facts() -> Non
 def test_production_default_requires_phase7_schema(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SCHEMA_REVISION", raising=False)
     settings = Settings.from_env()
-    assert settings.schema_revision == "0005_phase7_analytics"
+    assert settings.schema_revision == "0006_phase8_live_game"

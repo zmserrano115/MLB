@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Protocol
 
+from all_rise.domain.live import live_event_records, parse_live_game_feed
 from all_rise.jobs import (
     Publication,
     QualityGateError,
@@ -18,6 +19,7 @@ from all_rise.jobs.executor import TaskHandler
 from all_rise.jobs.validation import SourceValidationIssue, validate_source_records
 
 from all_rise_worker.providers import (
+    MlbLiveFeedProvider,
     MlbScheduleProvider,
     OpenMeteoProvider,
     PostgresWeatherCandidates,
@@ -34,6 +36,69 @@ class WeatherCandidates(Protocol):
 
 class WeatherProvider(Protocol):
     def forecast(self, candidate: Mapping[str, Any]) -> dict[str, Any]: ...
+
+
+class LiveFeedProvider(Protocol):
+    def fetch(self, game_pk: int) -> dict[str, Any]: ...
+
+
+@dataclass(slots=True)
+class PollLiveGameAdapter:
+    provider: LiveFeedProvider
+
+    def __call__(self, payload: dict[str, Any], context: TaskContext) -> TaskResult:
+        game_id = _required_text(payload, "game_id")
+        if not game_id.startswith("mlb:"):
+            raise ValueError("game_id must use the canonical mlb:<game_pk> form")
+        game_pk = int(game_id.removeprefix("mlb:"))
+        snapshot = parse_live_game_feed(self.provider.fetch(game_pk), game_id)
+        observed_at = context.clock().isoformat()
+        snapshot["observed_at"] = observed_at
+        encoded = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), default=str).encode()
+        if len(encoded) > 131_072:
+            raise QualityGateError("compact live snapshot exceeds the 128 KiB payload budget")
+        record = {
+            "game_id": game_id,
+            "version": snapshot["version"],
+            "observed_at": observed_at,
+            "feed_timestamp": snapshot.get("feed_timestamp"),
+            "abstract_state": snapshot["abstract_state"],
+            "detailed_state": snapshot["detailed_state"],
+            "is_final": snapshot["is_final"],
+            "payload_size_bytes": len(encoded),
+            "snapshot": snapshot,
+            "events": live_event_records(snapshot),
+        }
+        for event in record["events"]:
+            event["source_updated_at"] = observed_at
+        stored = context.put_artifact(
+            source="mlb-live-feed",
+            generation=str(snapshot["version"]),
+            name=f"live-{game_pk}.json",
+            data=encoded,
+            source_version=str(snapshot["version"]),
+            inventory={"events": len(record["events"]), "bytes": len(encoded)},
+            content_type="application/json",
+        )
+        context.record_item(game_id, status="succeeded", payload={"final": snapshot["is_final"]})
+        return TaskResult(
+            payload={
+                "artifact_uri": stored.uri,
+                "version": snapshot["version"],
+                "continue_polling": not snapshot["is_final"],
+            },
+            processed_items=1,
+            facts_loaded=1 + len(record["events"]),
+            publication=Publication(
+                source="mlb-live-feed",
+                scope=game_id,
+                watermark=observed_at,
+                source_version=str(snapshot["version"]),
+                detail=f"Published compact live snapshot for {game_id}",
+                dataset="live_game",
+                records=(record,),
+            ),
+        )
 
 
 @dataclass(slots=True)
@@ -202,6 +267,7 @@ def build_adapters(database_url: str) -> dict[str, TaskHandler]:
             PostgresWeatherCandidates(database_url),
             OpenMeteoProvider(base_url=f"{weather_base}/v1/forecast"),
         ),
+        "poll_live_game": PollLiveGameAdapter(MlbLiveFeedProvider()),
     }
 
 

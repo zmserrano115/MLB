@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from hashlib import sha256
 from typing import Annotated, Any
 
@@ -39,9 +39,7 @@ def games(
     response: Response,
     service: SlateServiceDependency,
     game_date: date = Query(alias="date"),
-    team: str | None = Query(
-        default=None, min_length=2, max_length=5, pattern=r"^[A-Za-z0-9]+$"
-    ),
+    team: str | None = Query(default=None, min_length=2, max_length=5, pattern=r"^[A-Za-z0-9]+$"),
     status: str | None = Query(default=None, min_length=1, max_length=64),
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None, min_length=1, max_length=80),
@@ -155,9 +153,9 @@ def conditional_response(
 def game_data(record: GameRecord) -> GameData:
     return GameData(
         game_id=record.game_id,
-        game_date=record.game_date,
+        game_date=date.fromisoformat(record.game_date),
         season=record.season,
-        game_time_utc=record.game_time_utc,
+        game_time_utc=_datetime(record.game_time_utc),
         status=record.status,
         away_team=TeamBrief(
             name=record.away_team,
@@ -194,30 +192,26 @@ def game_data(record: GameRecord) -> GameData:
             if record.venue_name
             else None
         ),
-        source_updated_at=record.source_updated_at,
+        source_updated_at=_datetime(record.source_updated_at),
     )
 
 
 def weather_data(record: GameWeatherRecord) -> WeatherData:
     return WeatherData(
         game_id=record.game_id,
-        game_date=record.game_date,
-        game_time_utc=record.game_time_utc,
+        game_date=date.fromisoformat(record.game_date),
+        game_time_utc=_datetime(record.game_time_utc),
         status=record.status,
-        away_team=TeamBrief(
-            name=record.away_team, abbreviation=record.away_team_abbreviation
-        ),
-        home_team=TeamBrief(
-            name=record.home_team, abbreviation=record.home_team_abbreviation
-        ),
+        away_team=TeamBrief(name=record.away_team, abbreviation=record.away_team_abbreviation),
+        home_team=TeamBrief(name=record.home_team, abbreviation=record.home_team_abbreviation),
         venue=(
             VenueBrief(name=record.venue_name, roof_type=record.roof_type)
             if record.venue_name
             else None
         ),
         available=record.observed_at is not None,
-        observed_at=record.observed_at,
-        forecast_for=record.forecast_for,
+        observed_at=_datetime(record.observed_at),
+        forecast_for=_datetime(record.forecast_for),
         source=record.source,
         condition=record.condition,
         temperature_f=record.temperature_f,
@@ -231,3 +225,7 @@ def weather_data(record: GameWeatherRecord) -> WeatherData:
         pitcher_adjustment=record.pitcher_adjustment,
         edge_label=record.edge_label,
     )
+
+
+def _datetime(value: str | None) -> datetime | None:
+    return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None

@@ -129,3 +129,36 @@ describe("research URL state", () => {
     expect(safeGroup("unknown")).toBe("batting");
   });
 });
+
+describe("Phase 8 live Game Center", () => {
+  const component = readFileSync(
+    new URL("../components/live-game-center.tsx", import.meta.url),
+    "utf8",
+  );
+  const gamePage = readFileSync(
+    new URL("games/[gameId]/page.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("uses one bounded conditional poll stream and stops at final", () => {
+    expect(component).toContain("snapshot.is_final");
+    expect(component).toContain("5_000");
+    expect(component).toContain("?since=");
+    expect(component).toContain("response.status === 304");
+  });
+
+  it("keeps accessible URL-backed tabs and explicit runner state", () => {
+    expect(component).toContain('role="tablist"');
+    expect(component).toContain("aria-selected");
+    expect(component).toContain("router.replace");
+    expect(component).toContain("aria-label={`Runners:");
+  });
+
+  it("ships motion, mobile, and controlled legacy fallback gates", () => {
+    const styles = readFileSync(new URL("../styles/globals.css", import.meta.url), "utf8");
+    expect(styles).toContain("prefers-reduced-motion: reduce");
+    expect(styles).toContain("max-width: 700px");
+    expect(gamePage).toContain("LIVE_GAME_CENTER_ENABLED");
+    expect(gamePage).toContain("LIVE_LEGACY_FALLBACK_ENABLED");
+  });
+});

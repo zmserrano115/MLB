@@ -79,6 +79,7 @@ class ExecutionResult:
     attempt: int
     retry_delay_ms: int | None = None
     message: str | None = None
+    result_payload: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)

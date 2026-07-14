@@ -18,6 +18,7 @@ from all_rise.jobs import QualityGateError, RetryableTaskError
 from sqlalchemy import create_engine, text
 
 MLB_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule"
+MLB_LIVE_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 
@@ -63,6 +64,21 @@ class MlbScheduleProvider:
             for game in day.get("games", []):
                 records.append(_schedule_record(game, game_date, source_version))
         return records
+
+
+class MlbLiveFeedProvider:
+    def __init__(
+        self, http: JsonHttpClient | None = None, *, base_url: str = MLB_LIVE_FEED_URL
+    ) -> None:
+        self._http = http or JsonHttpClient()
+        self._base_url = base_url
+
+    def fetch(self, game_pk: int) -> dict[str, Any]:
+        return self._http.get(
+            self._base_url.format(game_pk=game_pk),
+            {},
+            provider="MLB StatsAPI live feed",
+        )
 
 
 def _schedule_record(
@@ -189,9 +205,7 @@ class OpenMeteoProvider:
         return _forecast_record(payload, candidate)
 
 
-def _forecast_record(
-    payload: Mapping[str, Any], candidate: Mapping[str, Any]
-) -> dict[str, Any]:
+def _forecast_record(payload: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[str, Any]:
     hourly = _mapping(payload.get("hourly"))
     raw_times = hourly.get("time")
     if not isinstance(raw_times, list) or not raw_times:
@@ -249,8 +263,10 @@ def _game_date(candidate: Mapping[str, Any]) -> str:
 
 
 def _utc(value: Any) -> datetime:
-    result = value if isinstance(value, datetime) else datetime.fromisoformat(
-        str(value).replace("Z", "+00:00")
+    result = (
+        value
+        if isinstance(value, datetime)
+        else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     )
     return result.replace(tzinfo=UTC) if result.tzinfo is None else result.astimezone(UTC)
 

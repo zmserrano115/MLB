@@ -21,7 +21,7 @@ def main() -> None:
         redis_url="redis://localhost:6379/15",
         cors_allowed_origins=("http://localhost:3000",),
         build_sha="contract",
-        schema_revision="0005_phase7_analytics",
+        schema_revision="0006_phase8_live_game",
         max_body_bytes=1_048_576,
         slow_request_ms=500,
         db_pool_size=1,

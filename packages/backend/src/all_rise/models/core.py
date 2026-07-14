@@ -403,6 +403,48 @@ class LiveGameContact(Base):
     source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class LiveGameSnapshot(Base):
+    __tablename__ = "live_game_snapshots"
+    __table_args__ = (
+        UniqueConstraint("game_id", "version", name="uq_live_snapshot_game_version"),
+        Index("ix_live_snapshot_game_observed", "game_id", "observed_at"),
+        CheckConstraint(
+            "payload_size_bytes > 0 AND payload_size_bytes <= 131072",
+            name="ck_live_snapshot_payload_bound",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
+    version: Mapped[str] = mapped_column(String(128))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    feed_timestamp: Mapped[str | None] = mapped_column(String(64))
+    abstract_state: Mapped[str | None] = mapped_column(String(32))
+    detailed_state: Mapped[str | None] = mapped_column(String(80))
+    is_final: Mapped[bool] = mapped_column(Boolean, default=False)
+    payload_size_bytes: Mapped[int] = mapped_column(Integer)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE)
+
+
+class LiveGameEvent(Base):
+    __tablename__ = "live_game_events"
+    __table_args__ = (
+        UniqueConstraint("game_id", "event_key", name="uq_live_event_game_key"),
+        Index("ix_live_event_game_sequence", "game_id", "sequence"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
+    event_key: Mapped[str] = mapped_column(String(160))
+    sequence: Mapped[int] = mapped_column(Integer)
+    inning: Mapped[int | None] = mapped_column(Integer)
+    half_inning: Mapped[str | None] = mapped_column(String(16))
+    event_type: Mapped[str | None] = mapped_column(String(64))
+    description: Mapped[str | None] = mapped_column(Text)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE)
+    source_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class BullpenProjectionRun(Base):
     __tablename__ = "bullpen_projection_runs"
 

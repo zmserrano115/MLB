@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
+from hashlib import sha256
 from typing import Any
 
 import pandas as pd
@@ -139,3 +141,199 @@ def count_current_play_fouls(current_play: Mapping[str, Any]) -> int:
             ]
         ).lower()
     )
+
+
+def parse_live_game_feed(feed: Mapping[str, Any], game_id: str) -> dict[str, Any]:
+    """Reduce an MLB live feed to the bounded snapshot consumed by every viewer."""
+    game_data = _mapping(feed.get("gameData"))
+    live_data = _mapping(feed.get("liveData"))
+    status = _mapping(game_data.get("status"))
+    linescore = _mapping(live_data.get("linescore"))
+    teams = _mapping(game_data.get("teams"))
+    plays = _mapping(live_data.get("plays"))
+    all_plays = [play for play in plays.get("allPlays", []) if isinstance(play, Mapping)]
+    current_play = _mapping(plays.get("currentPlay"))
+    if not current_play and all_plays:
+        current_play = all_plays[-1]
+    feed_timestamp = str(feed.get("metaData", {}).get("timeStamp") or "")
+    abstract_state = str(status.get("abstractGameState") or "Preview")
+    snapshot: dict[str, Any] = {
+        "game_id": game_id,
+        "feed_timestamp": feed_timestamp or None,
+        "abstract_state": abstract_state,
+        "detailed_state": str(status.get("detailedState") or abstract_state),
+        "is_final": abstract_state.lower() == "final",
+        "inning": safe_int(linescore.get("currentInning"), 0),
+        "inning_ordinal": linescore.get("currentInningOrdinal"),
+        "half_inning": linescore.get("inningHalf"),
+        "count": {
+            "balls": safe_int(linescore.get("balls"), 0),
+            "strikes": safe_int(linescore.get("strikes"), 0),
+            "outs": safe_int(linescore.get("outs"), 0),
+            "fouls": count_current_play_fouls(current_play),
+        },
+        "teams": {
+            "away": _team_snapshot(teams.get("away"), linescore, "away"),
+            "home": _team_snapshot(teams.get("home"), linescore, "home"),
+        },
+        "bases": _bases(linescore),
+        "matchup": _matchup(linescore, current_play),
+        "pitches": _pitches(current_play)[-12:],
+        "recent_plays": [_play(play) for play in all_plays[-8:]],
+        "boxscore": _boxscore(live_data.get("boxscore")),
+    }
+    canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), default=str)
+    snapshot["version"] = feed_timestamp or sha256(canonical.encode()).hexdigest()[:20]
+    return snapshot
+
+
+def live_event_records(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Create stable, replay-safe event rows from a compact snapshot."""
+    events: list[dict[str, Any]] = []
+    for sequence, play in enumerate(snapshot.get("recent_plays", [])):
+        if not isinstance(play, Mapping):
+            continue
+        key = str(play.get("play_id") or f"{snapshot.get('version')}:{sequence}")
+        events.append(
+            {
+                "event_key": key,
+                "sequence": safe_int(play.get("at_bat_index"), sequence),
+                "inning": safe_int(play.get("inning"), 0),
+                "half_inning": play.get("half_inning"),
+                "event_type": play.get("result_type") or "other",
+                "description": play.get("description") or "",
+                "payload": dict(play),
+                "source_updated_at": snapshot.get("feed_timestamp"),
+            }
+        )
+    return events
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _team_snapshot(value: Any, linescore: Mapping[str, Any], side: str) -> dict[str, Any]:
+    team = _mapping(value)
+    totals = _mapping(_mapping(linescore.get("teams")).get(side))
+    return {
+        "id": safe_int(team.get("id"), None),
+        "name": team.get("name") or side.title(),
+        "abbreviation": team.get("abbreviation"),
+        "runs": safe_int(totals.get("runs"), 0),
+        "hits": safe_int(totals.get("hits"), 0),
+        "errors": safe_int(totals.get("errors"), 0),
+    }
+
+
+def _person(value: Any) -> dict[str, Any] | None:
+    person = _mapping(value)
+    identifier = safe_int(person.get("id"), None)
+    if identifier is None:
+        return None
+    return {
+        "id": identifier,
+        "name": person.get("fullName") or person.get("name") or "Unknown",
+        "headshot_url": f"https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/{identifier}/headshot/67/current",
+    }
+
+
+def _bases(linescore: Mapping[str, Any]) -> dict[str, bool]:
+    offense = _mapping(linescore.get("offense"))
+    return {
+        base: bool(_mapping(offense.get(base)).get("id")) for base in ("first", "second", "third")
+    }
+
+
+def _matchup(linescore: Mapping[str, Any], current_play: Mapping[str, Any]) -> dict[str, Any]:
+    offense = _mapping(linescore.get("offense"))
+    defense = _mapping(linescore.get("defense"))
+    matchup = _mapping(current_play.get("matchup"))
+    return {
+        "batter": _person(matchup.get("batter") or offense.get("batter")),
+        "pitcher": _person(matchup.get("pitcher") or defense.get("pitcher")),
+        "on_deck": _person(offense.get("onDeck")),
+        "bat_side": _mapping(matchup.get("batSide")).get("description"),
+        "pitch_hand": _mapping(matchup.get("pitchHand")).get("description"),
+    }
+
+
+def _pitches(play: Mapping[str, Any]) -> list[dict[str, Any]]:
+    parsed = [
+        parse_pitch_event(event)
+        for event in play.get("playEvents", [])
+        if isinstance(event, Mapping) and event.get("isPitch")
+    ]
+    return annotate_pitch_counts(parsed)
+
+
+def _play(play: Mapping[str, Any]) -> dict[str, Any]:
+    about = _mapping(play.get("about"))
+    result = _mapping(play.get("result"))
+    matchup = _mapping(play.get("matchup"))
+    hit = _mapping(play.get("hitData"))
+    coordinates = _mapping(hit.get("coordinates"))
+    return {
+        "play_id": about.get("atBatIndex")
+        if about.get("atBatIndex") is not None
+        else play.get("playId"),
+        "at_bat_index": safe_int(about.get("atBatIndex"), 0),
+        "inning": safe_int(about.get("inning"), 0),
+        "half_inning": about.get("halfInning"),
+        "is_complete": bool(about.get("isComplete", True)),
+        "result_type": classify_play_result(result),
+        "event": result.get("event"),
+        "description": result.get("description") or "",
+        "rbi": safe_int(result.get("rbi"), 0),
+        "away_score": safe_int(result.get("awayScore"), None),
+        "home_score": safe_int(result.get("homeScore"), None),
+        "batter": _person(matchup.get("batter")),
+        "pitcher": _person(matchup.get("pitcher")),
+        "contact": {
+            "launch_speed": safe_float(hit.get("launchSpeed")),
+            "launch_angle": safe_float(hit.get("launchAngle")),
+            "total_distance": safe_float(hit.get("totalDistance")),
+            "trajectory": hit.get("trajectory"),
+            "x": safe_float(coordinates.get("coordX")),
+            "y": safe_float(coordinates.get("coordY")),
+        }
+        if hit
+        else None,
+    }
+
+
+def _boxscore(value: Any) -> dict[str, Any]:
+    teams = _mapping(_mapping(value).get("teams"))
+    return {side: _boxscore_team(teams.get(side)) for side in ("away", "home")}
+
+
+def _boxscore_team(value: Any) -> dict[str, Any]:
+    team = _mapping(value)
+    players = _mapping(team.get("players"))
+    raw_batting_order = team.get("battingOrder")
+    batting_order = raw_batting_order if isinstance(raw_batting_order, list) else []
+    batters = [
+        _player_line(players.get(f"ID{identifier}"), "batting") for identifier in batting_order[:15]
+    ]
+    raw_pitcher_ids = team.get("pitchers")
+    pitcher_ids = raw_pitcher_ids if isinstance(raw_pitcher_ids, list) else []
+    pitchers = [
+        _player_line(players.get(f"ID{identifier}"), "pitching") for identifier in pitcher_ids[:10]
+    ]
+    return {
+        "batting": [row for row in batters if row],
+        "pitching": [row for row in pitchers if row],
+    }
+
+
+def _player_line(value: Any, group: str) -> dict[str, Any] | None:
+    player = _mapping(value)
+    person = _person(player.get("person"))
+    if person is None:
+        return None
+    stats = _mapping(_mapping(player.get("stats")).get(group))
+    return {
+        "player": person,
+        "position": _mapping(player.get("position")).get("abbreviation"),
+        "stats": dict(stats),
+    }

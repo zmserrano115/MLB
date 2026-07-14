@@ -8,6 +8,7 @@ from all_rise.config import Settings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from all_rise_api.api.v1.routes.live import router as live_router
 from all_rise_api.api.v1.routes.operations import api_version
 from all_rise_api.api.v1.routes.operations import router as operations_router
 from all_rise_api.api.v1.routes.research import router as research_router
@@ -40,13 +41,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if resolved_settings.cache_enabled or resolved_settings.rate_limit_enabled
             else None
         )
-        service, slate_service, research_service, cache_metrics = create_application_services(
-            resolved_settings, redis_client
+        service, slate_service, research_service, live_service, cache_metrics = (
+            create_application_services(resolved_settings, redis_client)
         )
         rate_limiter = create_rate_limiter(resolved_settings, redis_client)
         application.state.operations_service = service
         application.state.slate_service = slate_service
         application.state.research_service = research_service
+        application.state.live_service = live_service
         application.state.cache_metrics = cache_metrics
         application.state.rate_limiter = rate_limiter
         try:
@@ -67,7 +69,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "OPTIONS"],
         allow_headers=["accept", "content-type", "if-none-match", "x-request-id"],
-        expose_headers=["etag", "x-cache-status", "x-request-id", "x-rate-limit-remaining"],
+        expose_headers=[
+            "etag",
+            "x-cache-status",
+            "x-live-age",
+            "x-request-id",
+            "x-rate-limit-remaining",
+        ],
     )
     application.add_middleware(
         RateLimitMiddleware,
@@ -80,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_exception_handlers(application)
     application.include_router(operations_router)
     application.include_router(slate_router)
+    application.include_router(live_router)
     application.include_router(research_router)
     return application
 

@@ -13,6 +13,7 @@ from all_rise.repositories.protocols import (
     DataSourceStatusRecord,
     GameRecord,
     GameWeatherRecord,
+    LiveSnapshotRecord,
     PitchingSummaryRecord,
     PlayerGameLogRecord,
     PlayerRecord,
@@ -158,6 +159,10 @@ class SQLiteOperationsRepository:
     def get_game_weather(self, game_id: str) -> GameWeatherRecord | None:
         record = self.get_game(game_id)
         return self._empty_weather(record) if record else None
+
+    def get_live_snapshot(self, game_id: str) -> LiveSnapshotRecord | None:
+        del game_id
+        return None
 
     def get_players(
         self,

@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live Game */
+        get: operations["live_game_api_v1_games__game_id__live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/weather": {
         parameters: {
             query?: never;
@@ -323,6 +340,11 @@ export interface components {
         /** ApiEnvelope[HealthData] */
         ApiEnvelope_HealthData_: {
             data: components["schemas"]["HealthData"];
+            meta: components["schemas"]["ApiMeta"];
+        };
+        /** ApiEnvelope[LiveGameData] */
+        ApiEnvelope_LiveGameData_: {
+            data: components["schemas"]["LiveGameData"];
             meta: components["schemas"]["ApiMeta"];
         };
         /** ApiEnvelope[PitcherOpponentData] */
@@ -601,6 +623,64 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /** LiveGameData */
+        LiveGameData: {
+            /** Abstract State */
+            abstract_state: string;
+            /** Bases */
+            bases: {
+                [key: string]: boolean;
+            };
+            /** Boxscore */
+            boxscore: {
+                [key: string]: unknown;
+            };
+            /** Count */
+            count: {
+                [key: string]: number | null;
+            };
+            /** Detailed State */
+            detailed_state: string;
+            /** Feed Timestamp */
+            feed_timestamp?: string | null;
+            /** Game Id */
+            game_id: string;
+            /** Half Inning */
+            half_inning?: string | null;
+            /**
+             * Inning
+             * @default 0
+             */
+            inning: number;
+            /** Inning Ordinal */
+            inning_ordinal?: string | null;
+            /** Is Final */
+            is_final: boolean;
+            /** Matchup */
+            matchup: {
+                [key: string]: unknown;
+            };
+            /** Observed At */
+            observed_at: string;
+            /** Payload Size Bytes */
+            payload_size_bytes: number;
+            /** Pitches */
+            pitches: {
+                [key: string]: unknown;
+            }[];
+            /** Recent Plays */
+            recent_plays: {
+                [key: string]: unknown;
+            }[];
+            /** Teams */
+            teams: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Version */
+            version: string;
         };
         /** PaginationMeta */
         PaginationMeta: {
@@ -1215,6 +1295,55 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    live_game_api_v1_games__game_id__live_get: {
+        parameters: {
+            query?: {
+                since?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_LiveGameData_"];
+                };
+            };
+            /** @description The persisted live version has not changed */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

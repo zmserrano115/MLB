@@ -76,6 +76,16 @@ class GameWeatherRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class LiveSnapshotRecord:
+    game_id: str
+    version: str
+    observed_at: str
+    is_final: bool
+    payload_size_bytes: int
+    snapshot: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class PlayerRecord:
     player_id: str
     name: str | None
@@ -211,6 +221,8 @@ class SlateRepository(Protocol):
     ) -> list[GameWeatherRecord]: ...
 
     def get_game_weather(self, game_id: str) -> GameWeatherRecord | None: ...
+
+    def get_live_snapshot(self, game_id: str) -> LiveSnapshotRecord | None: ...
 
 
 class ResearchRepository(Protocol):
