@@ -11,6 +11,7 @@ const primary = [
 ] as const;
 
 const analysis = [
+  ["Players", "/players"],
   ["Player stats", "/stats/players"],
   ["Team stats", "/stats/teams"],
   ["Weather", "/weather"],

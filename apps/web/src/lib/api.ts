@@ -2,6 +2,9 @@ import type {
   ApiEnvelope,
   DataStatus,
   Game,
+  Matchup,
+  Player,
+  PlayerProfile,
   Readiness,
   Weather,
 } from "@all-rise/shared-types";
@@ -76,4 +79,43 @@ export function getWeather(filters: { date: string; gameId?: string }) {
 
 export function getGameWeather(gameId: string) {
   return apiGet<Weather>(`/api/v1/games/${encodeURIComponent(gameId)}/weather`);
+}
+
+export function getPlayers(filters: {
+  query?: string;
+  role?: "batter" | "pitcher" | "two-way";
+  season?: number;
+  cursor?: string;
+}) {
+  const query = new URLSearchParams({ limit: "40" });
+  if (filters.query) query.set("query", filters.query);
+  if (filters.role) query.set("role", filters.role);
+  if (filters.season) query.set("season", String(filters.season));
+  if (filters.cursor) query.set("cursor", filters.cursor);
+  return apiGet<Player[]>(`/api/v1/players?${query}`);
+}
+
+export function getPlayerProfile(
+  playerId: string,
+  filters: { season?: number; group: "batting" | "pitching" },
+) {
+  const query = new URLSearchParams({ group: filters.group, limit: "25" });
+  if (filters.season) query.set("season", String(filters.season));
+  return apiGet<PlayerProfile>(
+    `/api/v1/players/${encodeURIComponent(playerId)}?${query}`,
+  );
+}
+
+export function getBatterPitcherMatchup(filters: {
+  batterId: string;
+  pitcherId: string;
+  season?: number;
+}) {
+  const query = new URLSearchParams({
+    batter_id: filters.batterId,
+    pitcher_id: filters.pitcherId,
+    limit: "25",
+  });
+  if (filters.season) query.set("season", String(filters.season));
+  return apiGet<Matchup>(`/api/v1/matchups/batter-vs-pitcher?${query}`);
 }

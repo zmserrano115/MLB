@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlparse
 
 from all_rise.repositories.protocols import (
+    BatterPitcherMatchupRecord,
+    BattingSummaryRecord,
     DataSourceStatusRecord,
     GameRecord,
     GameWeatherRecord,
+    PitchingSummaryRecord,
+    PlayerGameLogRecord,
+    PlayerRecord,
     RepositoryReadiness,
 )
 
@@ -153,13 +159,242 @@ class SQLiteOperationsRepository:
         record = self.get_game(game_id)
         return self._empty_weather(record) if record else None
 
+    def get_players(
+        self,
+        *,
+        query: str | None,
+        role: str | None,
+        season: int | None,
+        limit: int,
+        cursor: str | None,
+    ) -> list[PlayerRecord]:
+        conditions = ["player_name IS NOT NULL"]
+        params: list[object] = []
+        if query:
+            conditions.append("player_name LIKE ? COLLATE NOCASE")
+            params.append(f"%{query}%")
+        if cursor:
+            conditions.append("player_id > ?")
+            params.append(int(cursor))
+        batter_exists = (
+            "EXISTS (SELECT 1 FROM batter_pitcher_game_logs b WHERE b.batter_id=p.player_id"
+        )
+        pitcher_exists = (
+            "EXISTS (SELECT 1 FROM pitcher_game_logs pg WHERE pg.pitcher_id=p.player_id"
+        )
+        if season:
+            batter_exists += " AND b.season = ?"
+            pitcher_exists += " AND pg.season = ?"
+        batter_exists += ")"
+        pitcher_exists += ")"
+        role_condition = None
+        if role == "batter":
+            role_condition = batter_exists
+            if season:
+                params.append(season)
+        elif role == "pitcher":
+            role_condition = pitcher_exists
+            if season:
+                params.append(season)
+        elif role == "two-way":
+            role_condition = f"({batter_exists} AND {pitcher_exists})"
+            if season:
+                params.extend([season, season])
+        elif season:
+            role_condition = f"({batter_exists} OR {pitcher_exists})"
+            params.extend([season, season])
+        if role_condition:
+            conditions.append(role_condition)
+        params.append(limit)
+        statement = f"""
+            SELECT p.player_id, p.player_name, p.active_status,
+                   CASE
+                     WHEN EXISTS (
+                       SELECT 1 FROM batter_pitcher_game_logs b
+                       WHERE b.batter_id=p.player_id
+                     ) AND EXISTS (
+                       SELECT 1 FROM pitcher_game_logs pg
+                       WHERE pg.pitcher_id=p.player_id
+                     )
+                       THEN 'two-way'
+                     WHEN EXISTS (
+                       SELECT 1 FROM pitcher_game_logs pg
+                       WHERE pg.pitcher_id=p.player_id
+                     )
+                       THEN 'pitcher'
+                     WHEN EXISTS (
+                       SELECT 1 FROM batter_pitcher_game_logs b
+                       WHERE b.batter_id=p.player_id
+                     )
+                       THEN 'batter'
+                     ELSE 'unknown'
+                   END AS player_type,
+                   MAX(
+                     COALESCE((
+                       SELECT MAX(b.season) FROM batter_pitcher_game_logs b
+                       WHERE b.batter_id=p.player_id
+                     ), 0),
+                     COALESCE((
+                       SELECT MAX(pg.season) FROM pitcher_game_logs pg
+                       WHERE pg.pitcher_id=p.player_id
+                     ), 0)
+                   ) AS latest_season,
+                   MAX(
+                     COALESCE((
+                       SELECT MAX(b.game_date) FROM batter_pitcher_game_logs b
+                       WHERE b.batter_id=p.player_id
+                     ), ''),
+                     COALESCE((
+                       SELECT MAX(pg.game_date) FROM pitcher_game_logs pg
+                       WHERE pg.pitcher_id=p.player_id
+                     ), '')
+                   ) AS last_game_date
+            FROM players p WHERE {" AND ".join(conditions)}
+            ORDER BY p.player_id LIMIT ?
+        """
+        with self._connect() as connection:
+            rows = connection.execute(statement, params).fetchall()
+            return [self._player_record(row) for row in rows]
+
+    def get_player(self, player_id: str) -> PlayerRecord | None:
+        records = self.get_players(
+            query=None, role=None, season=None, limit=1, cursor=str(int(player_id) - 1)
+        )
+        return records[0] if records and records[0].player_id == player_id else None
+
+    def get_player_batting_summary(
+        self, player_id: str, *, season: int | None
+    ) -> BattingSummaryRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT season, COUNT(DISTINCT game_pk) AS games,
+                       SUM(PA) AS pa, SUM(AB) AS ab, SUM(H) AS hits,
+                       SUM(doubles) AS doubles, SUM(triples) AS triples,
+                       SUM(BB) AS walks, SUM(HBP) AS hit_by_pitch,
+                       SUM(SO) AS strikeouts, SUM(HR) AS home_runs,
+                       SUM(RBI) AS rbi, SUM(TB) AS total_bases
+                FROM batter_pitcher_game_logs
+                WHERE batter_id=? AND season=COALESCE(?, (
+                    SELECT MAX(latest.season) FROM batter_pitcher_game_logs latest
+                    WHERE latest.batter_id=?
+                ))
+                GROUP BY season
+                HAVING COUNT(*) > 0
+                """,
+                (int(player_id), season, int(player_id)),
+            ).fetchone()
+        return self._batting_summary(row) if row else None
+
+    def get_player_pitching_summary(
+        self, player_id: str, *, season: int | None
+    ) -> PitchingSummaryRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM pitcher_stats WHERE pitcher_id=?
+                  AND (? IS NULL OR season=?) ORDER BY season DESC LIMIT 1
+                """,
+                (int(player_id), season, season),
+            ).fetchone()
+        return self._pitching_summary(row) if row else None
+
+    def get_player_game_logs(
+        self,
+        player_id: str,
+        *,
+        season: int | None,
+        group: str,
+        limit: int,
+    ) -> list[PlayerGameLogRecord]:
+        if group == "pitching":
+            statement = """
+                SELECT COALESCE(game_id, 'mlb:' || game_pk) AS game_id,
+                       game_date, season, opponent, is_starter, IP_outs AS innings_outs,
+                       pitch_count, BF AS batters_faced, H AS hits, BB AS walks,
+                       SO AS strikeouts, HR AS home_runs, R AS runs, ER AS earned_runs
+                FROM pitcher_game_logs WHERE pitcher_id=?
+                  AND (? IS NULL OR season=?)
+                ORDER BY game_date DESC, game_pk DESC LIMIT ?
+            """
+        else:
+            statement = """
+                SELECT COALESCE(game_id, 'mlb:' || game_pk) AS game_id,
+                       game_date, season, pitching_team AS opponent,
+                       SUM(PA) AS pa, SUM(AB) AS ab, SUM(H) AS hits,
+                       SUM(BB) AS walks, SUM(SO) AS strikeouts,
+                       SUM(HR) AS home_runs, SUM(RBI) AS rbi, SUM(TB) AS total_bases
+                FROM batter_pitcher_game_logs WHERE batter_id=?
+                  AND (? IS NULL OR season=?)
+                GROUP BY game_pk, game_id, game_date, season, pitching_team
+                ORDER BY game_date DESC, game_pk DESC LIMIT ?
+            """
+        with self._connect() as connection:
+            rows = connection.execute(statement, (int(player_id), season, season, limit)).fetchall()
+            return [self._player_game_log(row, group) for row in rows]
+
+    def get_batter_pitcher_matchup(
+        self,
+        *,
+        batter_id: str,
+        pitcher_id: str,
+        season: int | None,
+    ) -> BatterPitcherMatchupRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT batter.player_id AS batter_id, batter.player_name AS batter_name,
+                       pitcher.player_id AS pitcher_id, pitcher.player_name AS pitcher_name,
+                       ? AS season, COUNT(DISTINCT b.game_pk) AS games,
+                       SUM(b.PA) AS pa, SUM(b.AB) AS ab, SUM(b.H) AS hits,
+                       SUM(b.doubles) AS doubles, SUM(b.triples) AS triples,
+                       SUM(b.BB) AS walks, SUM(b.HBP) AS hit_by_pitch,
+                       SUM(b.SO) AS strikeouts, SUM(b.HR) AS home_runs,
+                       SUM(b.RBI) AS rbi, SUM(b.TB) AS total_bases,
+                       MAX(b.game_date) AS last_game_date
+                FROM batter_pitcher_game_logs b
+                JOIN players batter ON batter.player_id=b.batter_id
+                JOIN players pitcher ON pitcher.player_id=b.pitcher_id
+                WHERE b.batter_id=? AND b.pitcher_id=?
+                  AND (? IS NULL OR b.season=?)
+                GROUP BY batter.player_id, batter.player_name,
+                         pitcher.player_id, pitcher.player_name
+                """,
+                (season, int(batter_id), int(pitcher_id), season, season),
+            ).fetchone()
+        return self._matchup_record(row) if row else None
+
+    def get_batter_pitcher_logs(
+        self,
+        *,
+        batter_id: str,
+        pitcher_id: str,
+        season: int | None,
+        limit: int,
+    ) -> list[PlayerGameLogRecord]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT COALESCE(game_id, 'mlb:' || game_pk) AS game_id,
+                       game_date, season, pitching_team AS opponent,
+                       PA AS pa, AB AS ab, H AS hits, BB AS walks,
+                       SO AS strikeouts, HR AS home_runs, RBI AS rbi, TB AS total_bases
+                FROM batter_pitcher_game_logs
+                WHERE batter_id=? AND pitcher_id=?
+                  AND (? IS NULL OR season=?)
+                ORDER BY game_date DESC, game_pk DESC LIMIT ?
+                """,
+                (int(batter_id), int(pitcher_id), season, season, limit),
+            ).fetchall()
+            return [self._player_game_log(row, "batting") for row in rows]
+
     @staticmethod
     def _game_columns(connection: sqlite3.Connection) -> set[str]:
         return {row["name"] for row in connection.execute("PRAGMA table_info(games)")}
 
     @staticmethod
     def _sqlite_game_record(row: sqlite3.Row, columns: set[str]) -> GameRecord:
-        def value(name: str):
+        def value(name: str) -> Any:
             return row[name] if name in columns else None
 
         game_id = value("game_id") or f"mlb:{row['game_pk']}"
@@ -210,6 +445,123 @@ class SQLiteOperationsRepository:
             home_team_abbreviation=record.home_team_abbreviation,
             venue_name=record.venue_name,
             roof_type=record.roof_type,
+        )
+
+    @staticmethod
+    def _player_record(row: sqlite3.Row) -> PlayerRecord:
+        latest_season = int(row["latest_season"]) if row["latest_season"] else None
+        return PlayerRecord(
+            player_id=str(row["player_id"]),
+            name=str(row["player_name"]) if row["player_name"] else None,
+            active_status=str(row["active_status"] or "unknown"),
+            player_type=str(row["player_type"]),
+            latest_season=latest_season,
+            last_game_date=str(row["last_game_date"]) if row["last_game_date"] else None,
+        )
+
+    @staticmethod
+    def _batting_summary(row: sqlite3.Row) -> BattingSummaryRecord:
+        pa, ab, hits = int(row["pa"] or 0), int(row["ab"] or 0), int(row["hits"] or 0)
+        walks, hbp = int(row["walks"] or 0), int(row["hit_by_pitch"] or 0)
+        total_bases = int(row["total_bases"] or 0)
+
+        def ratio(numerator: int, denominator: int) -> float | None:
+            return round(numerator / denominator, 5) if denominator else None
+
+        return BattingSummaryRecord(
+            season=int(row["season"]),
+            games=int(row["games"]),
+            pa=pa,
+            ab=ab,
+            hits=hits,
+            doubles=int(row["doubles"] or 0),
+            triples=int(row["triples"] or 0),
+            walks=walks,
+            hit_by_pitch=hbp,
+            strikeouts=int(row["strikeouts"] or 0),
+            home_runs=int(row["home_runs"] or 0),
+            rbi=int(row["rbi"] or 0),
+            total_bases=total_bases,
+            batting_average=ratio(hits, ab),
+            on_base_percentage=ratio(hits + walks + hbp, pa),
+            slugging_percentage=ratio(total_bases, ab),
+        )
+
+    @staticmethod
+    def _pitching_summary(row: sqlite3.Row) -> PitchingSummaryRecord:
+        pitch_count = round(float(row["avg_pitch_count_per_start"] or 0) * int(row["starts"] or 0))
+        return PitchingSummaryRecord(
+            season=int(row["season"]),
+            games=int(row["games"]),
+            starts=int(row["starts"]),
+            innings_outs=int(row["IP_outs"]),
+            pitch_count=pitch_count,
+            batters_faced=int(row["BF"]),
+            hits=int(row["H"]),
+            walks=int(row["BB"]),
+            hit_by_pitch=int(row["HBP"]),
+            strikeouts=int(row["SO"]),
+            home_runs=int(row["HR"]),
+            runs=int(row["R"]),
+            earned_runs=int(row["ER"]),
+            earned_run_average=float(row["ERA"]) if row["ERA"] is not None else None,
+            whip=float(row["WHIP"]) if row["WHIP"] is not None else None,
+        )
+
+    @staticmethod
+    def _player_game_log(row: sqlite3.Row, group: str) -> PlayerGameLogRecord:
+        keys = set(row.keys())
+
+        def integer(name: str) -> int | None:
+            return int(row[name]) if name in keys and row[name] is not None else None
+
+        return PlayerGameLogRecord(
+            game_id=str(row["game_id"]),
+            game_date=str(row["game_date"]),
+            season=int(row["season"]),
+            group=group,
+            opponent=str(row["opponent"]) if row["opponent"] else None,
+            pa=integer("pa"),
+            ab=integer("ab"),
+            hits=integer("hits"),
+            walks=integer("walks"),
+            strikeouts=integer("strikeouts"),
+            home_runs=integer("home_runs"),
+            rbi=integer("rbi"),
+            total_bases=integer("total_bases"),
+            is_starter=bool(row["is_starter"]) if "is_starter" in keys else None,
+            innings_outs=integer("innings_outs"),
+            pitch_count=integer("pitch_count"),
+            batters_faced=integer("batters_faced"),
+            runs=integer("runs"),
+            earned_runs=integer("earned_runs"),
+        )
+
+    @staticmethod
+    def _matchup_record(row: sqlite3.Row) -> BatterPitcherMatchupRecord:
+        summary = SQLiteOperationsRepository._batting_summary(row)
+        return BatterPitcherMatchupRecord(
+            batter_id=str(row["batter_id"]),
+            batter_name=str(row["batter_name"]),
+            pitcher_id=str(row["pitcher_id"]),
+            pitcher_name=str(row["pitcher_name"]),
+            season=int(row["season"]) if row["season"] is not None else None,
+            games=summary.games,
+            pa=summary.pa,
+            ab=summary.ab,
+            hits=summary.hits,
+            doubles=summary.doubles,
+            triples=summary.triples,
+            walks=summary.walks,
+            hit_by_pitch=summary.hit_by_pitch,
+            strikeouts=summary.strikeouts,
+            home_runs=summary.home_runs,
+            rbi=summary.rbi,
+            total_bases=summary.total_bases,
+            batting_average=summary.batting_average,
+            on_base_percentage=summary.on_base_percentage,
+            slugging_percentage=summary.slugging_percentage,
+            last_game_date=str(row["last_game_date"]) if row["last_game_date"] else None,
         )
 
     def close(self) -> None:

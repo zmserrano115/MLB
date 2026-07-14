@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { isEnvelope } from "../lib/api";
 import { canonicalDate, safeFilter, shiftDate } from "../lib/date-state";
+import { safeGroup, safePlayerId, safeRole, safeSeason } from "../lib/research-state";
 import { buildLegacyUrl, canonicalState, resolveLegacyRoute } from "../lib/route-state";
 
 describe("Phase 7 route state", () => {
@@ -83,5 +84,21 @@ describe("slate URL state", () => {
     expect(canonicalDate("2026-02-31")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(canonicalDate("2026-02-31")).not.toBe("2026-02-31");
     expect(safeFilter("NY\u0000Y", 5)).toBe("NYY");
+  });
+});
+
+describe("research URL state", () => {
+  it("accepts bounded player, season, role, and group values", () => {
+    expect(safePlayerId("592450")).toBe("592450");
+    expect(safeSeason("2026")).toBe(2026);
+    expect(safeRole("two-way")).toBe("two-way");
+    expect(safeGroup("pitching")).toBe("pitching");
+  });
+
+  it("fails closed for invalid research state", () => {
+    expect(safePlayerId("592450<script>")).toBe("");
+    expect(safeSeason("3000")).toBeUndefined();
+    expect(safeRole("catcher")).toBeUndefined();
+    expect(safeGroup("unknown")).toBe("batting");
   });
 });

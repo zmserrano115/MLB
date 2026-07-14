@@ -10,6 +10,7 @@ from all_rise_api.main import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "packages" / "shared-types" / "openapi.json"
+TEST_TARGET = ROOT / "tests" / "fixtures" / "openapi_phase3_contract.json"
 
 
 def main() -> None:
@@ -29,7 +30,21 @@ def main() -> None:
         rate_limit_enabled=False,
     )
     document = create_app(settings).openapi()
-    TARGET.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
+    TARGET.write_text(serialized, encoding="utf-8")
+    snapshot = {
+        "paths": {
+            path: {
+                "methods": sorted(method for method in operation if method == "get"),
+                "responses": sorted(operation["get"]["responses"]),
+            }
+            for path, operation in document["paths"].items()
+        },
+        "schemas": sorted(document["components"]["schemas"]),
+    }
+    TEST_TARGET.write_text(
+        json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     print(f"wrote {TARGET.relative_to(ROOT)}")
 
 

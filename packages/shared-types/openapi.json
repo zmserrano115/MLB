@@ -1,6 +1,23 @@
 {
   "components": {
     "schemas": {
+      "ApiEnvelope_BatterPitcherMatchupData_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BatterPitcherMatchupData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ApiEnvelope[BatterPitcherMatchupData]",
+        "type": "object"
+      },
       "ApiEnvelope_GameData_": {
         "additionalProperties": false,
         "properties": {
@@ -33,6 +50,23 @@
           "meta"
         ],
         "title": "ApiEnvelope[HealthData]",
+        "type": "object"
+      },
+      "ApiEnvelope_PlayerProfileData_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PlayerProfileData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ApiEnvelope[PlayerProfileData]",
         "type": "object"
       },
       "ApiEnvelope_ReadinessData_": {
@@ -128,6 +162,27 @@
         "title": "ApiEnvelope[list[GameData]]",
         "type": "object"
       },
+      "ApiEnvelope_list_PlayerData__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerData"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ApiEnvelope[list[PlayerData]]",
+        "type": "object"
+      },
       "ApiEnvelope_list_WeatherData__": {
         "additionalProperties": false,
         "properties": {
@@ -199,6 +254,278 @@
           "request_id"
         ],
         "title": "ApiMeta",
+        "type": "object"
+      },
+      "BatterPitcherMatchupData": {
+        "additionalProperties": false,
+        "properties": {
+          "ab": {
+            "title": "Ab",
+            "type": "integer"
+          },
+          "batter_id": {
+            "title": "Batter Id",
+            "type": "string"
+          },
+          "batter_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batter Name"
+          },
+          "batting_average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batting Average"
+          },
+          "doubles": {
+            "title": "Doubles",
+            "type": "integer"
+          },
+          "game_logs": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerGameLogData"
+            },
+            "title": "Game Logs",
+            "type": "array"
+          },
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "hit_by_pitch": {
+            "title": "Hit By Pitch",
+            "type": "integer"
+          },
+          "hits": {
+            "title": "Hits",
+            "type": "integer"
+          },
+          "home_runs": {
+            "title": "Home Runs",
+            "type": "integer"
+          },
+          "last_game_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Game Date"
+          },
+          "on_base_percentage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Base Percentage"
+          },
+          "pa": {
+            "title": "Pa",
+            "type": "integer"
+          },
+          "pitcher_id": {
+            "title": "Pitcher Id",
+            "type": "string"
+          },
+          "pitcher_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pitcher Name"
+          },
+          "rbi": {
+            "title": "Rbi",
+            "type": "integer"
+          },
+          "season": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season"
+          },
+          "slugging_percentage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slugging Percentage"
+          },
+          "strikeouts": {
+            "title": "Strikeouts",
+            "type": "integer"
+          },
+          "total_bases": {
+            "title": "Total Bases",
+            "type": "integer"
+          },
+          "triples": {
+            "title": "Triples",
+            "type": "integer"
+          },
+          "walks": {
+            "title": "Walks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batter_id",
+          "pitcher_id",
+          "games",
+          "pa",
+          "ab",
+          "hits",
+          "doubles",
+          "triples",
+          "walks",
+          "hit_by_pitch",
+          "strikeouts",
+          "home_runs",
+          "rbi",
+          "total_bases",
+          "game_logs"
+        ],
+        "title": "BatterPitcherMatchupData",
+        "type": "object"
+      },
+      "BattingSummaryData": {
+        "additionalProperties": false,
+        "properties": {
+          "ab": {
+            "title": "Ab",
+            "type": "integer"
+          },
+          "batting_average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batting Average"
+          },
+          "doubles": {
+            "title": "Doubles",
+            "type": "integer"
+          },
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "hit_by_pitch": {
+            "title": "Hit By Pitch",
+            "type": "integer"
+          },
+          "hits": {
+            "title": "Hits",
+            "type": "integer"
+          },
+          "home_runs": {
+            "title": "Home Runs",
+            "type": "integer"
+          },
+          "on_base_percentage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Base Percentage"
+          },
+          "pa": {
+            "title": "Pa",
+            "type": "integer"
+          },
+          "rbi": {
+            "title": "Rbi",
+            "type": "integer"
+          },
+          "season": {
+            "title": "Season",
+            "type": "integer"
+          },
+          "slugging_percentage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slugging Percentage"
+          },
+          "strikeouts": {
+            "title": "Strikeouts",
+            "type": "integer"
+          },
+          "total_bases": {
+            "title": "Total Bases",
+            "type": "integer"
+          },
+          "triples": {
+            "title": "Triples",
+            "type": "integer"
+          },
+          "walks": {
+            "title": "Walks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "season",
+          "games",
+          "pa",
+          "ab",
+          "hits",
+          "doubles",
+          "triples",
+          "walks",
+          "hit_by_pitch",
+          "strikeouts",
+          "home_runs",
+          "rbi",
+          "total_bases"
+        ],
+        "title": "BattingSummaryData",
         "type": "object"
       },
       "DataStatusData": {
@@ -481,6 +808,406 @@
           "player_id"
         ],
         "title": "PitcherBrief",
+        "type": "object"
+      },
+      "PitchingSummaryData": {
+        "additionalProperties": false,
+        "properties": {
+          "batters_faced": {
+            "title": "Batters Faced",
+            "type": "integer"
+          },
+          "earned_run_average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earned Run Average"
+          },
+          "earned_runs": {
+            "title": "Earned Runs",
+            "type": "integer"
+          },
+          "games": {
+            "title": "Games",
+            "type": "integer"
+          },
+          "hit_by_pitch": {
+            "title": "Hit By Pitch",
+            "type": "integer"
+          },
+          "hits": {
+            "title": "Hits",
+            "type": "integer"
+          },
+          "home_runs": {
+            "title": "Home Runs",
+            "type": "integer"
+          },
+          "innings_outs": {
+            "title": "Innings Outs",
+            "type": "integer"
+          },
+          "pitch_count": {
+            "title": "Pitch Count",
+            "type": "integer"
+          },
+          "runs": {
+            "title": "Runs",
+            "type": "integer"
+          },
+          "season": {
+            "title": "Season",
+            "type": "integer"
+          },
+          "starts": {
+            "title": "Starts",
+            "type": "integer"
+          },
+          "strikeouts": {
+            "title": "Strikeouts",
+            "type": "integer"
+          },
+          "walks": {
+            "title": "Walks",
+            "type": "integer"
+          },
+          "whip": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whip"
+          }
+        },
+        "required": [
+          "season",
+          "games",
+          "starts",
+          "innings_outs",
+          "pitch_count",
+          "batters_faced",
+          "hits",
+          "walks",
+          "hit_by_pitch",
+          "strikeouts",
+          "home_runs",
+          "runs",
+          "earned_runs"
+        ],
+        "title": "PitchingSummaryData",
+        "type": "object"
+      },
+      "PlayerData": {
+        "additionalProperties": false,
+        "properties": {
+          "active_status": {
+            "title": "Active Status",
+            "type": "string"
+          },
+          "last_game_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Game Date"
+          },
+          "latest_season": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Season"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "player_id": {
+            "title": "Player Id",
+            "type": "string"
+          },
+          "player_type": {
+            "title": "Player Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_id",
+          "active_status",
+          "player_type"
+        ],
+        "title": "PlayerData",
+        "type": "object"
+      },
+      "PlayerGameLogData": {
+        "additionalProperties": false,
+        "properties": {
+          "ab": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ab"
+          },
+          "batters_faced": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batters Faced"
+          },
+          "earned_runs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earned Runs"
+          },
+          "game_date": {
+            "format": "date",
+            "title": "Game Date",
+            "type": "string"
+          },
+          "game_id": {
+            "title": "Game Id",
+            "type": "string"
+          },
+          "games": {
+            "default": 1,
+            "title": "Games",
+            "type": "integer"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "hits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hits"
+          },
+          "home_runs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Runs"
+          },
+          "innings_outs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Innings Outs"
+          },
+          "is_starter": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Starter"
+          },
+          "opponent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opponent"
+          },
+          "pa": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pa"
+          },
+          "pitch_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pitch Count"
+          },
+          "rbi": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rbi"
+          },
+          "runs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runs"
+          },
+          "season": {
+            "title": "Season",
+            "type": "integer"
+          },
+          "strikeouts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strikeouts"
+          },
+          "total_bases": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Bases"
+          },
+          "walks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walks"
+          }
+        },
+        "required": [
+          "game_id",
+          "game_date",
+          "season",
+          "group"
+        ],
+        "title": "PlayerGameLogData",
+        "type": "object"
+      },
+      "PlayerProfileData": {
+        "additionalProperties": false,
+        "properties": {
+          "batting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BattingSummaryData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "game_logs": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerGameLogData"
+            },
+            "title": "Game Logs",
+            "type": "array"
+          },
+          "pitching": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PitchingSummaryData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "player": {
+            "$ref": "#/components/schemas/PlayerData"
+          },
+          "selected_group": {
+            "title": "Selected Group",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player",
+          "game_logs",
+          "selected_group"
+        ],
+        "title": "PlayerProfileData",
         "type": "object"
       },
       "ReadinessData": {
@@ -1181,6 +1908,362 @@
         "summary": "Game Weather",
         "tags": [
           "slate"
+        ]
+      }
+    },
+    "/api/v1/matchups/batter-vs-pitcher": {
+      "get": {
+        "operationId": "batter_pitcher_matchup_api_v1_matchups_batter_vs_pitcher_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "batter_id",
+            "required": true,
+            "schema": {
+              "maxLength": 20,
+              "minLength": 1,
+              "pattern": "^\\d+$",
+              "title": "Batter Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pitcher_id",
+            "required": true,
+            "schema": {
+              "maxLength": 20,
+              "minLength": 1,
+              "pattern": "^\\d+$",
+              "title": "Pitcher Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "season",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2200,
+                  "minimum": 1876,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_BatterPitcherMatchupData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "The persisted data version has not changed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Batter Pitcher Matchup",
+        "tags": [
+          "research"
+        ]
+      }
+    },
+    "/api/v1/players": {
+      "get": {
+        "operationId": "players_api_v1_players_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Query"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "batter",
+                    "pitcher",
+                    "two-way"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          },
+          {
+            "in": "query",
+            "name": "season",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2200,
+                  "minimum": 1876,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "minLength": 1,
+                  "pattern": "^\\d+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_PlayerData__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "The persisted data version has not changed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Players",
+        "tags": [
+          "research"
+        ]
+      }
+    },
+    "/api/v1/players/{player_id}": {
+      "get": {
+        "operationId": "player_profile_api_v1_players__player_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "maxLength": 20,
+              "minLength": 1,
+              "pattern": "^\\d+$",
+              "title": "Player Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "season",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2200,
+                  "minimum": 1876,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group",
+            "required": false,
+            "schema": {
+              "default": "batting",
+              "enum": [
+                "batting",
+                "pitching"
+              ],
+              "title": "Group",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_PlayerProfileData_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "The persisted data version has not changed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Player Profile",
+        "tags": [
+          "research"
         ]
       }
     },

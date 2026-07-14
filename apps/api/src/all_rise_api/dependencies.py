@@ -6,6 +6,7 @@ from all_rise.application.operations import (
     OperationsService,
     build_operations_repository,
 )
+from all_rise.application.research import ResearchService
 from all_rise.application.slate import SlateService
 from all_rise.cache.circuit import CircuitBreakingRedis
 from all_rise.cache.metrics import InMemoryCacheMetrics
@@ -55,7 +56,7 @@ def create_operations_service(
 def create_application_services(
     settings: Settings,
     client: CircuitBreakingRedis | None = None,
-) -> tuple[OperationsService, SlateService, InMemoryCacheMetrics]:
+) -> tuple[OperationsService, SlateService, ResearchService, InMemoryCacheMetrics]:
     cache, metrics = create_shared_cache(settings, client)
     repository = build_operations_repository(settings)
     operations = OperationsService(
@@ -71,7 +72,13 @@ def create_application_services(
         cache_ttl_seconds=settings.cache_default_ttl_seconds,
         negative_ttl_seconds=settings.cache_negative_ttl_seconds,
     )
-    return operations, slate, metrics
+    research = ResearchService(
+        repository,
+        cache,
+        cache_ttl_seconds=settings.cache_default_ttl_seconds,
+        negative_ttl_seconds=settings.cache_negative_ttl_seconds,
+    )
+    return operations, slate, research, metrics
 
 
 def create_rate_limiter(
@@ -106,6 +113,10 @@ def get_operations_service(request: Request) -> OperationsService:
 
 def get_slate_service(request: Request) -> SlateService:
     return cast(SlateService, request.app.state.slate_service)
+
+
+def get_research_service(request: Request) -> ResearchService:
+    return cast(ResearchService, request.app.state.research_service)
 
 
 def get_settings(request: Request) -> Settings:

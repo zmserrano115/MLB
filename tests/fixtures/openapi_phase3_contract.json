@@ -1,48 +1,141 @@
 {
   "paths": {
     "/api/v1/data-status": {
-      "methods": ["get"],
-      "responses": ["200", "413", "422", "500"]
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "413",
+        "422",
+        "500"
+      ]
     },
     "/api/v1/games": {
-      "methods": ["get"],
-      "responses": ["200", "304", "422", "500"]
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "422",
+        "500"
+      ]
     },
     "/api/v1/games/{game_id}": {
-      "methods": ["get"],
-      "responses": ["200", "304", "404", "422", "500"]
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "404",
+        "422",
+        "500"
+      ]
     },
     "/api/v1/games/{game_id}/weather": {
-      "methods": ["get"],
-      "responses": ["200", "304", "404", "422", "500"]
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "404",
+        "422",
+        "500"
+      ]
+    },
+    "/api/v1/matchups/batter-vs-pitcher": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "404",
+        "422",
+        "500"
+      ]
+    },
+    "/api/v1/players": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "422",
+        "500"
+      ]
+    },
+    "/api/v1/players/{player_id}": {
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "404",
+        "422",
+        "500"
+      ]
     },
     "/api/v1/weather": {
-      "methods": ["get"],
-      "responses": ["200", "304", "422", "500"]
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "304",
+        "422",
+        "500"
+      ]
     },
     "/health": {
-      "methods": ["get"],
-      "responses": ["200", "500"]
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "500"
+      ]
     },
     "/ready": {
-      "methods": ["get"],
-      "responses": ["200", "500", "503"]
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "500",
+        "503"
+      ]
     },
     "/version": {
-      "methods": ["get"],
-      "responses": ["200", "500"]
+      "methods": [
+        "get"
+      ],
+      "responses": [
+        "200",
+        "500"
+      ]
     }
   },
   "schemas": [
+    "ApiEnvelope_BatterPitcherMatchupData_",
     "ApiEnvelope_GameData_",
     "ApiEnvelope_HealthData_",
+    "ApiEnvelope_PlayerProfileData_",
     "ApiEnvelope_ReadinessData_",
     "ApiEnvelope_VersionData_",
     "ApiEnvelope_WeatherData_",
     "ApiEnvelope_list_DataStatusData__",
     "ApiEnvelope_list_GameData__",
+    "ApiEnvelope_list_PlayerData__",
     "ApiEnvelope_list_WeatherData__",
     "ApiMeta",
+    "BatterPitcherMatchupData",
+    "BattingSummaryData",
     "DataStatusData",
     "ErrorBody",
     "ErrorEnvelope",
@@ -50,6 +143,10 @@
     "HealthData",
     "PaginationMeta",
     "PitcherBrief",
+    "PitchingSummaryData",
+    "PlayerData",
+    "PlayerGameLogData",
+    "PlayerProfileData",
     "ReadinessData",
     "TeamBrief",
     "VenueBrief",

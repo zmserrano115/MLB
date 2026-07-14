@@ -1,9 +1,9 @@
 # Phase 7 Next.js migration status
 
-Status: in progress. The shared shell, Methodology page, and persisted Games
-and Weather preview have passed their Phase 7 gates. The legacy application
-remains available for full live/current coverage while source publishing is
-activated route by route.
+Status: in progress. The shared shell, Methodology page, persisted Games and
+Weather, player directory/profile, and direct batter-versus-pitcher research
+have passed their Phase 7 gates. The legacy application remains available for
+full live/current coverage while source publishing is activated route by route.
 
 ## Completed foundation
 
@@ -41,6 +41,13 @@ activated route by route.
   coordinates, and out-of-range values fail closed before publication.
 - Added an eight-day weather window bound, immutable normalized artifacts, and
   separate Cloud Run Job templates/allowlists for schedule and weather.
+- Added cached, bounded player-directory, player-profile, season-summary,
+  recent-game-log, and direct batter-versus-pitcher APIs over persisted facts.
+- Migrated `/players`, `/players/[playerId]`, and the direct-history portion of
+  `/matchups`, including canonical player/season/group filters, responsive
+  tables, and permanent context-preserving legacy links.
+- Corrected the web container workspace copy so source refreshes do not replace
+  the lockfile-created dependency links in shared packages.
 
 ## Verification completed
 
@@ -62,21 +69,73 @@ activated route by route.
 - Browser review: home and Methodology checked at 1440 px and 390 px; no
   horizontal overflow, orange accents, or console warnings/errors were found.
 - Mobile navigation opened successfully and exposed all current routes.
+- Research validation: strict mypy and Ruff passed; the full Python suite passed
+  142 tests; TypeScript, ESLint, and 9 Vitest tests passed; the local and
+  container production Next.js builds passed.
+- PostgreSQL integration returned Miguel Cabrera's 98-game 2023 batting
+  profile and a persisted Miguel Cabrera versus Eli Morgan matchup; `/players`,
+  player detail, and `/matchups` all returned HTTP 200 through Next.js.
 
 ## Preservation boundary
 
-The Games and Weather pages read only persisted PostgreSQL snapshots; they do
-not call MLB or weather providers during a request. The provider adapters are
-available only through explicit task allowlists and the repository default
-remains shadow, preventing an accidental dual writer. Streamlit remains the
-authoritative production fallback until repeated parity and ownership approval,
-and for player profiles, matchup research, bullpen, streak, and player/team
-stat views. Each Next.js route preserves supported context when it hands off.
+The Games, Weather, Players, player-profile, and direct BvP pages read only
+persisted PostgreSQL snapshots; they do not call MLB or weather providers during
+a request. The provider adapters are available only through explicit task
+allowlists and the repository default remains shadow, preventing an accidental
+dual writer. Streamlit remains the authoritative production fallback until
+repeated parity and ownership approval, and for advanced pitch research,
+pitcher/opponent research, bullpen, streak, and player/team stat views. Each
+Next.js route preserves supported context when it hands off.
 
-## Next Phase 7 slice
+## Fixed remaining slice ledger
 
-Collect repeated schedule/weather parity observations before any production
-ownership flip. In parallel, migrate the next analytical inventory (player
-directory/profile and matchup research) only after its persisted API contracts
-exist. Phase 8 must not start until the non-live Phase 7 route inventory is
-complete.
+This ledger fixes the unit of work used for progress counts. A slice is complete
+only when its persisted contract, page or runtime behavior, regression tests,
+production build, fallback, and applicable integration gate pass. Splitting a
+slice during implementation does not increase the roadmap count; it remains one
+slice until its listed exit gate passes.
+
+### Phase 7 - 7 slices remaining
+
+1. Persist pitch-event read models and migrate Advanced HVP pitch-type,
+   sequence, contact-quality, and direct-history research.
+2. Migrate pitcher-versus-opponent and strikeout matchup research.
+3. Migrate projected bullpen availability, workload, appearance probability,
+   and batter-fit research.
+4. Migrate batter, pitcher, and team streak leaderboards.
+5. Migrate sortable/filterable player-stat leaderboards.
+6. Migrate team batting, pitching, and run-environment comparisons.
+7. Complete non-live route parity, repeated schedule/weather observations,
+   accessibility/E2E coverage, and the Phase 7 ownership review.
+
+### Phase 8 - 3 slices remaining
+
+1. Add worker-owned live snapshots with one upstream poll per game and final
+   game shutdown.
+2. Add the compact conditional live API/cache path and provider/Redis failure
+   behavior.
+3. Migrate React Game Center, recorded replays, animation/mobile visual parity,
+   and the live fallback flag.
+
+### Phase 9 - 4 slices remaining
+
+1. Provision parameterized GCP foundations: Cloud SQL, Memorystore, GCS, VPC,
+   secrets, IAM, probes, logs, and alert policies.
+2. Deploy staging images, migrations, worker pool, jobs, and Scheduler; migrate
+   and reconcile staging data.
+3. Pass the staging acceptance matrix, load/resilience/security checks,
+   backup/PITR restore, and operational runbooks.
+4. Run the canary, observe SLOs, rehearse rollback, and approve traffic/source
+   ownership cutover.
+
+### Phase 10 - 2 slices remaining
+
+1. Complete the defined observation period, usage/log review, final legacy
+   image/snapshot, and retirement approval.
+2. Remove production Streamlit, SQLite bootstrap, local caches, old workflows,
+   and duplicate code; then pass the final no-legacy-dependency gate.
+
+**Exact count after this checkpoint: 16 slices remain**: 7 in Phase 7 and 9
+across Phases 8-10. Phase 8 must not start until all seven Phase 7 slices pass.
+
+The next slice is Phase 7.1: persisted pitch-event read models and Advanced HVP.

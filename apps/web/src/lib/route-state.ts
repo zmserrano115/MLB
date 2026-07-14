@@ -20,7 +20,7 @@ const routeDefinitions: Readonly<Record<string, LegacyRoute>> = {
     title: "Player profile",
     description: "Season detail, splits, recent form, and game logs.",
     view: "Players",
-    allowedState: ["player_id", "season", "group", "from"],
+    allowedState: ["player_id", "season", "group", "from", "query", "role"],
   },
   matchups: {
     title: "Matchups",

@@ -13,7 +13,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/src ./apps/web/src
 COPY apps/web/public ./apps/web/public
 COPY apps/web/eslint.config.mjs apps/web/next-env.d.ts apps/web/next.config.ts apps/web/tsconfig.json ./apps/web/
-COPY packages ./packages
+COPY packages/shared-types/src ./packages/shared-types/src
+COPY packages/ui/src ./packages/ui/src
 RUN corepack enable && pnpm --filter @all-rise/web build
 
 FROM dependencies AS validation
@@ -22,7 +23,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/src ./apps/web/src
 COPY apps/web/public ./apps/web/public
 COPY apps/web/eslint.config.mjs apps/web/next-env.d.ts apps/web/next.config.ts apps/web/tsconfig.json ./apps/web/
-COPY packages ./packages
+COPY packages/shared-types/src ./packages/shared-types/src
+COPY packages/ui/src ./packages/ui/src
 RUN pnpm --filter @all-rise/web typecheck \
     && pnpm --filter @all-rise/web lint \
     && pnpm --filter @all-rise/web test
