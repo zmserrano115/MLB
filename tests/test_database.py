@@ -1,8 +1,9 @@
 import gzip
 import io
+import os
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from src import database
@@ -14,6 +15,16 @@ class RawBytes(io.BytesIO):
 
 class DatabaseTests(unittest.TestCase):
     def setUp(self):
+        self.environment = patch.dict(
+            os.environ,
+            {
+                "TURSO_DATABASE_URL": "",
+                "TURSO_AUTH_TOKEN": "",
+                "TURSO_READ_ONLY": "",
+                "TURSO_DATA_VERSION": "",
+            },
+        )
+        self.environment.start()
         self.original_db_path = database.DB_PATH
         self.original_initialized_path = database._INITIALIZED_PATH
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -25,6 +36,211 @@ class DatabaseTests(unittest.TestCase):
         database.DB_PATH = self.original_db_path
         database._INITIALIZED_PATH = self.original_initialized_path
         self.temp_dir.cleanup()
+        self.environment.stop()
+
+    def test_turso_connection_preserves_sqlite_row_access(self):
+        class FakeCursor:
+            description = (("player_id", None), ("player_name", None))
+
+            def __init__(self):
+                self.rows = [(42, "Jackie Robinson")]
+
+            def fetchone(self):
+                return self.rows[0]
+
+            def fetchall(self):
+                return list(self.rows)
+
+            def __iter__(self):
+                return iter(self.rows)
+
+        class FakeConnection:
+            def execute(self, sql, parameters=None):
+                return FakeCursor()
+
+            def close(self):
+                return None
+
+        with patch.dict(
+            os.environ,
+            {
+                "TURSO_DATABASE_URL": "libsql://all-rise.example.turso.io",
+                "TURSO_AUTH_TOKEN": "secret-token",
+            },
+        ), patch("src.database._connect_turso", return_value=FakeConnection()):
+            with database.read_connection() as conn:
+                row = conn.execute(
+                    "SELECT player_id, player_name FROM players"
+                ).fetchone()
+
+        self.assertEqual(row[0], 42)
+        self.assertEqual(row["player_name"], "Jackie Robinson")
+        self.assertEqual(
+            dict(row),
+            {"player_id": 42, "player_name": "Jackie Robinson"},
+        )
+
+    def test_turso_skips_local_bootstrap_and_schema_writes(self):
+        statements = []
+
+        class FakeCursor:
+            description = (("ready", None),)
+
+            def fetchone(self):
+                return (1,)
+
+        class FakeConnection:
+            def execute(self, sql, parameters=None):
+                statements.append(sql)
+                return FakeCursor()
+
+            def close(self):
+                return None
+
+        database._INITIALIZED_PATH = None
+        with patch.dict(
+            os.environ,
+            {
+                "TURSO_DATABASE_URL": "libsql://all-rise.example.turso.io",
+                "TURSO_AUTH_TOKEN": "secret-token",
+            },
+        ), patch("src.database._connect_turso", return_value=FakeConnection()), patch(
+            "src.database._bootstrap_database"
+        ) as bootstrap:
+            database.bootstrap_database()
+            database.ensure_database()
+
+        bootstrap.assert_not_called()
+        self.assertEqual(statements, ["SELECT 1 FROM games LIMIT 1"])
+        self.assertTrue(str(database._INITIALIZED_PATH).startswith("turso:"))
+
+    def test_turso_cache_key_is_versioned_without_exposing_credentials(self):
+        with patch.dict(
+            os.environ,
+            {
+                "TURSO_DATABASE_URL": "libsql://all-rise.example.turso.io",
+                "TURSO_AUTH_TOKEN": "do-not-leak",
+                "TURSO_DATA_VERSION": "2026-07-15",
+            },
+        ):
+            cache_key = database.db_cache_key()
+
+        self.assertIn("2026-07-15", cache_key)
+        self.assertNotIn("do-not-leak", repr(cache_key))
+        self.assertNotIn("all-rise.example.turso.io", repr(cache_key))
+
+    def test_turso_is_read_only_by_default(self):
+        with patch.dict(
+            os.environ,
+            {
+                "TURSO_DATABASE_URL": "libsql://all-rise.example.turso.io",
+                "TURSO_AUTH_TOKEN": "read-only-token",
+                "TURSO_READ_ONLY": "",
+            },
+        ):
+            self.assertFalse(database.database_writes_enabled())
+            self.assertEqual(
+                database.save_live_game_contacts(
+                    1,
+                    [{"play_index": 1, "hit_data": {"x": 10, "y": 20}}],
+                ),
+                0,
+            )
+
+    def test_turso_completed_game_refreshes_only_touched_summaries(self):
+        game = {
+            "game_pk": 321,
+            "game_date": "2026-07-14",
+            "season": 2026,
+            "away_team": "New York Yankees",
+            "home_team": "Boston Red Sox",
+            "game_status": "Final",
+        }
+        batter_pitcher_log = {
+            "game_pk": 321,
+            "game_date": "2026-07-14",
+            "season": 2026,
+            "batter_id": 10,
+            "pitcher_id": 20,
+            "PA": 1,
+            "AB": 1,
+            "H": 1,
+            "doubles": 0,
+            "triples": 0,
+            "BB": 0,
+            "HBP": 0,
+            "SO": 0,
+            "HR": 1,
+            "RBI": 1,
+            "SF": 0,
+            "TB": 4,
+        }
+        batter_pitch_type_log = {
+            **batter_pitcher_log,
+            "batting_team": "New York Yankees",
+            "pitcher_hand": "R",
+            "pitch_code": "FF",
+            "singles": 0,
+        }
+        pitcher_pitch_type_log = {
+            "game_pk": 321,
+            "game_date": "2026-07-14",
+            "season": 2026,
+            "pitcher_id": 20,
+            "team": "Boston Red Sox",
+            "opponent": "New York Yankees",
+            "pitch_code": "FF",
+            "pitch_count": 10,
+            "total_speed": 960.0,
+            "measured_pitches": 10,
+        }
+        pitcher_log = {
+            "game_pk": 321,
+            "game_date": "2026-07-14",
+            "season": 2026,
+            "pitcher_id": 20,
+            "pitcher_name": "Test Pitcher",
+            "is_starter": 1,
+            "IP_outs": 18,
+            "IP": 6.0,
+            "pitch_count": 90,
+            "BF": 22,
+            "H": 4,
+            "BB": 1,
+            "HBP": 0,
+            "SO": 8,
+            "HR": 1,
+            "R": 1,
+            "ER": 1,
+        }
+
+        with patch("src.database.using_turso", return_value=True), patch(
+            "src.database.database_writes_enabled", return_value=True
+        ):
+            database.save_completed_game(
+                game=game,
+                players={10: "Test Batter", 20: "Test Pitcher"},
+                batter_pitcher_logs=[batter_pitcher_log],
+                batter_pitch_type_logs=[batter_pitch_type_log],
+                pitcher_pitch_type_logs=[pitcher_pitch_type_log],
+                pitch_types={"FF": "Four-Seam Fastball"},
+                pitcher_logs=[pitcher_log],
+                plate_appearances_loaded=1,
+            )
+
+        self.assertEqual(
+            database.get_batter_vs_pitcher_stats_from_db(10, 20)["HR"],
+            1,
+        )
+        self.assertEqual(
+            database.get_batter_pitch_type_stats_from_db(10, 2026, "R")[0]["HR"],
+            1,
+        )
+        self.assertEqual(
+            database.get_pitcher_pitch_type_stats_from_db(20, 2026)[0]["COUNT"],
+            10,
+        )
+        self.assertEqual(database.get_pitcher_stats_from_db(2026, 20)["SO"], 8)
 
     def test_download_database_expands_gzip_release_asset(self):
         payload = b"SQLite format 3\x00" + (b"database-bytes" * 10)

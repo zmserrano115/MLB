@@ -1,19 +1,19 @@
-from contextlib import contextmanager
-from datetime import datetime
 import gzip
 import hashlib
 import json
 import logging
 import os
-from pathlib import Path
 import sqlite3
-from threading import Lock
 import time
+from collections.abc import Mapping
+from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+from threading import Lock
 from urllib.parse import urlparse
 
 from src.api_client import get as http_get
 from src.matchup_grading import grade_hitter_matchup
-
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -86,6 +86,130 @@ PITCHER_STAT_COLUMNS = (
 
 def now_text():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _truthy_environment_value(name, default=""):
+    return os.environ.get(name, default).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _turso_database_url():
+    return os.environ.get("TURSO_DATABASE_URL", "").strip()
+
+
+def using_turso():
+    """Return whether the process is configured for remote Turso reads."""
+    return bool(_turso_database_url())
+
+
+def database_writes_enabled():
+    """Keep the remote serving connection read-only unless explicitly enabled."""
+    if not using_turso():
+        return True
+    read_only = os.environ.get("TURSO_READ_ONLY", "").strip()
+    if not read_only:
+        return False
+    return not _truthy_environment_value("TURSO_READ_ONLY")
+
+
+def _database_identity():
+    database_url = _turso_database_url()
+    if not database_url:
+        return str(DB_PATH.resolve())
+    fingerprint = hashlib.sha256(database_url.encode("utf-8")).hexdigest()[:16]
+    return f"turso:{fingerprint}"
+
+
+class _RemoteRow(Mapping):
+    """Provide sqlite3.Row-style name and position access for libsql rows."""
+
+    def __init__(self, column_names, values):
+        self._column_names = tuple(column_names)
+        self._values = tuple(values)
+        self._positions = {
+            str(column_name).lower(): index
+            for index, column_name in enumerate(self._column_names)
+        }
+
+    def __getitem__(self, key):
+        if isinstance(key, (int, slice)):
+            return self._values[key]
+        position = self._positions.get(str(key).lower())
+        if position is None:
+            raise KeyError(key)
+        return self._values[position]
+
+    def __iter__(self):
+        return iter(self._column_names)
+
+    def __len__(self):
+        return len(self._values)
+
+    def keys(self):
+        return self._column_names
+
+
+class _RemoteCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def _column_names(self):
+        description = self._cursor.description or ()
+        return tuple(
+            column[0] if isinstance(column, (tuple, list)) else str(column)
+            for column in description
+        )
+
+    def _row(self, row):
+        if row is None or isinstance(row, Mapping):
+            return row
+        return _RemoteRow(self._column_names(), row)
+
+    def fetchone(self):
+        return self._row(self._cursor.fetchone())
+
+    def fetchall(self):
+        return [self._row(row) for row in self._cursor.fetchall()]
+
+    def __iter__(self):
+        for row in self._cursor:
+            yield self._row(row)
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class _RemoteConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, sql, parameters=None):
+        cursor = (
+            self._connection.execute(sql)
+            if parameters is None
+            else self._connection.execute(sql, parameters)
+        )
+        return _RemoteCursor(cursor)
+
+    def executemany(self, sql, parameters):
+        return _RemoteCursor(self._connection.executemany(sql, parameters))
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
+def _connect_turso(database_url, auth_token):
+    try:
+        import libsql
+    except ImportError as error:
+        raise RuntimeError(
+            "TURSO_DATABASE_URL is set, but the libsql package is not installed."
+        ) from error
+    return libsql.connect(database=database_url, auth_token=auth_token)
 
 
 def _download_database(database_url, temporary_path, expected_sha256=None):
@@ -196,6 +320,8 @@ def _bootstrap_database():
 
 
 def bootstrap_database():
+    if using_turso():
+        return
     if os.environ.get("MLB_DB_SKIP_BOOTSTRAP", "").strip().lower() in {
         "1",
         "true",
@@ -227,6 +353,15 @@ def _configure_connection(conn):
 
 
 def get_connection():
+    database_url = _turso_database_url()
+    if database_url:
+        auth_token = os.environ.get("TURSO_AUTH_TOKEN", "").strip()
+        if not auth_token:
+            raise RuntimeError(
+                "TURSO_AUTH_TOKEN must be set when TURSO_DATABASE_URL is configured."
+            )
+        return _RemoteConnection(_connect_turso(database_url, auth_token))
+
     bootstrap_database()
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=30)
@@ -234,6 +369,13 @@ def get_connection():
 
 
 def db_cache_key():
+    if using_turso():
+        return (
+            _database_identity(),
+            os.environ.get("TURSO_DATA_VERSION", "remote").strip() or "remote",
+            SCHEMA_VERSION,
+        )
+
     path = DB_PATH.resolve()
     try:
         stat = path.stat()
@@ -261,6 +403,10 @@ def db_cache_key():
 
 @contextmanager
 def transaction():
+    if not database_writes_enabled():
+        raise RuntimeError(
+            "Database writes are disabled because TURSO_READ_ONLY is enabled."
+        )
     conn = get_connection()
     try:
         conn.execute("BEGIN")
@@ -842,13 +988,21 @@ def init_database():
             """
         )
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-    _INITIALIZED_PATH = str(DB_PATH.resolve())
+    _INITIALIZED_PATH = _database_identity()
 
 
 def ensure_database():
-    if _INITIALIZED_PATH != str(DB_PATH.resolve()):
+    global _INITIALIZED_PATH
+    database_identity = _database_identity()
+    if database_identity != _INITIALIZED_PATH:
         with _INITIALIZE_LOCK:
-            if _INITIALIZED_PATH != str(DB_PATH.resolve()):
+            if database_identity == _INITIALIZED_PATH:
+                return
+            if using_turso():
+                with read_connection() as conn:
+                    conn.execute("SELECT 1 FROM games LIMIT 1").fetchone()
+                _INITIALIZED_PATH = database_identity
+            else:
                 init_database()
 
 
@@ -1029,6 +1183,8 @@ def save_live_game_contacts(game_pk, plays):
         if isinstance(play, dict) and play.get("hit_data")
     ]
     if not contact_plays:
+        return 0
+    if not database_writes_enabled():
         return 0
 
     rows = []
@@ -1433,6 +1589,248 @@ def mark_game_processed(
         )
 
 
+def _refresh_completed_game_summaries(
+    conn,
+    batter_pitcher_logs,
+    batter_pitch_type_logs,
+    pitcher_pitch_type_logs,
+    pitcher_logs,
+):
+    """Refresh only summary rows touched by one game to protect free quotas."""
+    refreshed_at = now_text()
+    batter_pitcher_keys = sorted(
+        {
+            (int(row["batter_id"]), int(row["pitcher_id"]))
+            for row in batter_pitcher_logs
+            if row.get("batter_id") is not None and row.get("pitcher_id") is not None
+        }
+    )
+    if batter_pitcher_keys:
+        conn.executemany(
+            "DELETE FROM batter_pitcher_stats WHERE batter_id = ? AND pitcher_id = ?",
+            batter_pitcher_keys,
+        )
+        conn.executemany(
+            """
+            INSERT INTO batter_pitcher_stats (
+                batter_id, pitcher_id, batter_name, pitcher_name,
+                PA, AB, H, doubles, triples, BB, HBP, SO, HR, RBI, SF, TB,
+                AVG, OBP, SLG, OPS, K_pct, BB_pct, last_game_date, last_updated
+            )
+            SELECT
+                gl.batter_id, gl.pitcher_id, MAX(bp.player_name), MAX(pp.player_name),
+                SUM(gl.PA), SUM(gl.AB), SUM(gl.H), SUM(gl.doubles), SUM(gl.triples),
+                SUM(gl.BB), SUM(gl.HBP), SUM(gl.SO), SUM(gl.HR), SUM(gl.RBI),
+                SUM(gl.SF), SUM(gl.TB),
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.H) * 1.0 / SUM(gl.AB), 3) ELSE 0 END,
+                CASE WHEN SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF) > 0
+                    THEN ROUND(
+                        (SUM(gl.H) + SUM(gl.BB) + SUM(gl.HBP)) * 1.0 /
+                        (SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF)), 3
+                    ) ELSE 0 END,
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.TB) * 1.0 / SUM(gl.AB), 3) ELSE 0 END,
+                CASE WHEN SUM(gl.AB) > 0
+                    AND SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF) > 0
+                    THEN ROUND(
+                        (SUM(gl.H) + SUM(gl.BB) + SUM(gl.HBP)) * 1.0 /
+                        (SUM(gl.AB) + SUM(gl.BB) + SUM(gl.HBP) + SUM(gl.SF)) +
+                        SUM(gl.TB) * 1.0 / SUM(gl.AB), 3
+                    ) ELSE 0 END,
+                CASE WHEN SUM(gl.PA) > 0
+                    THEN ROUND(SUM(gl.SO) * 100.0 / SUM(gl.PA), 2) ELSE 0 END,
+                CASE WHEN SUM(gl.PA) > 0
+                    THEN ROUND(SUM(gl.BB) * 100.0 / SUM(gl.PA), 2) ELSE 0 END,
+                MAX(gl.game_date), ?
+            FROM batter_pitcher_game_logs gl
+            LEFT JOIN players bp ON gl.batter_id = bp.player_id
+            LEFT JOIN players pp ON gl.pitcher_id = pp.player_id
+            WHERE gl.batter_id = ? AND gl.pitcher_id = ?
+            GROUP BY gl.batter_id, gl.pitcher_id
+            """,
+            [(refreshed_at, *key) for key in batter_pitcher_keys],
+        )
+
+    batter_pitch_type_keys = sorted(
+        {
+            (
+                int(row["season"]),
+                int(row["batter_id"]),
+                str(row["pitcher_hand"]),
+                str(row["pitch_code"]),
+            )
+            for row in batter_pitch_type_logs
+            if all(
+                row.get(field) is not None
+                for field in ("season", "batter_id", "pitcher_hand", "pitch_code")
+            )
+        }
+    )
+    if batter_pitch_type_keys:
+        conn.executemany(
+            """
+            DELETE FROM batter_pitch_type_stats
+            WHERE season = ? AND batter_id = ? AND pitcher_hand = ? AND pitch_code = ?
+            """,
+            batter_pitch_type_keys,
+        )
+        conn.executemany(
+            """
+            INSERT INTO batter_pitch_type_stats (
+                season, batter_id, batter_name, pitcher_hand, pitch_code,
+                pitch_name, PA, AB, H, singles, doubles, triples, BB, HBP,
+                SO, HR, SF, TB, AVG, SLG, ISO, K_pct, last_game_date, last_updated
+            )
+            SELECT
+                gl.season, gl.batter_id, MAX(bp.player_name), gl.pitcher_hand,
+                gl.pitch_code, COALESCE(MAX(pt.pitch_name), gl.pitch_code),
+                SUM(gl.PA), SUM(gl.AB), SUM(gl.H), SUM(gl.singles),
+                SUM(gl.doubles), SUM(gl.triples), SUM(gl.BB), SUM(gl.HBP),
+                SUM(gl.SO), SUM(gl.HR), SUM(gl.SF), SUM(gl.TB),
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.H) * 1.0 / SUM(gl.AB), 3) ELSE 0 END,
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND(SUM(gl.TB) * 1.0 / SUM(gl.AB), 3) ELSE 0 END,
+                CASE WHEN SUM(gl.AB) > 0
+                    THEN ROUND((SUM(gl.TB) - SUM(gl.H)) * 1.0 / SUM(gl.AB), 3)
+                    ELSE 0 END,
+                CASE WHEN SUM(gl.PA) > 0
+                    THEN ROUND(SUM(gl.SO) * 100.0 / SUM(gl.PA), 2) ELSE 0 END,
+                MAX(gl.game_date), ?
+            FROM batter_pitch_type_game_logs gl
+            LEFT JOIN players bp ON gl.batter_id = bp.player_id
+            LEFT JOIN pitch_types pt ON gl.pitch_code = pt.pitch_code
+            WHERE gl.season = ? AND gl.batter_id = ?
+                AND gl.pitcher_hand = ? AND gl.pitch_code = ?
+            GROUP BY gl.season, gl.batter_id, gl.pitcher_hand, gl.pitch_code
+            """,
+            [(refreshed_at, *key) for key in batter_pitch_type_keys],
+        )
+
+    pitcher_pitch_type_keys = sorted(
+        {
+            (int(row["season"]), int(row["pitcher_id"]), str(row["pitch_code"]))
+            for row in pitcher_pitch_type_logs
+            if all(
+                row.get(field) is not None
+                for field in ("season", "pitcher_id", "pitch_code")
+            )
+        }
+    )
+    if pitcher_pitch_type_keys:
+        conn.executemany(
+            """
+            DELETE FROM pitcher_pitch_type_stats
+            WHERE season = ? AND pitcher_id = ? AND pitch_code = ?
+            """,
+            pitcher_pitch_type_keys,
+        )
+        conn.executemany(
+            """
+            INSERT INTO pitcher_pitch_type_stats (
+                season, pitcher_id, pitcher_name, pitch_code, pitch_name,
+                pitch_count, percentage, avg_speed, last_game_date, last_updated
+            )
+            WITH pitch_totals AS (
+                SELECT season, pitcher_id, SUM(pitch_count) AS total_pitches
+                FROM pitcher_pitch_type_game_logs
+                WHERE season = ? AND pitcher_id = ?
+                GROUP BY season, pitcher_id
+            )
+            SELECT
+                gl.season, gl.pitcher_id, MAX(pp.player_name), gl.pitch_code,
+                COALESCE(MAX(pt.pitch_name), gl.pitch_code), SUM(gl.pitch_count),
+                CASE WHEN MAX(pitch_totals.total_pitches) > 0
+                    THEN ROUND(
+                        SUM(gl.pitch_count) * 100.0 /
+                        MAX(pitch_totals.total_pitches), 1
+                    ) ELSE 0 END,
+                CASE WHEN SUM(gl.measured_pitches) > 0
+                    THEN ROUND(
+                        SUM(gl.total_speed) * 1.0 / SUM(gl.measured_pitches), 1
+                    ) END,
+                MAX(gl.game_date), ?
+            FROM pitcher_pitch_type_game_logs gl
+            INNER JOIN pitch_totals
+                ON pitch_totals.season = gl.season
+                AND pitch_totals.pitcher_id = gl.pitcher_id
+            LEFT JOIN players pp ON gl.pitcher_id = pp.player_id
+            LEFT JOIN pitch_types pt ON gl.pitch_code = pt.pitch_code
+            WHERE gl.season = ? AND gl.pitcher_id = ? AND gl.pitch_code = ?
+            GROUP BY gl.season, gl.pitcher_id, gl.pitch_code
+            """,
+            [
+                (season, pitcher_id, refreshed_at, season, pitcher_id, pitch_code)
+                for season, pitcher_id, pitch_code in pitcher_pitch_type_keys
+            ],
+        )
+
+    pitcher_keys = sorted(
+        {
+            (int(row["season"]), int(row["pitcher_id"]))
+            for row in pitcher_logs
+            if row.get("season") is not None and row.get("pitcher_id") is not None
+        }
+    )
+    if pitcher_keys:
+        conn.executemany(
+            "DELETE FROM pitcher_stats WHERE season = ? AND pitcher_id = ?",
+            pitcher_keys,
+        )
+        conn.executemany(
+            """
+            INSERT INTO pitcher_stats (
+                season, pitcher_id, pitcher_name, games, starts, IP_outs, IP,
+                avg_ip_per_start, avg_pitch_count_per_start,
+                BF, H, BB, HBP, SO, HR, R, ER, ERA, WHIP, K_pct, K9,
+                projected_ip, projected_pitch_count, projected_ks,
+                last_game_date, last_updated
+            )
+            SELECT
+                season, pitcher_id, MAX(pitcher_name), COUNT(*), SUM(is_starter),
+                SUM(IP_outs),
+                CAST(SUM(IP_outs) / 3 AS INTEGER) + (SUM(IP_outs) % 3) / 10.0,
+                CASE WHEN SUM(is_starter) > 0
+                    THEN ROUND(
+                        SUM(CASE WHEN is_starter = 1 THEN IP_outs ELSE 0 END)
+                        / 3.0 / SUM(is_starter), 2
+                    ) ELSE ROUND(SUM(IP_outs) / 3.0 / COUNT(*), 2) END,
+                ROUND(AVG(CASE WHEN is_starter = 1 THEN pitch_count END), 0),
+                SUM(BF), SUM(H), SUM(BB), SUM(HBP), SUM(SO), SUM(HR),
+                SUM(R), SUM(ER),
+                CASE WHEN SUM(IP_outs) > 0
+                    THEN ROUND(SUM(ER) * 27.0 / SUM(IP_outs), 2) ELSE 0 END,
+                CASE WHEN SUM(IP_outs) > 0
+                    THEN ROUND((SUM(BB) + SUM(H)) * 3.0 / SUM(IP_outs), 2)
+                    ELSE 0 END,
+                CASE WHEN SUM(BF) > 0
+                    THEN ROUND(SUM(SO) * 100.0 / SUM(BF), 2) ELSE 0 END,
+                CASE WHEN SUM(IP_outs) > 0
+                    THEN ROUND(SUM(SO) * 27.0 / SUM(IP_outs), 2) ELSE 0 END,
+                CASE WHEN SUM(is_starter) > 0
+                    THEN ROUND(
+                        SUM(CASE WHEN is_starter = 1 THEN IP_outs ELSE 0 END)
+                        / 3.0 / SUM(is_starter), 2
+                    ) ELSE ROUND(SUM(IP_outs) / 3.0 / COUNT(*), 2) END,
+                ROUND(AVG(CASE WHEN is_starter = 1 THEN pitch_count END), 0),
+                CASE WHEN SUM(IP_outs) > 0
+                    THEN ROUND(
+                        (CASE WHEN SUM(is_starter) > 0
+                            THEN SUM(CASE WHEN is_starter = 1 THEN IP_outs ELSE 0 END)
+                                / 3.0 / SUM(is_starter)
+                            ELSE SUM(IP_outs) / 3.0 / COUNT(*) END)
+                        * (SUM(SO) * 3.0 / SUM(IP_outs)), 2
+                    ) ELSE 0 END,
+                MAX(game_date), ?
+            FROM pitcher_game_logs
+            WHERE season = ? AND pitcher_id = ?
+            GROUP BY season, pitcher_id
+            """,
+            [(refreshed_at, *key) for key in pitcher_keys],
+        )
+
+
 def save_completed_game(
     game,
     players,
@@ -1475,6 +1873,14 @@ def save_completed_game(
             plate_appearances_loaded,
             len(pitcher_logs),
         )
+        if using_turso():
+            _refresh_completed_game_summaries(
+                conn,
+                batter_pitcher_logs,
+                batter_pitch_type_logs,
+                pitcher_pitch_type_logs,
+                pitcher_logs,
+            )
 
 
 def replace_retrosheet_season(
@@ -2490,6 +2896,8 @@ def save_pitch_level_events(events):
     rows = [dict(row) for row in events or []]
     if not rows:
         return 0
+    if not database_writes_enabled():
+        return 0
     ensure_database()
     columns = (*PITCH_LEVEL_COLUMNS, "updated_at")
     placeholders = ",".join("?" for _ in columns)
@@ -2520,6 +2928,8 @@ def save_plate_appearance_sequences(sequences):
     rows = [dict(row) for row in sequences or []]
     if not rows:
         return 0
+    if not database_writes_enabled():
+        return 0
     ensure_database()
     columns = (*PLATE_SEQUENCE_COLUMNS, "updated_at")
     placeholders = ",".join("?" for _ in columns)
@@ -2549,6 +2959,8 @@ def save_plate_appearance_sequences(sequences):
 def save_bvp_pitch_type_stats(rows):
     rows = [dict(row) for row in rows or []]
     if not rows:
+        return 0
+    if not database_writes_enabled():
         return 0
     ensure_database()
     columns = (*BVP_PITCH_TYPE_COLUMNS, "last_updated")
@@ -2690,6 +3102,8 @@ def get_pitcher_game_logs_batch_from_db(pitcher_ids, season=None, through_date=N
 def save_daily_bullpen_projections(rows):
     rows = [dict(row) for row in rows or []]
     if not rows:
+        return 0
+    if not database_writes_enabled():
         return 0
     ensure_database()
     columns = (

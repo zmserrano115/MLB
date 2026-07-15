@@ -47,6 +47,8 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    env:
+      TURSO_CONFIGURED: ${{ secrets.TURSO_DATABASE_URL != '' && 'true' || 'false' }}
 
     steps:
       - name: Checkout repository
@@ -74,7 +76,7 @@ jobs:
           python -m pytest -q
 
       - name: Download or build SQLite database
-        if: ${{ github.event.inputs.test_only != 'true' }}
+        if: ${{ github.event.inputs.test_only != 'true' && env.TURSO_CONFIGURED != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           MLB_DB_SKIP_BOOTSTRAP: "1"
@@ -93,6 +95,10 @@ jobs:
       - name: Refresh final games
         if: ${{ github.event.inputs.test_only != 'true' }}
         shell: bash
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_WRITE_AUTH_TOKEN }}
+          TURSO_READ_ONLY: "0"
         run: |
           GAME_DATE="${{ github.event.inputs.game_date }}"
           LOOKBACK_DAYS="${{ github.event.inputs.lookback_days }}"
@@ -120,11 +126,11 @@ jobs:
           python refresh_nightly.py "${ARGS[@]}"
 
       - name: Compress SQLite database
-        if: ${{ github.event.inputs.test_only != 'true' }}
+        if: ${{ github.event.inputs.test_only != 'true' && env.TURSO_CONFIGURED != 'true' }}
         run: gzip -c data/mlb.db > data/mlb.db.gz
 
       - name: Publish refreshed SQLite database
-        if: ${{ github.event.inputs.test_only != 'true' }}
+        if: ${{ github.event.inputs.test_only != 'true' && env.TURSO_CONFIGURED != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -87,7 +87,14 @@ idempotently skipped unless `--reprocess-existing` is supplied. Repository
 pushes run the season-to-date mode so a new deployment cannot miss earlier
 current-season games; scheduled nightly runs use the three-day lookback.
 
-## Cloud Database
+## Free hosted database
+
+The preferred $0 deployment keeps the app on Streamlit Community Cloud and
+uses a read-only Turso Free database, avoiding the large SQLite download on
+each clean Streamlit start. Follow the guarded setup and rollback procedure in
+[the Streamlit + Turso runbook](docs/runbooks/streamlit-turso-free.md).
+
+## Legacy release database
 
 A full 2005-2025 SQLite file is too large for GitHub's normal file limit.
 Create a compressed copy and publish both assets on a release tagged

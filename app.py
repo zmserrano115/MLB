@@ -14559,8 +14559,15 @@ def start_hand_split_preload(season):
 
 app_today = current_app_date()
 try:
-    if "MLB_DB_URL" in st.secrets:
-        os.environ.setdefault("MLB_DB_URL", st.secrets["MLB_DB_URL"])
+    for secret_name in (
+        "MLB_DB_URL",
+        "TURSO_DATABASE_URL",
+        "TURSO_AUTH_TOKEN",
+        "TURSO_READ_ONLY",
+        "TURSO_DATA_VERSION",
+    ):
+        if secret_name in st.secrets:
+            os.environ.setdefault(secret_name, str(st.secrets[secret_name]))
 except Exception:
     pass
 

@@ -1,8 +1,8 @@
 import argparse
+import traceback
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
-import traceback
 
 from refresh_database import refresh_completed_games
 from src import database
@@ -35,7 +35,7 @@ def run_nightly_refresh(
     pitch_recheck_days=4,
 ):
     """Update only final-game BvP history and pitcher logs."""
-    database.init_database()
+    database.ensure_database()
     totals = defaultdict(int)
     dates = list(refresh_dates(end_date, lookback_days))
 
@@ -55,8 +55,11 @@ def run_nightly_refresh(
         for key, value in result.items():
             totals[key] += value
 
-    print("Rebuilding aggregate matchup and pitcher season summaries...")
-    database.rebuild_all_summary_stats()
+    if database.using_turso():
+        print("Remote summary rows were refreshed incrementally per completed game.")
+    else:
+        print("Rebuilding aggregate matchup and pitcher season summaries...")
+        database.rebuild_all_summary_stats()
 
     status = "success" if totals["errors"] == 0 else "completed_with_errors"
     message = (
@@ -89,7 +92,10 @@ def run_nightly_refresh(
             recheck_days=pitch_recheck_days,
         )
 
-    database.print_database_counts()
+    if database.using_turso():
+        print("Skipped full-table row counts to protect the Turso free read quota.")
+    else:
+        database.print_database_counts()
     return dict(totals)
 
 
