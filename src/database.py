@@ -3,6 +3,7 @@ import gzip
 import hashlib
 import json
 import logging
+import math
 import os
 import sqlite3
 import time
@@ -245,7 +246,9 @@ def _encode_http_value(value):
     if isinstance(value, int):
         return {"type": "integer", "value": str(value)}
     if isinstance(value, float):
-        return {"type": "float", "value": repr(value)}
+        if not math.isfinite(value):
+            return {"type": "null"}
+        return {"type": "float", "value": value}
     if isinstance(value, (bytes, bytearray, memoryview)):
         encoded = base64.b64encode(bytes(value)).decode("ascii")
         return {"type": "blob", "base64": encoded}
@@ -393,7 +396,11 @@ class _HttpConnection:
         if self._transaction_requests is not None:
             self._transaction_requests = None
             return
-        self.execute("ROLLBACK")
+        try:
+            self.execute("ROLLBACK")
+        except RuntimeError as error:
+            if "no transaction is active" not in str(error).lower():
+                raise
 
     def close(self):
         if self._closed:

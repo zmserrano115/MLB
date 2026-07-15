@@ -174,6 +174,36 @@ class DatabaseTests(unittest.TestCase):
             ["COMMIT", "ROLLBACK"],
         )
 
+    def test_turso_http_encodes_float_arguments_as_json_numbers(self):
+        self.assertEqual(
+            database._encode_http_value(12.5),
+            {"type": "float", "value": 12.5},
+        )
+        self.assertEqual(
+            database._encode_http_value(float("nan")),
+            {"type": "null"},
+        )
+
+    def test_turso_http_rollback_ignores_absent_transaction(self):
+        connection = database._HttpConnection(
+            "libsql://all-rise.example.turso.io",
+            "secret-token",
+        )
+        with patch.object(
+            connection,
+            "execute",
+            side_effect=RuntimeError("cannot rollback - no transaction is active"),
+        ):
+            connection.rollback()
+
+        with patch.object(
+            connection,
+            "execute",
+            side_effect=RuntimeError("network failure"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "network failure"):
+                connection.rollback()
+
     def test_turso_http_transaction_batches_work_before_commit(self):
         connection = database._HttpConnection(
             "libsql://all-rise.example.turso.io",
