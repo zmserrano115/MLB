@@ -5,7 +5,7 @@ import traceback
 
 from src.api_client import get_json
 from src.database import (
-    init_database,
+    ensure_database,
     is_game_processed,
     save_completed_game,
     rebuild_all_summary_stats,
@@ -651,7 +651,7 @@ def refresh_completed_games(
     rebuild_after=True,
     write_refresh_log=True,
 ):
-    init_database()
+    ensure_database()
 
     games = get_schedule_for_date(refresh_date, game_type=game_type)
 

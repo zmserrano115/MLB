@@ -160,6 +160,20 @@ class DatabaseTests(unittest.TestCase):
         )
         self.assertEqual(calls[1][2]["requests"], [{"type": "close"}])
 
+    def test_turso_http_connection_exposes_transaction_methods(self):
+        connection = database._HttpConnection(
+            "libsql://all-rise.example.turso.io",
+            "secret-token",
+        )
+        with patch.object(connection, "execute") as execute:
+            connection.commit()
+            connection.rollback()
+
+        self.assertEqual(
+            [call.args[0] for call in execute.call_args_list],
+            ["COMMIT", "ROLLBACK"],
+        )
+
     def test_turso_skips_local_bootstrap_and_schema_writes(self):
         statements = []
 

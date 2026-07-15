@@ -353,6 +353,12 @@ class _HttpConnection:
             }
         )
 
+    def commit(self):
+        self.execute("COMMIT")
+
+    def rollback(self):
+        self.execute("ROLLBACK")
+
     def close(self):
         if self._closed:
             return
