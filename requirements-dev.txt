@@ -1,2 +1,4 @@
 -r requirements.txt
+-e ./apps/api
+-e ./services/worker
 pytest
