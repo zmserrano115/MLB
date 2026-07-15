@@ -80,6 +80,86 @@ class DatabaseTests(unittest.TestCase):
             {"player_id": 42, "player_name": "Jackie Robinson"},
         )
 
+    def test_turso_http_connection_decodes_rows_and_binds_parameters(self):
+        calls = []
+
+        class FakeResponse:
+            def __init__(self, body):
+                self.body = body
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self.body
+
+        class FakeSession:
+            def post(self, url, headers, json, timeout):
+                calls.append((url, headers, json, timeout))
+                request = json["requests"][0]
+                if request["type"] == "close":
+                    return FakeResponse(
+                        {
+                            "baton": None,
+                            "results": [
+                                {"type": "ok", "response": {"type": "close"}}
+                            ],
+                        }
+                    )
+                return FakeResponse(
+                    {
+                        "baton": "connection-baton",
+                        "results": [
+                            {
+                                "type": "ok",
+                                "response": {
+                                    "type": "execute",
+                                    "result": {
+                                        "cols": [
+                                            {"name": "player_id"},
+                                            {"name": "player_name"},
+                                        ],
+                                        "rows": [
+                                            [
+                                                {"type": "integer", "value": "42"},
+                                                {
+                                                    "type": "text",
+                                                    "value": "Jackie Robinson",
+                                                },
+                                            ]
+                                        ],
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                )
+
+            def close(self):
+                return None
+
+        with patch("src.database.requests.Session", return_value=FakeSession()):
+            connection = database._RemoteConnection(
+                database._connect_turso(
+                    "libsql://all-rise.example.turso.io",
+                    "secret-token",
+                )
+            )
+            row = connection.execute(
+                "SELECT player_id, player_name FROM players WHERE player_id = ?",
+                (42,),
+            ).fetchone()
+            connection.close()
+
+        self.assertEqual(row["player_id"], 42)
+        self.assertEqual(row[1], "Jackie Robinson")
+        self.assertEqual(calls[0][0], "https://all-rise.example.turso.io/v2/pipeline")
+        self.assertEqual(
+            calls[0][2]["requests"][0]["stmt"]["args"],
+            [{"type": "integer", "value": "42"}],
+        )
+        self.assertEqual(calls[1][2]["requests"], [{"type": "close"}])
+
     def test_turso_skips_local_bootstrap_and_schema_writes(self):
         statements = []
 

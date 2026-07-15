@@ -3,4 +3,3 @@ numpy
 pandas
 requests
 streamlit
-libsql==0.1.11

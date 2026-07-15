@@ -110,7 +110,7 @@ row-write quotas.
 Before changing the public app, verify:
 
 1. Home, Games, Matchups, Players, Streaks, and one live or recorded game load.
-2. The Streamlit logs contain no `libsql`, missing-table, or authorization
+2. The Streamlit logs contain no SQL-over-HTTP, missing-table, or authorization
    errors.
 3. A manual `test_only` workflow succeeds, followed by one normal refresh.
 4. Turso storage remains below 4 GB, monthly reads below 400 million, and

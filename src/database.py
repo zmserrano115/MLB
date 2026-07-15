@@ -1,3 +1,4 @@
+import base64
 import gzip
 import hashlib
 import json
@@ -11,6 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from threading import Lock
 from urllib.parse import urlparse
+
+import requests
 
 from src.api_client import get as http_get
 from src.matchup_grading import grade_hitter_matchup
@@ -125,7 +128,7 @@ def _database_identity():
 
 
 class _RemoteRow(Mapping):
-    """Provide sqlite3.Row-style name and position access for libsql rows."""
+    """Provide sqlite3.Row-style name and position access for remote rows."""
 
     def __init__(self, column_names, values):
         self._column_names = tuple(column_names)
@@ -202,14 +205,168 @@ class _RemoteConnection:
         return getattr(self._connection, name)
 
 
+class _HttpCursor:
+    def __init__(self, result):
+        columns = result.get("cols") or []
+        self.description = tuple(
+            (column.get("name", ""), None, None, None, None, None, None)
+            for column in columns
+        )
+        self._rows = [
+            tuple(_decode_http_value(value) for value in row)
+            for row in (result.get("rows") or [])
+        ]
+        self._position = 0
+        self.rowcount = int(result.get("affected_row_count") or 0)
+        self.lastrowid = result.get("last_insert_rowid")
+
+    def fetchone(self):
+        if self._position >= len(self._rows):
+            return None
+        row = self._rows[self._position]
+        self._position += 1
+        return row
+
+    def fetchall(self):
+        rows = self._rows[self._position :]
+        self._position = len(self._rows)
+        return rows
+
+    def __iter__(self):
+        while self._position < len(self._rows):
+            yield self.fetchone()
+
+
+def _encode_http_value(value):
+    if value is None:
+        return {"type": "null"}
+    if isinstance(value, bool):
+        return {"type": "integer", "value": "1" if value else "0"}
+    if isinstance(value, int):
+        return {"type": "integer", "value": str(value)}
+    if isinstance(value, float):
+        return {"type": "float", "value": repr(value)}
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        encoded = base64.b64encode(bytes(value)).decode("ascii")
+        return {"type": "blob", "base64": encoded}
+    return {"type": "text", "value": str(value)}
+
+
+def _decode_http_value(value):
+    value_type = value.get("type")
+    if value_type == "null":
+        return None
+    if value_type == "integer":
+        return int(value.get("value", "0"))
+    if value_type == "float":
+        return float(value.get("value", "0"))
+    if value_type == "blob":
+        return base64.b64decode(value.get("base64", ""))
+    return value.get("value")
+
+
+class _HttpConnection:
+    """Small DB-API-style adapter for Turso's portable SQL-over-HTTP API."""
+
+    def __init__(self, database_url, auth_token, timeout=30):
+        http_url = database_url.strip()
+        if http_url.startswith("libsql://"):
+            http_url = "https://" + http_url[len("libsql://") :]
+        self._base_url = http_url.rstrip("/")
+        self._auth_token = auth_token
+        self._timeout = timeout
+        self._baton = None
+        self._routed_base_url = None
+        self._session = requests.Session()
+        self._closed = False
+
+    @staticmethod
+    def _pipeline_url(base_url):
+        base_url = base_url.rstrip("/")
+        if base_url.endswith("/v2/pipeline"):
+            return base_url
+        return f"{base_url}/v2/pipeline"
+
+    def _pipeline(self, requests_payload):
+        if self._closed:
+            raise RuntimeError("The Turso HTTP connection is closed.")
+        payload = {"requests": requests_payload}
+        if self._baton:
+            payload["baton"] = self._baton
+        target_base_url = self._routed_base_url or self._base_url
+        response = self._session.post(
+            self._pipeline_url(target_base_url),
+            headers={
+                "Authorization": f"Bearer {self._auth_token}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        body = response.json()
+        self._baton = body.get("baton")
+        self._routed_base_url = body.get("base_url") or self._routed_base_url
+        results = body.get("results") or []
+        if len(results) != len(requests_payload):
+            raise RuntimeError("Turso returned an incomplete pipeline response.")
+        return results
+
+    @staticmethod
+    def _result(result):
+        if result.get("type") != "ok":
+            error = result.get("error") or {}
+            message = error.get("message") or "Unknown SQL-over-HTTP error"
+            raise RuntimeError(f"Turso query failed: {message}")
+        response = result.get("response") or {}
+        if response.get("type") != "execute":
+            return {}
+        return response.get("result") or {}
+
+    @staticmethod
+    def _statement(sql, parameters=None):
+        statement = {"sql": sql}
+        if parameters is not None:
+            statement["args"] = [_encode_http_value(value) for value in parameters]
+        return {"type": "execute", "stmt": statement}
+
+    def execute(self, sql, parameters=None):
+        result = self._pipeline([self._statement(sql, parameters)])[0]
+        return _HttpCursor(self._result(result))
+
+    def executemany(self, sql, parameters):
+        statements = [self._statement(sql, values) for values in parameters]
+        if not statements:
+            return _HttpCursor({})
+        results = self._pipeline(statements)
+        affected_rows = 0
+        last_insert_rowid = None
+        for result in results:
+            statement_result = self._result(result)
+            affected_rows += int(statement_result.get("affected_row_count") or 0)
+            if statement_result.get("last_insert_rowid") is not None:
+                last_insert_rowid = statement_result["last_insert_rowid"]
+        return _HttpCursor(
+            {
+                "affected_row_count": affected_rows,
+                "last_insert_rowid": last_insert_rowid,
+            }
+        )
+
+    def close(self):
+        if self._closed:
+            return
+        try:
+            if self._baton:
+                self._pipeline([{"type": "close"}])
+        finally:
+            self._closed = True
+            self._baton = None
+            self._session.close()
+
+
 def _connect_turso(database_url, auth_token):
-    try:
-        import libsql
-    except ImportError as error:
-        raise RuntimeError(
-            "TURSO_DATABASE_URL is set, but the libsql package is not installed."
-        ) from error
-    return libsql.connect(database=database_url, auth_token=auth_token)
+    return _HttpConnection(database_url, auth_token)
 
 
 def _download_database(database_url, temporary_path, expected_sha256=None):
