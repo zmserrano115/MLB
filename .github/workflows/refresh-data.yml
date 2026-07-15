@@ -110,7 +110,7 @@ jobs:
           fi
 
           ARGS=(--date "$GAME_DATE")
-          if [ "$EVENT_NAME" = "push" ] && [ -z "$LOOKBACK_DAYS" ]; then
+          if [ "$EVENT_NAME" = "push" ] && [ -z "$LOOKBACK_DAYS" ] && [ "$TURSO_CONFIGURED" != "true" ]; then
             ARGS+=(--season-to-date)
           else
             if [ -z "$LOOKBACK_DAYS" ]; then
