@@ -279,6 +279,7 @@ class _HttpConnection:
         self._routed_base_url = None
         self._session = requests.Session()
         self._closed = False
+        self._transaction_requests = None
 
     @staticmethod
     def _pipeline_url(base_url):
@@ -303,7 +304,18 @@ class _HttpConnection:
             json=payload,
             timeout=self._timeout,
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as error:
+            try:
+                error_body = response.json()
+            except ValueError:
+                error_body = {}
+            message = error_body.get("message") or error_body.get("error")
+            detail = f": {message}" if message else ""
+            raise RuntimeError(
+                f"Turso pipeline HTTP {response.status_code}{detail}"
+            ) from error
         body = response.json()
         self._baton = body.get("baton")
         self._routed_base_url = body.get("base_url") or self._routed_base_url
@@ -331,13 +343,26 @@ class _HttpConnection:
         return {"type": "execute", "stmt": statement}
 
     def execute(self, sql, parameters=None):
-        result = self._pipeline([self._statement(sql, parameters)])[0]
+        command = sql.strip().rstrip(";").upper()
+        if command in {"BEGIN", "BEGIN TRANSACTION", "BEGIN IMMEDIATE"}:
+            if self._transaction_requests is not None:
+                raise RuntimeError("A Turso transaction is already active.")
+            self._transaction_requests = []
+            return _HttpCursor({})
+        statement = self._statement(sql, parameters)
+        if self._transaction_requests is not None:
+            self._transaction_requests.append(statement)
+            return _HttpCursor({})
+        result = self._pipeline([statement])[0]
         return _HttpCursor(self._result(result))
 
     def executemany(self, sql, parameters):
         statements = [self._statement(sql, values) for values in parameters]
         if not statements:
             return _HttpCursor({})
+        if self._transaction_requests is not None:
+            self._transaction_requests.extend(statements)
+            return _HttpCursor({"affected_row_count": len(statements)})
         results = self._pipeline(statements)
         affected_rows = 0
         last_insert_rowid = None
@@ -354,9 +379,20 @@ class _HttpConnection:
         )
 
     def commit(self):
+        if self._transaction_requests is None:
+            self.execute("COMMIT")
+            return
+        statements = [self._statement("BEGIN"), *self._transaction_requests]
+        self._transaction_requests = None
+        results = self._pipeline(statements)
+        for result in results:
+            self._result(result)
         self.execute("COMMIT")
 
     def rollback(self):
+        if self._transaction_requests is not None:
+            self._transaction_requests = None
+            return
         self.execute("ROLLBACK")
 
     def close(self):

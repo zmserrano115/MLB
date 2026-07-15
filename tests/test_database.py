@@ -174,6 +174,36 @@ class DatabaseTests(unittest.TestCase):
             ["COMMIT", "ROLLBACK"],
         )
 
+    def test_turso_http_transaction_batches_work_before_commit(self):
+        connection = database._HttpConnection(
+            "libsql://all-rise.example.turso.io",
+            "secret-token",
+        )
+        ok = {
+            "type": "ok",
+            "response": {"type": "execute", "result": {}},
+        }
+        with patch.object(
+            connection,
+            "_pipeline",
+            side_effect=[[ok, ok], [ok]],
+        ) as pipeline:
+            connection.execute("BEGIN")
+            connection.execute("INSERT INTO players (player_id) VALUES (?)", (42,))
+            pipeline.assert_not_called()
+            connection.commit()
+
+        first_pipeline = pipeline.call_args_list[0].args[0]
+        self.assertEqual(first_pipeline[0]["stmt"]["sql"], "BEGIN")
+        self.assertEqual(
+            first_pipeline[1]["stmt"]["args"],
+            [{"type": "integer", "value": "42"}],
+        )
+        self.assertEqual(
+            pipeline.call_args_list[1].args[0][0]["stmt"]["sql"],
+            "COMMIT",
+        )
+
     def test_turso_skips_local_bootstrap_and_schema_writes(self):
         statements = []
 
