@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from all_rise.domain import stats as _domain_stats
+from src.domain import stats as _domain_stats
 from src.api_client import get_json
 from src.database import (
     get_batter_pitch_type_stats_batch_from_db,
@@ -153,6 +153,8 @@ def get_batter_stats(season, force_refresh=False):
         "hits": "H",
         "runs": "R",
         "homeRuns": "HR",
+        "doubles": "2B",
+        "triples": "3B",
         "rbi": "RBI",
         "stolenBases": "SB",
         "totalBases": "TB",
@@ -180,6 +182,8 @@ def get_batter_stats(season, force_refresh=False):
         "H",
         "R",
         "HR",
+        "2B",
+        "3B",
         "RBI",
         "SB",
         "TB",
@@ -205,6 +209,8 @@ def get_batter_stats(season, force_refresh=False):
         "H",
         "R",
         "HR",
+        "2B",
+        "3B",
         "RBI",
         "SB",
         "TB",

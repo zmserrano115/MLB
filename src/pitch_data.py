@@ -7,6 +7,7 @@ from collections import defaultdict
 import pandas as pd
 
 from src import database
+from src.api_client import get_json
 from src.pitch_analysis import (
     calculate_pitch_type_summaries,
     normalize_pitch_code,
@@ -15,6 +16,8 @@ from src.pitch_analysis import (
     safe_float,
     safe_int,
 )
+
+MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
 
 
 STATCAST_FIELD_MAP = {
@@ -64,10 +67,129 @@ def statcast_frame_to_pitch_events(frame):
         launch_speed = safe_float(row.get("launch_speed"))
         row["hard_hit"] = 1 if launch_speed is not None and launch_speed >= 95 else 0
         row["barrel"] = 1 if _is_barrel(source) else 0
-        row["runs_produced"] = safe_int(source.get("post_bat_score")) - safe_int(
-            source.get("bat_score")
-        ) if source.get("post_bat_score") is not None and source.get("bat_score") is not None else None
+        scores_available = (
+            source.get("post_bat_score") is not None
+            and source.get("bat_score") is not None
+        )
+        row["runs_produced"] = (
+            safe_int(source.get("post_bat_score")) - safe_int(source.get("bat_score"))
+            if scores_available
+            else None
+        )
         rows.append(row)
+    return _dedupe_pitch_events(rows)
+
+
+def statsapi_feed_to_matchup_pitch_events(payload, batter_id, pitcher_id):
+    """Normalize pitches for one exact batter/pitcher pair from an MLB game feed."""
+    payload = payload or {}
+    game_pk = safe_int(payload.get("gamePk"), default=None)
+    game_date = (payload.get("gameData") or {}).get("datetime", {}).get("officialDate")
+    season = safe_int(str(game_date or "")[:4], default=None)
+    rows = []
+    plays = ((payload.get("liveData") or {}).get("plays") or {}).get("allPlays") or []
+    for play in plays:
+        matchup = play.get("matchup") or {}
+        if (
+            safe_int((matchup.get("batter") or {}).get("id"), default=None)
+            != int(batter_id)
+            or safe_int((matchup.get("pitcher") or {}).get("id"), default=None)
+            != int(pitcher_id)
+        ):
+            continue
+        pitch_events = [event for event in play.get("playEvents") or [] if event.get("isPitch")]
+        if not pitch_events:
+            continue
+        final_pitch = pitch_events[-1]
+        result = play.get("result") or {}
+        about = play.get("about") or {}
+        runners = play.get("runners") or []
+        runs_scored = sum(
+            1
+            for runner in runners
+            if (runner.get("details") or {}).get("isScoringEvent")
+        )
+        for offset, event in enumerate(pitch_events, start=1):
+            details = event.get("details") or {}
+            pitch_data = event.get("pitchData") or {}
+            coordinates = pitch_data.get("coordinates") or {}
+            breaks = pitch_data.get("breaks") or {}
+            hit_data = event.get("hitData") or {}
+            pitch_type = details.get("type") or {}
+            count = event.get("count") or {}
+            description = str(details.get("description") or "").strip().lower()
+            description = description.replace(" ", "_").replace("-", "_")
+            is_final = event is final_pitch
+            launch_speed = safe_float(hit_data.get("launchSpeed"))
+            launch_angle = safe_float(hit_data.get("launchAngle"))
+            row = {
+                "game_pk": game_pk,
+                "game_date": game_date,
+                "season": season,
+                "at_bat_number": safe_int(about.get("atBatIndex"), default=0) + 1,
+                "pitch_number": safe_int(event.get("pitchNumber"), default=offset),
+                "batter_id": int(batter_id),
+                "pitcher_id": int(pitcher_id),
+                "batter_side": (matchup.get("batSide") or {}).get("code"),
+                "pitcher_hand": (matchup.get("pitchHand") or {}).get("code"),
+                "pitch_type": normalize_pitch_code(pitch_type.get("code")),
+                "pitch_name": pitch_type.get("description"),
+                "release_speed": safe_float(pitch_data.get("startSpeed")),
+                "release_spin_rate": safe_float(breaks.get("spinRate")),
+                "pfx_x": safe_float(coordinates.get("pfxX")),
+                "pfx_z": safe_float(coordinates.get("pfxZ")),
+                "plate_x": safe_float(coordinates.get("pX")),
+                "plate_z": safe_float(coordinates.get("pZ")),
+                "zone": safe_int(pitch_data.get("zone"), default=None),
+                "pitch_description": description,
+                "event": result.get("eventType") if is_final else None,
+                "launch_speed": launch_speed,
+                "launch_angle": launch_angle,
+                "estimated_distance": safe_float(hit_data.get("totalDistance")),
+                "estimated_woba": None,
+                "estimated_ba": None,
+                "barrel": (
+                    1
+                    if _is_barrel(
+                        {"launch_speed": launch_speed, "launch_angle": launch_angle}
+                    )
+                    else 0
+                ),
+                "hard_hit": 1 if launch_speed is not None and launch_speed >= 95 else 0,
+                "balls": safe_int(count.get("balls"), default=None),
+                "strikes": safe_int(count.get("strikes"), default=None),
+                "outs": safe_int(count.get("outs"), default=None),
+                "inning": safe_int(about.get("inning"), default=None),
+                "rbi": safe_int(result.get("rbi"), default=0) if is_final else None,
+                "runs_produced": runs_scored if is_final else None,
+            }
+            rows.append(row)
+    return _dedupe_pitch_events(rows)
+
+
+def fetch_matchup_pitch_events(batter_id, pitcher_id, game_logs, feed_loader=None):
+    """Load only game feeds known to contain the selected matchup."""
+    loader = feed_loader or (
+        lambda game_pk: get_json(
+            MLB_GAME_FEED_URL.format(game_pk=int(game_pk)),
+            provider="MLB StatsAPI",
+            timeout=20,
+        )
+    )
+    game_pks = []
+    for log in game_logs or []:
+        game_pk = safe_int(log.get("game_pk"), default=None)
+        if game_pk is not None and game_pk not in game_pks:
+            game_pks.append(game_pk)
+    rows = []
+    for game_pk in game_pks:
+        try:
+            payload = loader(game_pk)
+        except Exception:
+            continue
+        rows.extend(
+            statsapi_feed_to_matchup_pitch_events(payload, batter_id, pitcher_id)
+        )
     return _dedupe_pitch_events(rows)
 
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from html import escape
 import json
+from html import escape
 
 import pandas as pd
 import streamlit as st
@@ -11,11 +11,11 @@ import streamlit as st
 from src import bvp_research
 from src.live_game import player_headshot_url
 from src.pitch_analysis import UNAVAILABLE, fmt_metric, safe_float, safe_int
-
+from src.player_rankings import rank_hitters_by_wrc_plus
 
 PAGE_TITLE = "Advanced Batter vs Pitcher Research"
 PAGE_TAB_LABEL = "Advanced HVP"
-MODE_OPTIONS = ("Specific Pitcher", "Projected Bullpen")
+BULLPEN_TAB_LABEL = "Bullpen"
 
 
 @st.cache_data(show_spinner=False, ttl=600, max_entries=128)
@@ -112,18 +112,12 @@ def _set_state_int(key, value):
 def _restore_query_state(selected_date):
     defaults = {
         "hvp_game_pk": _query_int("game_pk", "hvp_game_pk"),
-        "hvp_batter_id": _query_int("batter_id", "hvp_batter_id"),
-        "hvp_pitcher_id": _query_int("pitcher_id", "hvp_pitcher_id"),
-        "hvp_opponent_team_id": _query_int("opponent_team_id", "hvp_opponent_team_id"),
-        "hvp_mode": _query_value("hvp_mode", MODE_OPTIONS[0]),
     }
     for key, value in defaults.items():
         if key not in st.session_state and value is not None:
             st.session_state[key] = value
     if "hvp_selected_date" not in st.session_state:
         st.session_state.hvp_selected_date = str(_query_value("date", selected_date))
-    if st.session_state.get("hvp_mode") not in MODE_OPTIONS:
-        st.session_state.hvp_mode = MODE_OPTIONS[0]
 
 
 def _sync_query_params(selected_date):
@@ -132,11 +126,9 @@ def _sync_query_params(selected_date):
     st.query_params["date"] = str(selected_date)
     mappings = {
         "game_pk": st.session_state.get("hvp_game_pk"),
-        "batter_id": st.session_state.get("hvp_batter_id"),
-        "pitcher_id": st.session_state.get("hvp_pitcher_id"),
-        "opponent_team_id": st.session_state.get("hvp_opponent_team_id"),
-        "hvp_mode": st.session_state.get("hvp_mode"),
     }
+    for private_key in ("batter_id", "pitcher_id", "opponent_team_id", "hvp_mode"):
+        st.query_params.pop(private_key, None)
     for key, value in mappings.items():
         if value is None or value == "":
             st.query_params.pop(key, None)
@@ -166,7 +158,8 @@ def _player_meta(row, group):
 
 def _player_card(player_id, row, group):
     has_player = bool(player_id and row)
-    name = _player_display(row, fallback="Batter" if group == "batter" else "Pitcher")
+    role = "batter" if group == "batter" else "pitcher"
+    name = _player_display(row, fallback=f"Select {role}")
     meta = _player_meta(row, group)
     if has_player:
         avatar_html = (
@@ -177,8 +170,8 @@ def _player_card(player_id, row, group):
         meta_html = f'<div class="hvp-player-meta">{escape(meta)}</div>' if meta else ""
     else:
         avatar_html = '<div class="hvp-avatar-blank" aria-hidden="true"></div>'
-        name_html = '<div class="hvp-player-name hvp-player-empty" aria-hidden="true">&nbsp;</div>'
-        meta_html = '<div class="hvp-player-meta hvp-player-empty" aria-hidden="true">&nbsp;</div>'
+        name_html = f'<div class="hvp-player-name">{escape(name)}</div>'
+        meta_html = '<div class="hvp-player-meta">Tap to browse players</div>'
     st.html(
         f"""
         <div class="hvp-player-card">
@@ -190,6 +183,76 @@ def _player_card(player_id, row, group):
         </div>
         """
     )
+
+
+def _ordered_picker_players(frame, group):
+    players = pd.DataFrame(frame).copy()
+    if players.empty:
+        return players
+    players = players.drop_duplicates("player_id", keep="first")
+    if group == "batter":
+        return rank_hitters_by_wrc_plus(players)
+    return players.reset_index(drop=True)
+
+
+def _render_player_picker(frame, group):
+    players = _ordered_picker_players(frame, group)
+    if players.empty:
+        st.info("No players are available for this selection.")
+        return
+    search = st.text_input(
+        f"Search {group}s",
+        key=f"hvp_{group}_picker_search",
+        placeholder=f"Search {group}...",
+        label_visibility="collapsed",
+    ).strip().casefold()
+    if search:
+        names = players.get("Name", players.get("Player", pd.Series(dtype=str)))
+        teams = players.get("Team", players.get("team_name", pd.Series(dtype=str)))
+        mask = names.fillna("").astype(str).str.casefold().str.contains(search, regex=False)
+        mask |= teams.fillna("").astype(str).str.casefold().str.contains(search, regex=False)
+        players = players[mask]
+    # Keep the initial image request bounded; search still resolves the full pool.
+    visible_players = players.head(30)
+    for offset in range(0, len(visible_players), 3):
+        columns = st.columns(3, gap="small")
+        for column, (_, row) in zip(
+            columns,
+            visible_players.iloc[offset : offset + 3].iterrows(),
+            strict=False,
+        ):
+            player_id = pd.to_numeric(row.get("player_id"), errors="coerce")
+            if pd.isna(player_id):
+                continue
+            name = str(row.get("Name") or row.get("Player") or "Player")
+            team = str(row.get("Team") or row.get("team_name") or "").strip()
+            with column, st.container(key=f"hvp_picker_card_{group}_{int(player_id)}"):
+                st.html(
+                    '<div class="hvp-picker-player-card">'
+                    f'<img src="{escape(player_headshot_url(int(player_id), width=128), quote=True)}" '
+                    f'alt="{escape(name, quote=True)} headshot">'
+                    '<div class="hvp-picker-player-copy">'
+                    f'<strong>{escape(name)}</strong>'
+                    f'<span>{escape(team)}</span>'
+                    "</div></div>"
+                )
+                if st.button(
+                    f"Select {name}",
+                    key=f"hvp_pick_{group}_{int(player_id)}",
+                    use_container_width=True,
+                ):
+                    _set_state_int(f"hvp_{group}_id", int(player_id))
+                    st.rerun(scope="app")
+
+
+@st.dialog("Choose batter", width="large")
+def _batter_picker_dialog(frame):
+    _render_player_picker(frame, "batter")
+
+
+@st.dialog("Choose pitcher", width="large")
+def _pitcher_picker_dialog(frame):
+    _render_player_picker(frame, "pitcher")
 
 
 def _render_hvp_styles():
@@ -219,6 +282,46 @@ def _render_hvp_styles():
             gap: 12px;
             min-height: 92px;
             padding: 10px 12px;
+            transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+        }
+        [class*="st-key-hvp_batter_card"],
+        [class*="st-key-hvp_pitcher_card"] {
+            position: relative;
+        }
+        [class*="st-key-hvp_batter_card"] > [data-testid="stElementContainer"]:has(.stButton),
+        [class*="st-key-hvp_pitcher_card"] > [data-testid="stElementContainer"]:has(.stButton) {
+            height: 92px !important;
+            inset: 0 !important;
+            position: absolute !important;
+            z-index: 3 !important;
+        }
+        [class*="st-key-hvp_batter_card"] .stButton,
+        [class*="st-key-hvp_pitcher_card"] .stButton {
+            height: 100%;
+        }
+        [class*="st-key-hvp_batter_card"] .stButton > button,
+        [class*="st-key-hvp_pitcher_card"] .stButton > button {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            color: transparent !important;
+            height: 100%;
+            min-height: 92px;
+            opacity: 0;
+            padding: 0;
+            width: 100%;
+        }
+        [class*="st-key-hvp_batter_card"]:hover .hvp-player-card,
+        [class*="st-key-hvp_pitcher_card"]:hover .hvp-player-card {
+            border-color: #0f3b66;
+            box-shadow: 0 4px 12px rgba(15, 59, 102, 0.12);
+            cursor: pointer;
+            transform: translateY(-1px);
+        }
+        [class*="st-key-hvp_batter_card"]:has(button:focus-visible) .hvp-player-card,
+        [class*="st-key-hvp_pitcher_card"]:has(button:focus-visible) .hvp-player-card {
+            outline: 3px solid rgba(15, 59, 102, 0.35);
+            outline-offset: 2px;
         }
         .hvp-player-card img {
             background: #edf1f5;
@@ -250,6 +353,175 @@ def _render_hvp_styles():
             color: #637183;
             font-size: 0.9rem;
             margin-top: 2px;
+        }
+        [class*="st-key-hvp_picker_card_"] {
+            min-height: 84px;
+            position: relative;
+        }
+        .hvp-picker-player-card {
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #d8dee6;
+            border-radius: 6px;
+            display: flex;
+            gap: 10px;
+            min-height: 84px;
+            padding: 9px 10px;
+            transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+        }
+        .hvp-picker-player-card img {
+            background: #edf1f5;
+            border: 1px solid #d8dee6;
+            border-radius: 50%;
+            flex: 0 0 auto;
+            height: 62px;
+            object-fit: cover;
+            width: 62px;
+        }
+        .hvp-picker-player-copy {
+            min-width: 0;
+        }
+        .hvp-picker-player-copy strong,
+        .hvp-picker-player-copy span {
+            display: block;
+        }
+        .hvp-picker-player-copy strong {
+            color: #071b31;
+            font-size: 0.92rem;
+            line-height: 1.2;
+        }
+        .hvp-picker-player-copy span {
+            color: #637183;
+            font-size: 0.78rem;
+            margin-top: 3px;
+        }
+        [class*="st-key-hvp_picker_card_"] > [data-testid="stElementContainer"]:has(.stButton) {
+            height: 84px !important;
+            inset: 0 !important;
+            position: absolute !important;
+            z-index: 3 !important;
+        }
+        [class*="st-key-hvp_picker_card_"] .stButton,
+        [class*="st-key-hvp_picker_card_"] .stButton > button {
+            height: 100% !important;
+            min-height: 84px !important;
+            width: 100% !important;
+        }
+        [class*="st-key-hvp_picker_card_"] .stButton > button {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            color: transparent !important;
+            opacity: 0;
+            padding: 0;
+        }
+        [class*="st-key-hvp_picker_card_"]:hover .hvp-picker-player-card {
+            border-color: #0f3b66;
+            box-shadow: 0 3px 10px rgba(15, 59, 102, 0.12);
+            cursor: pointer;
+            transform: translateY(-1px);
+        }
+        [class*="st-key-hvp_picker_card_"]:has(button:focus-visible) .hvp-picker-player-card {
+            outline: 3px solid rgba(15, 59, 102, 0.35);
+            outline-offset: 2px;
+        }
+        .hvp-heat-shell {
+            background: #ffffff;
+            border: 1px solid #d8dee6;
+            border-radius: 0;
+            margin: 0 0 14px;
+            overflow: hidden;
+        }
+        .hvp-heat-title {
+            background: #ffffff;
+            border-bottom: 1px solid #d8dee6;
+            color: #071b31;
+            font-family: "Bebas Neue", "Arial Narrow", sans-serif;
+            font-size: 1.25rem;
+            font-weight: 400;
+            letter-spacing: 0.035em;
+            padding: 11px 12px 9px;
+        }
+        .hvp-heat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        .hvp-heat-cell {
+            align-items: center;
+            border-bottom: 1px solid #e2e8ef;
+            border-right: 1px solid #e2e8ef;
+            color: #071b31;
+            display: flex;
+            justify-content: space-between;
+            min-height: 58px;
+            padding: 9px 12px;
+        }
+        .hvp-heat-cell span {
+            color: inherit;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .hvp-heat-cell strong {
+            color: inherit;
+            font-size: 1.05rem;
+            font-variant-numeric: tabular-nums;
+        }
+        .heat-strong { background: #e8f4ed; color: #08733f; box-shadow: inset 4px 0 0 #168253; }
+        .heat-good { background: #f0f7f3; color: #236848; box-shadow: inset 4px 0 0 #5b9b78; }
+        .heat-neutral { background: #fff8df; color: #755f08; box-shadow: inset 4px 0 0 #d4aa20; }
+        .heat-poor { background: #f9eeee; color: #8b2e38; box-shadow: inset 4px 0 0 #b54b55; }
+        .heat-missing { background: #f3f5f8; color: #6b7787; box-shadow: inset 4px 0 0 #aeb8c4; }
+        .heat-sample { background: #edf3f9; color: #173f67; box-shadow: inset 4px 0 0 #4e789e; }
+        .hvp-pitch-heat {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .hvp-pitch-heat table {
+            border-collapse: collapse;
+            min-width: 760px;
+            width: 100%;
+        }
+        .hvp-pitch-heat th {
+            background: #f7f9fb;
+            border-bottom: 1px solid #d8dee6;
+            color: #526171;
+            font-size: 0.72rem;
+            letter-spacing: 0.04em;
+            padding: 8px 10px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+        .hvp-pitch-heat th:first-child,
+        .hvp-pitch-heat td:first-child {
+            text-align: left;
+        }
+        .hvp-pitch-heat td {
+            border: 1px solid #e2e8ef;
+            font-size: 0.95rem;
+            font-variant-numeric: tabular-nums;
+            font-weight: 750;
+            padding: 10px;
+            text-align: center;
+        }
+        .hvp-pitch-name {
+            background: #ffffff;
+            border-color: #d9e1ea !important;
+            color: #071b31;
+            box-shadow: none !important;
+            min-width: 180px;
+        }
+        @media (max-width: 680px) {
+            .hvp-heat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .hvp-heat-cell { min-height: 54px; }
+            [class*="st-key-hvp_batter_card"] > [data-testid="stElementContainer"]:has(.stButton),
+            [class*="st-key-hvp_pitcher_card"] > [data-testid="stElementContainer"]:has(.stButton),
+            [class*="st-key-hvp_batter_card"] .stButton > button,
+            [class*="st-key-hvp_pitcher_card"] .stButton > button {
+                height: 78px !important;
+                min-height: 78px !important;
+            }
         }
         .hvp-metric-grid {
             display: grid;
@@ -328,8 +600,12 @@ def render_bvp_research_page(
     selected_date,
     database_cache_key,
     active_roster_loader=None,
+    analysis_mode="Specific Pitcher",
 ):
     _restore_query_state(selected_date)
+    if analysis_mode == "Specific Pitcher":
+        st.session_state.hvp_game_pk = None
+        st.session_state.hvp_previous_game_pk = None
     _render_hvp_styles()
 
     batters = bvp_research.player_lookup(batters_df)
@@ -354,7 +630,7 @@ def render_bvp_research_page(
     st.markdown(
         f"""
         <div class="hvp-shell">
-            <div class="hvp-title">{PAGE_TITLE}</div>
+            <div class="hvp-title">{BULLPEN_TAB_LABEL if analysis_mode == 'Projected Bullpen' else PAGE_TITLE}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -367,6 +643,7 @@ def render_bvp_research_page(
         selected_date,
         batters,
         pitchers,
+        analysis_mode,
     )
 
     selected_game_pk = _state_int("hvp_game_pk")
@@ -380,16 +657,7 @@ def render_bvp_research_page(
         st.session_state.hvp_opponent_team_id = int(opponent_context["opponent_team_id"])
     _sync_query_params(selected_date)
 
-    mode = st.radio(
-        "Analysis mode",
-        MODE_OPTIONS,
-        key="hvp_mode",
-        horizontal=True,
-        label_visibility="collapsed",
-    )
-    _sync_query_params(selected_date)
-
-    if mode == "Specific Pitcher":
+    if analysis_mode == "Specific Pitcher":
         _render_specific_pitcher_mode(
             selected_batter_id,
             selected_pitcher_id,
@@ -421,83 +689,61 @@ def _render_selection_header(
     selected_date,
     batters,
     pitchers,
+    analysis_mode,
 ):
-    game_opts = bvp_research.game_options(schedule_df)
-    game_labels = list(game_opts)
-    current_game_pk = _state_int("hvp_game_pk")
-    game_index = None
-    if current_game_pk in set(game_opts.values()):
-        game_index = list(game_opts.values()).index(current_game_pk)
-
-    batter_opts = bvp_research.player_search_options(batters_df)
-    pitcher_opts = bvp_research.player_search_options(pitchers_df)
-    current_batter_id = _state_int("hvp_batter_id")
-    current_pitcher_id = _state_int("hvp_pitcher_id")
-
-    batter_index = (
-        list(batter_opts.values()).index(current_batter_id)
-        if current_batter_id in set(batter_opts.values())
-        else None
-    )
-    pitcher_index = (
-        list(pitcher_opts.values()).index(current_pitcher_id)
-        if current_pitcher_id in set(pitcher_opts.values())
-        else None
-    )
-
     with st.container(key="hvp_selection_header"):
-        game_col, batter_col, pitcher_col, action_col = st.columns(
-            [1.05, 1.2, 1.2, 0.55],
-            gap="small",
-            vertical_alignment="bottom",
-        )
-        with game_col:
-            selected_game_label = st.selectbox(
-                "Selected game",
-                game_labels,
-                index=game_index,
-                placeholder="Select game...",
-                key="hvp_game_select",
+        if analysis_mode != "Specific Pitcher":
+            game_opts = bvp_research.game_options(schedule_df)
+            game_labels = list(game_opts)
+            current_game_pk = _state_int("hvp_game_pk")
+            game_index = None
+            if current_game_pk in set(game_opts.values()):
+                game_index = list(game_opts.values()).index(current_game_pk)
+
+            game_col, action_col = st.columns(
+                [3.45, 0.55],
+                gap="small",
+                vertical_alignment="bottom",
             )
-            _set_state_int("hvp_game_pk", game_opts.get(selected_game_label))
-        with batter_col:
-            selected_batter_label = st.selectbox(
-                "Batter search",
-                list(batter_opts),
-                index=batter_index,
-                placeholder="Search batter by MLB ID...",
-                key="hvp_batter_select",
-            )
-            _set_state_int("hvp_batter_id", batter_opts.get(selected_batter_label))
-        with pitcher_col:
-            selected_pitcher_label = st.selectbox(
-                "Pitcher search",
-                list(pitcher_opts),
-                index=pitcher_index,
-                placeholder="Search pitcher by MLB ID...",
-                key="hvp_pitcher_select",
-            )
-            _set_state_int("hvp_pitcher_id", pitcher_opts.get(selected_pitcher_label))
-        with action_col:
-            if st.button("Reset", key="hvp_reset", use_container_width=True):
-                for key in (
-                    "hvp_game_pk",
-                    "hvp_batter_id",
-                    "hvp_pitcher_id",
-                    "hvp_opponent_team_id",
-                ):
-                    st.session_state[key] = None
-                st.rerun(scope="app")
+            with game_col:
+                selected_game_label = st.selectbox(
+                    "Selected game",
+                    game_labels,
+                    index=game_index,
+                    placeholder="Select game...",
+                    key="hvp_game_select",
+                )
+                _set_state_int("hvp_game_pk", game_opts.get(selected_game_label))
+            with action_col:
+                if st.button("Reset", key="hvp_reset", use_container_width=True):
+                    for key in (
+                        "hvp_game_pk",
+                        "hvp_batter_id",
+                        "hvp_pitcher_id",
+                        "hvp_opponent_team_id",
+                    ):
+                        st.session_state[key] = None
+                    st.rerun(scope="app")
 
         current_batter_id = _state_int("hvp_batter_id")
         current_pitcher_id = _state_int("hvp_pitcher_id")
-        selected_game_pk = _state_int("hvp_game_pk")
-        game_row = bvp_research.game_context(schedule_df, selected_game_pk)
         card_cols = st.columns(2, gap="small")
-        with card_cols[0]:
+        with card_cols[0], st.container(key="hvp_batter_card"):
             _player_card(current_batter_id, batters.get(current_batter_id, {}), "batter")
-        with card_cols[1]:
+            if st.button(
+                "Choose batter" if current_batter_id is None else "Change batter",
+                key="hvp_open_batter_picker",
+                use_container_width=True,
+            ):
+                _batter_picker_dialog(batters_df)
+        with card_cols[1], st.container(key="hvp_pitcher_card"):
             _player_card(current_pitcher_id, pitchers.get(current_pitcher_id, {}), "pitcher")
+            if st.button(
+                "Choose pitcher" if current_pitcher_id is None else "Change pitcher",
+                key="hvp_open_pitcher_picker",
+                use_container_width=True,
+            ):
+                _pitcher_picker_dialog(pitchers_df)
 
 
 def _render_specific_pitcher_mode(
@@ -523,7 +769,6 @@ def _render_specific_pitcher_mode(
             database_cache_key,
         )
     summary = research.get("summary", {})
-    st.markdown('<div class="hvp-shell">', unsafe_allow_html=True)
     st.markdown(
         f"#### {_player_display(batter_row, 'Batter')} vs {_player_display(pitcher_row, 'Pitcher')}"
     )
@@ -538,29 +783,10 @@ def _render_specific_pitcher_mode(
             ("HR", summary.get("HR"), 0),
             ("BB", summary.get("BB"), 0),
             ("SO", summary.get("SO"), 0),
-            ("AVG", summary.get("AVG"), 3),
-            ("OBP", summary.get("OBP"), 3),
-            ("SLG", summary.get("SLG"), 3),
-            ("OPS", summary.get("OPS"), 3),
-            ("wOBA", summary.get("wOBA"), 3),
-            ("K%", summary.get("K%"), 1, True),
-            ("BB%", summary.get("BB%"), 1, True),
-            ("BABIP", summary.get("BABIP"), 3),
-            ("Barrel%", summary.get("Barrel%"), 1, True),
-            ("Hard-hit%", summary.get("Hard-hit%"), 1, True),
         ]
     )
-    st.caption(
-        "Career BvP uses the local historical database. "
-        f"Pitch-level Statcast rows: {summary.get('data_date_range') or 'not backfilled yet'}. "
-        f"Sample: {summary.get('sample_label', 'Unavailable')}. "
-        f"Last matchup: {summary.get('last_matchup_date') or UNAVAILABLE}."
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
-
+    _render_matchup_heatmap(summary)
     _render_exact_pitch_table(research.get("comparison_rows", []))
-    _render_pitch_location(research.get("pitch_events", []))
-    _render_plate_appearance_logs(research.get("plate_appearances", []), research.get("pitch_events", []))
 
 
 def _metric_grid(items):
@@ -580,41 +806,102 @@ def _metric_grid(items):
     st.markdown("".join(html), unsafe_allow_html=True)
 
 
-def _render_exact_pitch_table(rows):
-    st.markdown('<div class="hvp-shell">', unsafe_allow_html=True)
-    st.markdown("#### Exact Pitch-Type Analysis")
-    if not rows:
-        st.info(
-            "No exact pitch-level history is available yet for this pair. "
-            "Run the pitch-data refresh or backfill to populate exact pitch chips, zone rates, and CSW/whiff detail."
+def _heat_class(value, baseline, higher_is_better=True):
+    value = safe_float(value)
+    if value is None or baseline in (None, 0):
+        return "heat-missing"
+    edge = (value - float(baseline)) / abs(float(baseline))
+    if not higher_is_better:
+        edge *= -1
+    if edge >= 0.12:
+        return "heat-strong"
+    if edge >= 0.03:
+        return "heat-good"
+    if edge > -0.03:
+        return "heat-neutral"
+    return "heat-poor"
+
+
+def _heat_value(value, percent=False):
+    value = safe_float(value)
+    if value is None:
+        return "—"
+    if percent:
+        return f"{value:.1f}%"
+    return f"{value:.3f}".replace("0.", ".")
+
+
+def _render_matchup_heatmap(summary):
+    metrics = (
+        ("AVG", 0.250, True, False),
+        ("OBP", 0.320, True, False),
+        ("SLG", 0.410, True, False),
+        ("OPS", 0.730, True, False),
+        ("wOBA", 0.315, True, False),
+        ("K%", 22.0, False, True),
+        ("BB%", 8.0, True, True),
+    )
+    cells = []
+    for label, baseline, higher_is_better, percent in metrics:
+        value = safe_float(summary.get(label))
+        cells.append(
+            f'<div class="hvp-heat-cell {_heat_class(value, baseline, higher_is_better)}">'
+            f"<span>{escape(label)}</span><strong>{_heat_value(value, percent=percent)}</strong>"
+            "</div>"
         )
-        st.markdown("</div>", unsafe_allow_html=True)
+    cells.append(
+        '<div class="hvp-heat-cell heat-sample">'
+        f"<span>Sample</span><strong>{safe_int(summary.get('PA'))} PA</strong></div>"
+    )
+    sample = summary.get("sample_label") or "Matchup sample"
+    st.html(
+        '<div class="hvp-heat-shell">'
+        f'<div class="hvp-heat-title">Matchup Stat Grid · {escape(str(sample))}</div>'
+        f'<div class="hvp-heat-grid">{"".join(cells)}</div></div>'
+    )
+
+
+def _render_exact_pitch_table(rows):
+    frame = pd.DataFrame(rows or [])
+    if frame.empty:
         return
-    frame = pd.DataFrame(rows)
-    display_columns = [
-        "Pitch",
-        "Code",
-        "Pitcher Usage",
-        "Pitcher Count",
-        "Avg Velo",
-        "Direct Count",
-        "Whiff%",
-        "CSW%",
-        "Contact%",
-        "Hard-hit%",
-        "Barrel%",
-        "Direct AVG",
-        "Direct SLG",
-        "Direct wOBA",
-        "Direct xwOBA",
-        "Batter Pitch AVG",
-        "Batter Pitch SLG",
-        "Batter Pitch K%",
-        "Sample",
-    ]
-    display_columns = [column for column in display_columns if column in frame.columns]
-    st.dataframe(frame[display_columns], hide_index=True, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+    frame["Direct Count"] = pd.to_numeric(frame.get("Direct Count"), errors="coerce")
+    frame = frame[frame["Direct Count"].gt(0)].copy()
+    if frame.empty:
+        return
+    frame = frame.sort_values(["Direct Count", "Pitch"], ascending=[False, True])
+    columns = (
+        ("Direct AVG", "AVG", 0.250, True, False),
+        ("Direct SLG", "SLG", 0.410, True, False),
+        ("Direct wOBA", "wOBA", 0.315, True, False),
+        ("Whiff%", "Whiff%", 25.0, False, True),
+        ("CSW%", "CSW%", 27.0, False, True),
+    )
+    header = "".join(f"<th>{escape(label)}</th>" for _, label, *_ in columns)
+    body = []
+    for _, row in frame.iterrows():
+        cells = []
+        for key, _, baseline, higher_is_better, percent in columns:
+            value = safe_float(row.get(key))
+            cells.append(
+                f'<td class="{_heat_class(value, baseline, higher_is_better)}">'
+                f"{_heat_value(value, percent=percent)}</td>"
+            )
+        body.append(
+            "<tr>"
+            f'<td class="hvp-pitch-name">{escape(str(row.get("Pitch") or "Pitch"))}</td>'
+            f'<td class="heat-sample">{safe_int(row.get("Direct Count"))}</td>'
+            f'<td class="heat-sample">{safe_int(row.get("Balls in Play"))}</td>'
+            f"{''.join(cells)}"
+            "</tr>"
+        )
+    st.html(
+        '<div class="hvp-heat-shell">'
+        '<div class="hvp-heat-title">Exact Pitch-Type Analysis · Selected Matchup</div>'
+        '<div class="hvp-pitch-heat"><table><thead><tr>'
+        f"<th>Pitch</th><th>Pitches</th><th>BIP</th>{header}"
+        f"</tr></thead><tbody>{''.join(body)}</tbody></table></div></div>"
+    )
 
 
 def _render_pitch_location(pitch_events):
