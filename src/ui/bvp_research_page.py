@@ -13,7 +13,6 @@ from src.live_game import player_headshot_url
 from src.pitch_analysis import UNAVAILABLE, fmt_metric, safe_float, safe_int
 from src.player_rankings import rank_hitters_by_wrc_plus
 
-PAGE_TITLE = "Advanced Batter vs Pitcher Research"
 PAGE_TAB_LABEL = "Advanced HVP"
 BULLPEN_TAB_LABEL = "Bullpen"
 
@@ -265,13 +264,6 @@ def _render_hvp_styles():
             border-radius: 6px;
             padding: 14px 16px;
             margin: 0 0 14px;
-        }
-        .hvp-title {
-            color: #071b31;
-            font-family: "Bebas Neue", sans-serif;
-            font-size: 2rem;
-            line-height: 1;
-            margin: 0;
         }
         .hvp-player-card {
             align-items: center;
@@ -577,7 +569,6 @@ def _render_hvp_styles():
         }
         @media (max-width: 760px) {
             .hvp-shell { padding: 12px; }
-            .hvp-title { font-size: 1.55rem; }
             .hvp-player-card { min-height: 78px; }
             .hvp-player-card img { height: 54px; width: 54px; }
             .hvp-avatar-blank { height: 54px; width: 54px; }
@@ -626,15 +617,6 @@ def render_bvp_research_page(
             st.session_state.hvp_pitcher_id = selected_pitcher_id
     if opponent_context.get("opponent_team_id") is not None:
         st.session_state.hvp_opponent_team_id = int(opponent_context["opponent_team_id"])
-
-    st.markdown(
-        f"""
-        <div class="hvp-shell">
-            <div class="hvp-title">{BULLPEN_TAB_LABEL if analysis_mode == 'Projected Bullpen' else PAGE_TITLE}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
     _render_selection_header(
         schedule_df,
