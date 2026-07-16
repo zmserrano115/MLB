@@ -3805,6 +3805,7 @@ st.markdown(
         cursor: pointer;
         gap: 0 !important;
         text-align: center;
+        transition: background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
     }
 
     [class*="st-key-box_tabs_"] .stButtonGroup button[kind="segmented_controlActive"] {
@@ -3814,6 +3815,10 @@ st.markdown(
         background: var(--panel);
         color: var(--text);
         font-weight: 700;
+        box-shadow: 0 3px 8px rgba(15, 59, 102, 0.12) !important;
+        transform: translateY(-2px);
+        position: relative;
+        z-index: 1;
     }
 
     [class*="st-key-box_tabs_"] .stButtonGroup button:hover {
