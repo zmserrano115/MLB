@@ -2,7 +2,7 @@ from html import escape
 
 import pandas as pd
 
-from all_rise.domain import recent_form as _domain_recent_form
+from src.domain import recent_form as _domain_recent_form
 
 
 def recent_game_values(game_log_df, value_column, limit=5):

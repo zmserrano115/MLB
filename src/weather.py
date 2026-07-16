@@ -5,7 +5,7 @@ import time
 import pandas as pd
 import requests
 
-from all_rise.domain import weather as _domain_weather
+from src.domain import weather as _domain_weather
 from src.api_client import get_json
 
 

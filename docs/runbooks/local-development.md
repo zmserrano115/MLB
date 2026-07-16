@@ -1,8 +1,10 @@
 # Local development
 
-1. Copy `.env.example` to `.env` and adjust only local values.
-2. Run `docker compose up --build` for PostgreSQL, Redis, the migration baseline, API, worker, and web shell.
-3. Run `docker compose --profile legacy up --build` to include the existing Streamlit application.
+1. Create and activate a Python virtual environment.
+2. Install `requirements-dev.txt`.
+3. Run `streamlit run app.py`.
+4. Run `pytest` before committing changes.
 
-The root `app.py`, legacy `src/`, and `components/` remain available as the
-rollback target through the Phase 9 canary and Phase 10 retirement approval.
+The local database defaults to `data/mlb.db`. Turso can be enabled with
+`TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`. The serving process should keep
+`TURSO_READ_ONLY=true`.

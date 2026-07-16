@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Mapping
+from collections.abc import Mapping
+from datetime import UTC, datetime
 
 import pandas as pd
 
@@ -20,11 +20,10 @@ from src.pitch_analysis import (
     ordered_pitch_sequence,
     pitch_name_for_code,
     plate_appearance_logs_from_pitches,
-    safe_divide,
     safe_float,
     safe_int,
 )
-
+from src.pitch_data import fetch_matchup_pitch_events, save_pitch_events
 
 NO_HISTORY_GRADES = {"no history", "no pitcher id", "no data"}
 
@@ -59,7 +58,7 @@ def player_search_options(df):
         if player_id is None or not name:
             continue
         team = row.get("Team") or row.get("team_name") or ""
-        label = f"{name} - {team} ({player_id})"
+        label = f"{name} - {team}" if team else str(name)
         options[label] = player_id
     return dict(sorted(options.items(), key=lambda item: item[0].casefold()))
 
@@ -75,7 +74,8 @@ def game_options(schedule_df):
             continue
         label = row.get("game") or f"{row.get('away_team')} @ {row.get('home_team')}"
         status = row.get("game_status") or row.get("status") or ""
-        options[f"{label} - {status} ({game_pk})"] = game_pk
+        display = f"{label} - {status}" if status else str(label)
+        options[display] = game_pk
     return options
 
 
@@ -164,20 +164,28 @@ def specific_pitcher_research(batter_id, pitcher_id, season):
 
     direct_stats = direct_stats_for_pair(batter_id, pitcher_id)
     game_logs = database.get_batter_vs_pitcher_game_logs_from_db(batter_id, pitcher_id)
+    season_game_logs = [
+        row
+        for row in game_logs
+        if clean_player_id(row.get("season")) == int(season)
+    ]
     pitch_events = _call_database_list(
         "get_pitch_level_events_for_matchup",
         batter_id,
         pitcher_id,
+        season,
     )
-    stored_pa = _call_database_list(
-        "get_plate_appearance_sequences_for_matchup",
-        batter_id,
-        pitcher_id,
-    )
-    if stored_pa:
-        plate_appearances = stored_pa
-    else:
-        plate_appearances = plate_appearance_logs_from_pitches(pitch_events)
+    pitch_source = "Stored Statcast"
+    if not pitch_events and season_game_logs:
+        pitch_events = fetch_matchup_pitch_events(
+            batter_id,
+            pitcher_id,
+            season_game_logs,
+        )
+        if pitch_events:
+            pitch_source = "MLB StatsAPI game feeds"
+            save_pitch_events(pitch_events)
+    plate_appearances = plate_appearance_logs_from_pitches(pitch_events)
     direct_pitch_types = database.get_bvp_pitch_type_stats_from_db(
         batter_id,
         pitcher_id,
@@ -199,6 +207,7 @@ def specific_pitcher_research(batter_id, pitcher_id, season):
         "pitch_events": ordered_pitch_sequence(pitch_events),
         "plate_appearances": plate_appearances,
         "pitch_type_rows": direct_pitch_types,
+        "pitch_source": pitch_source if pitch_events else None,
         "comparison_rows": exact_pitch_comparison_rows(
             direct_pitch_types,
             pitcher_pitch_mix,
@@ -219,7 +228,9 @@ def exact_pitch_comparison_rows(direct_pitch_types, pitcher_pitch_mix, batter_pi
         normalize_pitch_code(row.get("pitch_code") or row.get("pitch_type")): dict(row)
         for row in (batter_pitch_types or [])
     }
-    codes = sorted(set(direct_by_code) | set(pitcher_by_code) | set(batter_by_code))
+    # A direct matchup chart must never be populated from the pitcher's overall
+    # mix. Overall rows are lookup context only after a direct pitch type exists.
+    codes = sorted(direct_by_code)
     rows = []
     for code in codes:
         direct = direct_by_code.get(code, {})
@@ -230,7 +241,7 @@ def exact_pitch_comparison_rows(direct_pitch_types, pitcher_pitch_mix, batter_pi
                 "Pitch": pitch_name_for_code(code),
                 "Code": code,
                 "Pitcher Usage": pitcher.get("PERCENTAGE") or direct.get("usage_pct"),
-                "Pitcher Count": pitcher.get("COUNT") or direct.get("pitch_count"),
+                "Pitcher Count": pitcher.get("COUNT"),
                 "Avg Velo": pitcher.get("AVG SPEED") or direct.get("avg_velocity"),
                 "Direct Count": direct.get("pitch_count"),
                 "Whiff%": direct.get("whiff_pct"),
@@ -246,6 +257,7 @@ def exact_pitch_comparison_rows(direct_pitch_types, pitcher_pitch_mix, batter_pi
                 "Batter Pitch SLG": batter.get("SLG"),
                 "Batter Pitch K%": batter.get("K%"),
                 "Sample": direct.get("sample_size"),
+                "Balls in Play": direct.get("balls_in_play"),
             }
         )
     return rows
@@ -312,7 +324,9 @@ def _primary_pitches(pitch_mix, limit=3):
     if not rows:
         return ""
     rows.sort(
-        key=lambda row: safe_float(row.get("PERCENTAGE") or row.get("percentage") or row.get("COUNT")) or 0,
+        key=lambda row: safe_float(
+            row.get("PERCENTAGE") or row.get("percentage") or row.get("COUNT")
+        ) or 0,
         reverse=True,
     )
     labels = []
@@ -363,7 +377,7 @@ def projected_bullpen_research(
         team_id=opponent_team_id,
         doubleheader=doubleheader,
         already_used_pitcher_ids=already_used_pitcher_ids,
-        projection_timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        projection_timestamp=datetime.now(UTC).isoformat(timespec="seconds"),
     )
     reliever_ids = [
         row["player_id"]

@@ -55,7 +55,9 @@ from src.recent_form import build_recent_bar_chart_html
 from src.scoring import parse_baseball_ip
 from src import database
 from src.time_utils import current_app_date
+from src.player_rankings import rank_hitters_by_wrc_plus
 from src.ui.bvp_research_page import (
+    BULLPEN_TAB_LABEL,
     PAGE_TAB_LABEL as HVP_PAGE_TAB_LABEL,
     render_bvp_research_page,
 )
@@ -353,6 +355,14 @@ st.markdown(
         display: none;
     }
 
+    header[data-testid="stHeader"] [data-testid="stToolbar"],
+    header[data-testid="stHeader"] [data-testid="stHeaderActionElements"],
+    header[data-testid="stHeader"] [data-testid="stMainMenu"],
+    header[data-testid="stHeader"] a[href*="github.com"],
+    [data-testid="stDecoration"] {
+        display: none !important;
+    }
+
     header[data-testid="stHeader"] button,
     header[data-testid="stHeader"] button *,
     div[data-testid="collapsedControl"] button,
@@ -617,6 +627,11 @@ st.markdown(
         letter-spacing: 0.035em;
     }
 
+    [data-baseweb="popover"] {
+        z-index: 9990 !important;
+        max-width: calc(100vw - 16px) !important;
+    }
+
     .stSegmentedControl [data-baseweb="button-group"] {
         gap: 0;
         border-bottom: 1px solid var(--line);
@@ -629,13 +644,13 @@ st.markdown(
         width: 100%;
     }
 
-    .stRadio [role="radiogroup"] input,
-    .stRadio [role="radiogroup"] svg {
+    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] input,
+    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] svg {
         display: none !important;
     }
 
-    .stRadio label[data-baseweb="radio"] > div:first-child,
-    .stRadio [role="radiogroup"] label > div:first-child:not([data-testid="stMarkdownContainer"]) {
+    [class*="st-key-box_tabs_"] .stRadio label[data-baseweb="radio"] > div:first-child,
+    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label > div:first-child:not([data-testid="stMarkdownContainer"]) {
         display: none !important;
         width: 0 !important;
         height: 0 !important;
@@ -1013,6 +1028,8 @@ st.markdown(
     [data-testid="stDialog"] [role="dialog"] {
         width: min(1180px, calc(100vw - 32px)) !important;
         max-width: 1180px !important;
+        max-height: calc(100dvh - 80px) !important;
+        overflow-y: auto !important;
         border: 1px solid #cbd5e1;
         border-radius: 0;
         background: #f8fafc;
@@ -3778,13 +3795,13 @@ st.markdown(
         border-bottom: 2px solid #245f96 !important;
     }
 
-    .stRadio [role="radiogroup"] {
+    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] {
         gap: 0;
         border-bottom: 1px solid var(--line);
         margin-bottom: 4px;
     }
 
-    .stRadio [role="radiogroup"] label {
+    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -3801,7 +3818,7 @@ st.markdown(
         text-align: center;
     }
 
-    .stRadio [role="radiogroup"] label:has(input:checked) {
+    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label:has(input:checked) {
         margin-bottom: -1px;
         border-color: var(--line);
         border-bottom-color: #245f96;
@@ -3810,12 +3827,12 @@ st.markdown(
         font-weight: 700;
     }
 
-    .stRadio [role="radiogroup"] label:hover {
+    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label:hover {
         color: var(--text);
         background: #f6f8fa;
     }
 
-    .stRadio [role="radiogroup"] [data-testid="stMarkdownContainer"] p {
+    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] [data-testid="stMarkdownContainer"] p {
         font-size: 15px;
         font-family: var(--font-display) !important;
         font-weight: 400 !important;
@@ -3825,7 +3842,7 @@ st.markdown(
         white-space: nowrap;
     }
 
-    .stRadio [role="radiogroup"] [data-testid="stMarkdownContainer"] {
+    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] [data-testid="stMarkdownContainer"] {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -3880,8 +3897,8 @@ st.markdown(
         }
 
         [class*="st-key-app_header_nav_mount"] .stButton > button {
-            min-height: 36px;
-            padding: 0 10px;
+            min-height: 44px;
+            padding: 0 12px;
             font-size: 14px;
         }
 
@@ -3904,18 +3921,18 @@ st.markdown(
             letter-spacing: 0.035em;
         }
 
-        .stRadio [role="radiogroup"] {
+        [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] {
             overflow-x: auto;
             flex-wrap: nowrap !important;
             scrollbar-width: none;
             -webkit-overflow-scrolling: touch;
         }
 
-        .stRadio [role="radiogroup"]::-webkit-scrollbar {
+        [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"]::-webkit-scrollbar {
             display: none;
         }
 
-        .stRadio [role="radiogroup"] label {
+        [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label {
             flex: 0 0 auto;
             min-height: 46px;
             padding: 0 14px;
@@ -3926,10 +3943,23 @@ st.markdown(
             margin: 8px 0;
         }
 
-        .st-key-matchup_toolbar [data-testid="stHorizontalBlock"] {
+        .st-key-matchup_toolbar > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
             display: grid !important;
-            grid-template-columns: minmax(0, 1fr) 44px minmax(150px, 180px) 44px !important;
+            grid-template-columns: 44px minmax(0, 1fr) 44px !important;
             gap: 8px !important;
+        }
+
+        .st-key-matchup_toolbar > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) {
+            grid-column: 1 / -1;
+        }
+
+        [data-baseweb="popover"] {
+            max-width: calc(100vw - 16px) !important;
+        }
+
+        [data-baseweb="calendar"] {
+            max-width: calc(100vw - 16px) !important;
+            overflow-x: auto !important;
         }
 
         .st-key-matchup_filter_toolbar [data-testid="stHorizontalBlock"] {
@@ -3982,6 +4012,16 @@ st.markdown(
     }
 
     @media (max-width: 900px) {
+        .st-key-matchup_toolbar > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
+            display: grid !important;
+            grid-template-columns: 44px minmax(0, 1fr) 44px !important;
+            gap: 8px !important;
+        }
+
+        .st-key-matchup_toolbar > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) {
+            grid-column: 1 / -1;
+        }
+
         .block-container {
             padding-top: 0.95rem;
         }
@@ -4778,16 +4818,13 @@ def open_advanced_hvp(
     st.query_params["matchup_table"] = HVP_PAGE_TAB_LABEL
     if batter_id is not None and not is_missing_value(batter_id):
         st.session_state.hvp_batter_id = int(batter_id)
-        st.query_params["batter_id"] = str(int(batter_id))
     if pitcher_id is not None and not is_missing_value(pitcher_id):
         st.session_state.hvp_pitcher_id = int(pitcher_id)
-        st.query_params["pitcher_id"] = str(int(pitcher_id))
     if game_pk is not None and not is_missing_value(game_pk):
         st.session_state.hvp_game_pk = int(game_pk)
         st.query_params["game_pk"] = str(int(game_pk))
     if opponent_team_id is not None and not is_missing_value(opponent_team_id):
         st.session_state.hvp_opponent_team_id = int(opponent_team_id)
-        st.query_params["opponent_team_id"] = str(int(opponent_team_id))
     st.rerun(scope="app")
 
 
@@ -4840,13 +4877,14 @@ def render_box_tabs(tab_key, options, state_key, default=None):
         active_value = default
         st.session_state[state_key] = active_value
 
-    return st.radio(
-        tab_key,
-        options,
-        horizontal=True,
-        key=state_key,
-        label_visibility="collapsed",
-    )
+    with st.container(key=f"box_tabs_{dashboard_view_slug(state_key)}"):
+        return st.radio(
+            tab_key,
+            options,
+            horizontal=True,
+            key=state_key,
+            label_visibility="collapsed",
+        )
 
 
 def selected_game_row(schedule_df, game_pk):
@@ -11250,31 +11288,6 @@ def capped_volume_score(df, column, quantile=0.85, floor=1):
     return (values / target).clip(upper=1).fillna(0)
 
 
-def add_batter_leader_score(result):
-    pa_volume = capped_volume_score(result, "PA", floor=80)
-    ab_volume = capped_volume_score(result, "AB", floor=65)
-    sample_factor = 0.35 + (0.65 * pa_volume)
-
-    result["leader_score"] = (
-        0.18 * normalized_score(result, "OPS") * sample_factor
-        + 0.12 * normalized_score(result, "AVG") * sample_factor
-        + 0.10 * normalized_score(result, "OBP") * sample_factor
-        + 0.10 * normalized_score(result, "SLG") * sample_factor
-        + 0.10 * pa_volume
-        + 0.06 * ab_volume
-        + 0.08 * normalized_score(result, "H")
-        + 0.07 * normalized_score(result, "HR")
-        + 0.07 * normalized_score(result, "RBI")
-        + 0.05 * normalized_score(result, "BB")
-        + 0.04 * normalized_score(result, "R")
-        + 0.03 * normalized_score(result, "SB")
-        + 0.02 * normalized_score(result, "HBP")
-        + 0.05 * normalized_score(result, "K%", higher_is_better=False)
-        + 0.03 * normalized_score(result, "BB%")
-    )
-    return result
-
-
 def add_pitcher_leader_score(result):
     result = result.copy()
     if "IP" in result.columns:
@@ -11337,7 +11350,7 @@ def prepare_player_stats(df, player_type):
         )
     else:
         result = result.rename(columns={"SO": "K"})
-        result = add_batter_leader_score(result)
+        result = rank_hitters_by_wrc_plus(result)
         columns = [
             *identity_columns,
             "Player",
@@ -11355,14 +11368,10 @@ def prepare_player_stats(df, player_type):
             "OBP",
             "SLG",
             "OPS",
+            "wRC+",
             "K%",
             "BB%",
         ]
-        result = result.sort_values(
-            ["leader_score", "PA", "AB", "Player"],
-            ascending=[False, False, False, True],
-            na_position="last",
-        )
 
     columns = [column for column in columns if column in result.columns]
     return result[columns].reset_index(drop=True)
@@ -11387,6 +11396,7 @@ STATS_COLUMN_LABELS = {
     "OBP": "OBP",
     "SLG": "SLG",
     "OPS": "OPS",
+    "wRC+": "wRC+",
     "K%": "K%",
     "BB%": "BB%",
     "IP": "IP",
@@ -11413,6 +11423,8 @@ def stats_cell_value(column, value, mode="Total"):
     if column in STATS_TWO_DECIMAL_COLUMNS and pd.notna(number):
         return f"{float(number):.2f}"
     if column == "G" and pd.notna(number):
+        return f"{float(number):.0f}"
+    if column == "wRC+" and pd.notna(number):
         return f"{float(number):.0f}"
     if (
         mode == "Per Game"
@@ -11656,7 +11668,7 @@ def render_player_stats_tab(batter_stats_df, pitcher_stats_df, season):
     st.markdown(
         """
         <div class="section-shell">
-            <div class="section-title">Season Player Leaders</div>
+            <div class="section-title">Season Player Leaders · wRC+ Hitter Ranking</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -11691,7 +11703,7 @@ def render_player_stats_tab(batter_stats_df, pitcher_stats_df, season):
         )
         render_clean_stats_table(
             filter_player_leaders_for_search(batter_leaders, batter_search),
-            ["Player", "Team", "PA", "AB", "R", "H", "BB", "HBP", "K", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS", "K%", "BB%"],
+            ["Player", "Team", "wRC+", "PA", "AB", "R", "H", "BB", "HBP", "K", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS", "K%", "BB%"],
             table_key="player-batter-stats",
             player_log_group="batting",
             season=season,
@@ -14341,7 +14353,7 @@ def render_matchup_filter_fragment(
     pitcher_k_matchups,
 ):
     """Keep common matchup filters on a fragment-only rerun path."""
-    if active_matchup_table == HVP_PAGE_TAB_LABEL:
+    if active_matchup_table in {HVP_PAGE_TAB_LABEL, BULLPEN_TAB_LABEL}:
         render_bvp_research_page(
             schedule_df=schedule_df,
             batters_df=batters_df,
@@ -14350,6 +14362,11 @@ def render_matchup_filter_fragment(
             selected_date=st.session_state.selected_game_date,
             database_cache_key=database.db_cache_key(),
             active_roster_loader=load_active_team_rosters,
+            analysis_mode=(
+                "Projected Bullpen"
+                if active_matchup_table == BULLPEN_TAB_LABEL
+                else "Specific Pitcher"
+            ),
         )
         return
 
@@ -14642,9 +14659,10 @@ needs_schedule = active_view in {"Games", "Matchups", "Weather", "Streaks"}
 needs_weather = active_view in {"Games", "Matchups", "Weather"}
 MATCHUP_TABLE_OPTIONS = [
     "Hitter vs Pitcher",
-    HVP_PAGE_TAB_LABEL,
     "Hitter vs Throwing Hand",
+    HVP_PAGE_TAB_LABEL,
     "Pitcher vs Opponent",
+    BULLPEN_TAB_LABEL,
 ]
 matchup_table_options = MATCHUP_TABLE_OPTIONS
 session_matchup_table = st.session_state.get("active_matchup_table")
@@ -14675,7 +14693,7 @@ if active_matchup_table not in matchup_table_options:
     st.session_state.active_matchup_table = active_matchup_table
 st.session_state.active_matchup_table = active_matchup_table
 hand_split_preload_future = None
-if active_view == "Matchups" and active_matchup_table != HVP_PAGE_TAB_LABEL:
+if active_view == "Matchups" and active_matchup_table == "Hitter vs Throwing Hand":
     _, hand_split_preload_future = start_hand_split_preload(
         st.session_state.selected_game_date.year
     )
@@ -14707,12 +14725,7 @@ if needs_schedule and active_view != "Weather":
     }[active_view]
     with st.container(key=toolbar_key):
         if active_view == "Matchups":
-            toolbar_columns = st.columns(
-                [0.74, 0.05, 0.16, 0.05],
-                gap="small",
-                vertical_alignment="bottom",
-            )
-            with toolbar_columns[0]:
+            if active_matchup_table == HVP_PAGE_TAB_LABEL:
                 active_matchup_table = render_box_tabs(
                     "matchup-table-tabs",
                     matchup_table_options,
@@ -14720,9 +14733,26 @@ if needs_schedule and active_view != "Weather":
                     matchup_table_options[0],
                 )
                 st.query_params["matchup_table"] = active_matchup_table
-            previous_column = toolbar_columns[1]
-            date_column = toolbar_columns[2]
-            next_column = toolbar_columns[3]
+                previous_column = None
+                date_column = None
+                next_column = None
+            else:
+                toolbar_columns = st.columns(
+                    [0.74, 0.05, 0.16, 0.05],
+                    gap="small",
+                    vertical_alignment="bottom",
+                )
+                with toolbar_columns[0]:
+                    active_matchup_table = render_box_tabs(
+                        "matchup-table-tabs",
+                        matchup_table_options,
+                        "active_matchup_table",
+                        matchup_table_options[0],
+                    )
+                    st.query_params["matchup_table"] = active_matchup_table
+                previous_column = toolbar_columns[1]
+                date_column = toolbar_columns[2]
+                next_column = toolbar_columns[3]
         elif active_view == "Games":
             toolbar_columns = st.columns(
                 [2.7, 0.38, 1.45, 0.38, 3.25],
@@ -14744,30 +14774,31 @@ if needs_schedule and active_view != "Weather":
             date_column = toolbar_columns[1]
             next_column = toolbar_columns[2]
 
-        with previous_column:
-            st.button(
-                "\u2039",
-                key="previous_game_date",
-                help="Previous day",
-                on_click=shift_selected_date,
-                args=(-1,),
-                use_container_width=True,
-            )
-        with date_column:
-            selected_date = st.date_input(
-                "Game Date",
-                key="selected_game_date",
-                label_visibility="collapsed",
-            )
-        with next_column:
-            st.button(
-                "\u203a",
-                key="next_game_date",
-                help="Next day",
-                on_click=shift_selected_date,
-                args=(1,),
-                use_container_width=True,
-            )
+        if previous_column is not None:
+            with previous_column:
+                st.button(
+                    "\u2039",
+                    key="previous_game_date",
+                    help="Previous day",
+                    on_click=shift_selected_date,
+                    args=(-1,),
+                    use_container_width=True,
+                )
+            with date_column:
+                selected_date = st.date_input(
+                    "Game Date",
+                    key="selected_game_date",
+                    label_visibility="collapsed",
+                )
+            with next_column:
+                st.button(
+                    "\u203a",
+                    key="next_game_date",
+                    help="Next day",
+                    on_click=shift_selected_date,
+                    args=(1,),
+                    use_container_width=True,
+                )
 
 season = selected_date.year
 
@@ -15457,7 +15488,7 @@ if active_view == "Games":
 else:
     selected_game = "All Games"
 
-if needs_matchups and active_matchup_table != HVP_PAGE_TAB_LABEL:
+if needs_matchups and active_matchup_table not in {HVP_PAGE_TAB_LABEL, BULLPEN_TAB_LABEL}:
     # Build each table from the full slate. Game/player controls below only
     # filter these cached results, so changing a filter does not rebuild stats.
     hitter_pool = matchup_batter_pool(

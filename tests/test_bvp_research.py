@@ -3,6 +3,7 @@ import unittest
 import pandas as pd
 
 from src.bvp_research import (
+    exact_pitch_comparison_rows,
     game_context,
     game_options,
     opponent_context_for_batter,
@@ -27,6 +28,18 @@ class BvpResearchTests(unittest.TestCase):
         )
         self.assertEqual(list(game_options(schedule).values()), [123])
         self.assertEqual(list(player_search_options(players).values()), [99])
+        self.assertNotIn("123", next(iter(game_options(schedule))))
+        self.assertNotIn("99", next(iter(player_search_options(players))))
+
+    def test_exact_pitch_rows_require_direct_matchup_history(self):
+        overall_mix = [{"pitch_code": "FF", "COUNT": 500, "PERCENTAGE": 55.0}]
+        self.assertEqual(exact_pitch_comparison_rows([], overall_mix), [])
+        rows = exact_pitch_comparison_rows(
+            [{"pitch_type": "SL", "pitch_count": 7, "wOBA": 0.250}],
+            overall_mix,
+        )
+        self.assertEqual([row["Code"] for row in rows], ["SL"])
+        self.assertEqual(rows[0]["Direct Count"], 7)
 
     def test_opponent_context_selects_probable_starter(self):
         schedule = pd.DataFrame(

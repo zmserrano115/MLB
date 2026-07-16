@@ -1,0 +1,8 @@
+# Local Google Cloud SDK installation and review-only Terraform plans
+/google-cloud-sdk/
+/cloud_env.bat
+/install_mode
+/supercloud-16x16.ico
+/uninstaller.exe
+/infra/terraform/plans/
+/.tools/

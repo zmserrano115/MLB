@@ -3,8 +3,8 @@ from datetime import date
 
 import pandas as pd
 
-from all_rise.domain import live as _domain_live
-from all_rise.domain import streaks as _domain_streaks
+from src.domain import live as _domain_live
+from src.domain import streaks as _domain_streaks
 from src.api_client import get_json
 
 BOXSCORE_URL = "https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore"

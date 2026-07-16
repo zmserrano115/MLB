@@ -59,3 +59,6 @@ data/*.db-shm
 # Legacy PyBaseball cache
 pybaseball/
 .cache/
+
+# Local binaries retained alongside the inactive Google Cloud archive
+archive/google-cloud/tooling/

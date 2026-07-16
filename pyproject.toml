@@ -1,50 +1,15 @@
-[dependency-groups]
-dev = [
-  "httpx2>=2,<3",
-  "mypy>=1.15,<2",
-  "pytest>=9,<10",
-  "ruff>=0.11,<1",
-]
-
 [tool.pytest.ini_options]
 addopts = "-ra"
-pythonpath = [".", "apps/api/src", "packages/backend/src", "services/worker/src"]
+pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-extend-exclude = ["app.py"]
+extend-exclude = ["app.py", "archive"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
-[tool.mypy]
-python_version = "3.12"
-strict = true
-warn_unused_configs = true
-mypy_path = ["apps/api/src", "packages/backend/src", "services/worker/src"]
-packages = ["all_rise", "all_rise_api", "all_rise_worker"]
-
-[[tool.mypy.overrides]]
-module = ["numpy", "pandas"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["google.cloud", "google.cloud.storage"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [
-  "all_rise.domain.bullpen_projection",
-  "all_rise.domain.pitch_analysis",
-  "all_rise.domain.scoring",
-]
-check_untyped_defs = true
-disallow_any_generics = false
-disallow_incomplete_defs = false
-disallow_untyped_calls = false
-disallow_untyped_defs = false
-
-[tool.uv.workspace]
-members = ["apps/api", "packages/backend", "services/worker"]
+[tool.ruff.lint.per-file-ignores]
+"src/ui/bvp_research_page.py" = ["E501"]

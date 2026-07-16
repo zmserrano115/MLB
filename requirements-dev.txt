@@ -1,5 +1,3 @@
 -r requirements.txt
--e ./apps/api
--e ./services/worker
-httpx2>=2,<3
 pytest
+ruff

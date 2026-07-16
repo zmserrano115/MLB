@@ -1,3 +1,4 @@
+-e ./packages/backend
 numpy
 pandas
 requests

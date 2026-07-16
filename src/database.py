@@ -2495,7 +2495,9 @@ def get_batter_vs_pitcher_game_logs_from_db(batter_id, pitcher_id):
         rows = conn.execute(
             """
             SELECT
+                gl.game_pk,
                 gl.game_date,
+                gl.season,
                 gl.batting_team AS team,
                 gl.pitching_team AS opponent,
                 CASE
@@ -2683,6 +2685,8 @@ def get_batter_season_game_logs_from_db(batter_id, season):
                 SUM(gl.PA) AS PA,
                 SUM(gl.AB) AS AB,
                 SUM(gl.H) AS H,
+                SUM(gl.doubles) AS "2B",
+                SUM(gl.triples) AS "3B",
                 SUM(gl.TB) AS TB,
                 SUM(gl.BB) AS BB,
                 SUM(gl.HBP) AS HBP,
@@ -2793,6 +2797,8 @@ def get_batter_season_stats_from_db(season):
                 SUM(gl.PA) AS PA,
                 SUM(gl.AB) AS AB,
                 SUM(gl.H) AS H,
+                SUM(gl.doubles) AS "2B",
+                SUM(gl.triples) AS "3B",
                 0 AS R,
                 SUM(gl.BB) AS BB,
                 SUM(gl.HBP) AS HBP,
@@ -3194,19 +3200,24 @@ def save_bvp_pitch_type_stats(rows):
     return len(rows)
 
 
-def get_pitch_level_events_for_matchup(batter_id, pitcher_id):
+def get_pitch_level_events_for_matchup(batter_id, pitcher_id, season=None):
     if batter_id is None or pitcher_id is None:
         return []
     ensure_database()
+    filters = ["batter_id = ?", "pitcher_id = ?"]
+    params = [int(batter_id), int(pitcher_id)]
+    if season is not None:
+        filters.append("season = ?")
+        params.append(int(season))
     with read_connection() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT *
             FROM pitch_level_events
-            WHERE batter_id = ? AND pitcher_id = ?
+            WHERE {' AND '.join(filters)}
             ORDER BY game_date DESC, game_pk DESC, at_bat_number, pitch_number
             """,
-            (int(batter_id), int(pitcher_id)),
+            params,
         ).fetchall()
     return [dict(row) for row in rows]
 

@@ -91,7 +91,10 @@ class PitchAnalysisTests(unittest.TestCase):
 
     def test_batting_rates_and_division_by_zero(self):
         rates = calculate_batting_rates(
-            {"PA": 10, "AB": 8, "H": 4, "2B": 1, "3B": 0, "HR": 1, "BB": 1, "HBP": 1, "SF": 0, "SO": 2}
+            {
+                "PA": 10, "AB": 8, "H": 4, "2B": 1, "3B": 0,
+                "HR": 1, "BB": 1, "HBP": 1, "SF": 0, "SO": 2,
+            }
         )
         self.assertEqual(rates["AVG"], 0.5)
         self.assertEqual(rates["SLG"], 1.0)
@@ -129,6 +132,19 @@ class PitchAnalysisTests(unittest.TestCase):
         summaries = calculate_pitch_type_summaries(rows)
         self.assertEqual({row["pitch_type"] for row in summaries}, {"ST", "SL"})
         self.assertTrue(all(row["pitch_count"] == 1 for row in summaries))
+
+    def test_pitch_type_summary_deduplicates_and_drops_null_codes(self):
+        pitch = {
+            "game_pk": 1,
+            "at_bat_number": 2,
+            "pitch_number": 3,
+            "pitch_type": "FF",
+            "pitch_description": "swinging_strike",
+        }
+        summaries = calculate_pitch_type_summaries([pitch, dict(pitch), {"pitch_type": None}])
+        self.assertEqual(len(summaries), 1)
+        self.assertEqual(summaries[0]["pitch_type"], "FF")
+        self.assertEqual(summaries[0]["pitch_count"], 1)
 
     def test_small_sample_shrinkage_and_evidence_blend(self):
         self.assertAlmostEqual(shrink_rate(1.0, 1, 0.300, 9), 0.370)
