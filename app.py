@@ -632,7 +632,7 @@ st.markdown(
         max-width: calc(100vw - 16px) !important;
     }
 
-    .stButtonGroup [data-baseweb="button-group"] {
+    .stButtonGroup [role="radiogroup"] {
         gap: 0;
         border-bottom: 1px solid var(--line);
         margin-bottom: 8px;
@@ -656,7 +656,9 @@ st.markdown(
         font-weight: 500 !important;
     }
 
-    .stButtonGroup button[kind="segmented_controlActive"] {
+    .stButtonGroup button[kind="segmented_controlActive"],
+    .stButtonGroup button[aria-checked="true"],
+    .stButtonGroup button[data-selected="true"] {
         border-color: var(--line) !important;
         background: var(--panel) !important;
         color: var(--text) !important;
@@ -3781,7 +3783,7 @@ st.markdown(
         border-bottom: 2px solid #245f96 !important;
     }
 
-    [class*="st-key-box_tabs_"] .stButtonGroup [data-baseweb="button-group"] {
+    [class*="st-key-box_tabs_"] .stButtonGroup [role="radiogroup"] {
         gap: 0;
         border-bottom: 1px solid var(--line);
         margin-bottom: 4px;
@@ -3808,7 +3810,9 @@ st.markdown(
         transition: background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
     }
 
-    [class*="st-key-box_tabs_"] .stButtonGroup button[kind="segmented_controlActive"] {
+    [class*="st-key-box_tabs_"] .stButtonGroup button[kind="segmented_controlActive"],
+    [class*="st-key-box_tabs_"] .stButtonGroup button[aria-checked="true"],
+    [class*="st-key-box_tabs_"] .stButtonGroup button[data-selected="true"] {
         margin-bottom: -1px;
         border-color: var(--line);
         border-bottom-color: #245f96 !important;
@@ -3908,14 +3912,14 @@ st.markdown(
             letter-spacing: 0.035em;
         }
 
-        [class*="st-key-box_tabs_"] .stButtonGroup [data-baseweb="button-group"] {
+        [class*="st-key-box_tabs_"] .stButtonGroup [role="radiogroup"] {
             overflow-x: auto;
             flex-wrap: nowrap !important;
             scrollbar-width: none;
             -webkit-overflow-scrolling: touch;
         }
 
-        [class*="st-key-box_tabs_"] .stButtonGroup [data-baseweb="button-group"]::-webkit-scrollbar {
+        [class*="st-key-box_tabs_"] .stButtonGroup [role="radiogroup"]::-webkit-scrollbar {
             display: none;
         }
 
