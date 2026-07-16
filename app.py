@@ -632,7 +632,7 @@ st.markdown(
         max-width: calc(100vw - 16px) !important;
     }
 
-    .stSegmentedControl [data-baseweb="button-group"] {
+    .stButtonGroup [data-baseweb="button-group"] {
         gap: 0;
         border-bottom: 1px solid var(--line);
         margin-bottom: 8px;
@@ -644,21 +644,7 @@ st.markdown(
         width: 100%;
     }
 
-    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] input,
-    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] svg {
-        display: none !important;
-    }
-
-    [class*="st-key-box_tabs_"] .stRadio label[data-baseweb="radio"] > div:first-child,
-    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label > div:first-child:not([data-testid="stMarkdownContainer"]) {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-    .stSegmentedControl button {
+    .stButtonGroup button {
         min-height: 42px;
         padding: 9px 20px !important;
         border-radius: 0 !important;
@@ -670,7 +656,7 @@ st.markdown(
         font-weight: 500 !important;
     }
 
-    .stSegmentedControl button[aria-pressed="true"] {
+    .stButtonGroup button[kind="segmented_controlActive"] {
         border-color: var(--line) !important;
         background: var(--panel) !important;
         color: var(--text) !important;
@@ -3795,20 +3781,23 @@ st.markdown(
         border-bottom: 2px solid #245f96 !important;
     }
 
-    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] {
+    [class*="st-key-box_tabs_"] .stButtonGroup [data-baseweb="button-group"] {
         gap: 0;
         border-bottom: 1px solid var(--line);
         margin-bottom: 4px;
+        width: 100%;
     }
 
-    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label {
+    [class*="st-key-box_tabs_"] .stButtonGroup button {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        flex: 1 1 0 !important;
+        width: auto !important;
         min-height: 40px;
         padding: 0 18px;
         border: 1px solid transparent;
-        border-bottom: 2px solid transparent;
+        border-bottom: 2px solid transparent !important;
         border-radius: 0;
         background: transparent;
         color: var(--muted);
@@ -3818,21 +3807,21 @@ st.markdown(
         text-align: center;
     }
 
-    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label:has(input:checked) {
+    [class*="st-key-box_tabs_"] .stButtonGroup button[kind="segmented_controlActive"] {
         margin-bottom: -1px;
         border-color: var(--line);
-        border-bottom-color: #245f96;
+        border-bottom-color: #245f96 !important;
         background: var(--panel);
         color: var(--text);
         font-weight: 700;
     }
 
-    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label:hover {
+    [class*="st-key-box_tabs_"] .stButtonGroup button:hover {
         color: var(--text);
         background: #f6f8fa;
     }
 
-    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] [data-testid="stMarkdownContainer"] p {
+    [class*="st-key-box_tabs_"] .stButtonGroup button p {
         font-size: 15px;
         font-family: var(--font-display) !important;
         font-weight: 400 !important;
@@ -3840,13 +3829,6 @@ st.markdown(
         margin: 0 !important;
         text-align: center;
         white-space: nowrap;
-    }
-
-    [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] [data-testid="stMarkdownContainer"] {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
     }
 
     .stButton > button {
@@ -3921,19 +3903,20 @@ st.markdown(
             letter-spacing: 0.035em;
         }
 
-        [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] {
+        [class*="st-key-box_tabs_"] .stButtonGroup [data-baseweb="button-group"] {
             overflow-x: auto;
             flex-wrap: nowrap !important;
             scrollbar-width: none;
             -webkit-overflow-scrolling: touch;
         }
 
-        [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"]::-webkit-scrollbar {
+        [class*="st-key-box_tabs_"] .stButtonGroup [data-baseweb="button-group"]::-webkit-scrollbar {
             display: none;
         }
 
-        [class*="st-key-box_tabs_"] .stRadio [role="radiogroup"] label {
-            flex: 0 0 auto;
+        [class*="st-key-box_tabs_"] .stButtonGroup button {
+            flex: 0 0 auto !important;
+            width: auto !important;
             min-height: 46px;
             padding: 0 14px;
         }
@@ -4875,15 +4858,17 @@ def render_box_tabs(tab_key, options, state_key, default=None):
     active_value = st.session_state.get(state_key, default)
     if active_value not in options:
         active_value = default
-        st.session_state[state_key] = active_value
+    st.session_state[state_key] = active_value
 
     with st.container(key=f"box_tabs_{dashboard_view_slug(state_key)}"):
-        return st.radio(
+        return st.segmented_control(
             tab_key,
             options,
-            horizontal=True,
+            selection_mode="single",
+            required=True,
             key=state_key,
             label_visibility="collapsed",
+            width="stretch",
         )
 
 
