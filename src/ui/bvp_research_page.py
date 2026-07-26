@@ -19,12 +19,24 @@ BULLPEN_TAB_LABEL = "Bullpen"
 
 
 @st.cache_data(show_spinner=False, ttl=600, max_entries=128)
-def _load_specific_research_cached(batter_id, pitcher_id, season, db_key):
+def _load_specific_research_cached(
+    batter_id,
+    pitcher_id,
+    season,
+    db_key,
+    supplemental_pitch_events_json="",
+):
+    supplemental_pitch_events = (
+        json.loads(supplemental_pitch_events_json)
+        if supplemental_pitch_events_json
+        else []
+    )
     return bvp_research.specific_pitcher_research(
         int(batter_id),
         int(pitcher_id),
         int(season),
         backfill_missing=False,
+        supplemental_pitch_events=supplemental_pitch_events,
     )
 
 
@@ -33,18 +45,22 @@ def _start_specific_history_backfill(batter_id, pitcher_id, game_logs_json):
     state = {
         "done": Event(),
         "saved": 0,
+        "events": [],
+        "error": None,
     }
 
     def load_missing_history():
         try:
             game_logs = json.loads(game_logs_json)
-            state["saved"] = len(
-                bvp_research.backfill_matchup_pitch_history(
-                    int(batter_id),
-                    int(pitcher_id),
-                    game_logs,
-                )
+            events = bvp_research.backfill_matchup_pitch_history(
+                int(batter_id),
+                int(pitcher_id),
+                game_logs,
             )
+            state["events"] = list(events or [])
+            state["saved"] = len(state["events"])
+        except Exception as exc:
+            state["error"] = str(exc)
         finally:
             state["done"].set()
 
@@ -1222,6 +1238,28 @@ def _render_specific_pitcher_mode(
         int(season),
         database_cache_key,
     )
+    missing_game_logs = research.get("missing_pitch_game_logs", [])
+    backfill_state = None
+    if missing_game_logs:
+        game_logs_json = json.dumps(missing_game_logs, sort_keys=True, default=str)
+        backfill_state = _start_specific_history_backfill(
+            int(batter_id),
+            int(pitcher_id),
+            game_logs_json,
+        )
+        if backfill_state["done"].is_set() and backfill_state.get("events"):
+            supplemental_pitch_events_json = json.dumps(
+                backfill_state["events"],
+                sort_keys=True,
+                default=str,
+            )
+            research = _load_specific_research_cached(
+                int(batter_id),
+                int(pitcher_id),
+                int(season),
+                database_cache_key,
+                supplemental_pitch_events_json,
+            )
     summary = research.get("summary", {})
     st.html(
         '<div class="hvp-matchup-heading">'
@@ -1248,14 +1286,7 @@ def _render_specific_pitcher_mode(
         research.get("plate_appearances", []),
         research.get("pitch_events", []),
     )
-    missing_game_logs = research.get("missing_pitch_game_logs", [])
-    if missing_game_logs:
-        game_logs_json = json.dumps(missing_game_logs, sort_keys=True, default=str)
-        backfill_state = _start_specific_history_backfill(
-            int(batter_id),
-            int(pitcher_id),
-            game_logs_json,
-        )
+    if backfill_state is not None:
         _refresh_specific_history_when_ready(
             backfill_state,
             f"{int(batter_id)}_{int(pitcher_id)}",

@@ -181,6 +181,7 @@ def specific_pitcher_research(
     season,
     *,
     backfill_missing=False,
+    supplemental_pitch_events=None,
 ):
     batter_id = clean_player_id(batter_id)
     pitcher_id = clean_player_id(pitcher_id)
@@ -197,28 +198,48 @@ def specific_pitcher_research(
 
     direct_stats = direct_stats_for_pair(batter_id, pitcher_id)
     game_logs = database.get_batter_vs_pitcher_game_logs_from_db(batter_id, pitcher_id)
-    pitch_events = _call_database_list(
+    stored_pitch_events = _call_database_list(
         "get_pitch_level_events_for_matchup",
         batter_id,
         pitcher_id,
         None,
     )
-    pitch_source = "Stored Statcast"
+    supplemental_pitch_events = list(supplemental_pitch_events or [])
+    pitch_events = _merge_pitch_events(
+        stored_pitch_events,
+        supplemental_pitch_events,
+    )
+    if stored_pitch_events and supplemental_pitch_events:
+        pitch_source = "Stored Statcast + MLB StatsAPI game feeds"
+    elif supplemental_pitch_events:
+        pitch_source = "MLB StatsAPI game feeds"
+    else:
+        pitch_source = "Stored Statcast"
     stored_game_pks = {
         clean_player_id(row.get("game_pk"))
-        for row in pitch_events
+        for row in stored_pitch_events
         if clean_player_id(row.get("game_pk")) is not None
     }
     stored_pa_by_game = {}
+    stored_pa_by_date = {}
     for row in pitch_events:
         game_pk = clean_player_id(row.get("game_pk"))
         at_bat_number = clean_player_id(row.get("at_bat_number"))
         if game_pk is not None and at_bat_number is not None:
             stored_pa_by_game.setdefault(game_pk, set()).add(at_bat_number)
+        game_date = str(row.get("game_date") or "").strip()
+        if game_date and at_bat_number is not None:
+            stored_pa_by_date.setdefault(game_date, set()).add(
+                (game_pk, at_bat_number)
+            )
     missing_game_logs = [
         row
         for row in game_logs
-        if _game_log_needs_pitch_backfill(row, stored_pa_by_game)
+        if _game_log_needs_pitch_backfill(
+            row,
+            stored_pa_by_game,
+            stored_pa_by_date,
+        )
     ]
     if missing_game_logs and backfill_missing:
         fetched_events = backfill_matchup_pitch_history(
@@ -295,11 +316,19 @@ def backfill_matchup_pitch_history(batter_id, pitcher_id, game_logs):
     return fetched_events
 
 
-def _game_log_needs_pitch_backfill(game_log, stored_pa_by_game):
+def _game_log_needs_pitch_backfill(
+    game_log,
+    stored_pa_by_game,
+    stored_pa_by_date=None,
+):
     game_pk = clean_player_id(game_log.get("game_pk"))
     if game_pk is None:
         return False
     stored_count = len(stored_pa_by_game.get(game_pk, set()))
+    if stored_count == 0 and stored_pa_by_date:
+        game_date = str(game_log.get("game_date") or "").strip()
+        if game_date:
+            stored_count = len(stored_pa_by_date.get(game_date, set()))
     expected_count = safe_int(game_log.get("PA"))
     if expected_count > 0:
         return stored_count < expected_count

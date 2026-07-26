@@ -195,6 +195,51 @@ class BvpResearchTests(unittest.TestCase):
         self.assertEqual(result["missing_pitch_game_logs"], game_logs.return_value)
         self.assertEqual(len(result["comparison_rows"]), 8)
 
+    @patch("src.bvp_research.database.get_pitcher_pitch_type_stats_from_db")
+    @patch("src.bvp_research.database.get_pitch_level_events_for_matchup")
+    @patch("src.bvp_research.database.get_batter_vs_pitcher_game_logs_from_db")
+    @patch("src.bvp_research.database.get_batter_vs_pitcher_stats_from_db")
+    def test_specific_research_uses_transient_cloud_backfill_events(
+        self,
+        direct_stats,
+        game_logs,
+        stored_events,
+        pitcher_mix,
+    ):
+        direct_stats.return_value = {"matchup_grade": "Neutral", "PA": 1, "AB": 1}
+        game_logs.return_value = [
+            {"game_pk": -123, "game_date": "2025-06-01", "PA": 1}
+        ]
+        stored_events.return_value = []
+        pitcher_mix.return_value = []
+        fetched_events = [
+            {
+                "game_pk": 777,
+                "game_date": "2025-06-01",
+                "season": 2025,
+                "at_bat_number": 4,
+                "pitch_number": 1,
+                "batter_id": 10,
+                "pitcher_id": 20,
+                "pitch_type": "FF",
+                "pitch_description": "called_strike",
+                "event": "strikeout",
+            }
+        ]
+
+        result = specific_pitcher_research(
+            10,
+            20,
+            2026,
+            supplemental_pitch_events=fetched_events,
+        )
+
+        self.assertEqual(result["pitch_source"], "MLB StatsAPI game feeds")
+        self.assertEqual(result["pitch_events"], fetched_events)
+        self.assertEqual(result["missing_pitch_game_logs"], [])
+        self.assertEqual(result["comparison_rows"][0]["Code"], "FF")
+        self.assertEqual(result["comparison_rows"][0]["Direct Count"], 1)
+
     def test_opponent_context_selects_probable_starter(self):
         schedule = pd.DataFrame(
             [
