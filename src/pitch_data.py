@@ -18,6 +18,7 @@ from src.pitch_analysis import (
 )
 
 MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
+MLB_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule"
 
 
 STATCAST_FIELD_MAP = {
@@ -167,7 +168,13 @@ def statsapi_feed_to_matchup_pitch_events(payload, batter_id, pitcher_id):
     return _dedupe_pitch_events(rows)
 
 
-def fetch_matchup_pitch_events(batter_id, pitcher_id, game_logs, feed_loader=None):
+def fetch_matchup_pitch_events(
+    batter_id,
+    pitcher_id,
+    game_logs,
+    feed_loader=None,
+    schedule_loader=None,
+):
     """Load only game feeds known to contain the selected matchup."""
     loader = feed_loader or (
         lambda game_pk: get_json(
@@ -176,11 +183,35 @@ def fetch_matchup_pitch_events(batter_id, pitcher_id, game_logs, feed_loader=Non
             timeout=20,
         )
     )
+    load_schedule = schedule_loader or (
+        lambda game_date: get_json(
+            MLB_SCHEDULE_URL,
+            params={"sportId": 1, "date": str(game_date)},
+            provider="MLB StatsAPI",
+            timeout=20,
+        )
+    )
     game_pks = []
+    schedule_cache = {}
     for log in game_logs or []:
         game_pk = safe_int(log.get("game_pk"), default=None)
-        if game_pk is not None and game_pk not in game_pks:
+        if game_pk is not None and game_pk > 0 and game_pk not in game_pks:
             game_pks.append(game_pk)
+            continue
+        game_date = log.get("game_date")
+        if not game_date:
+            continue
+        if game_date not in schedule_cache:
+            try:
+                schedule_cache[game_date] = load_schedule(game_date)
+            except Exception:
+                schedule_cache[game_date] = {}
+        for official_game_pk in _official_game_pks_for_log(
+            log,
+            schedule_cache[game_date],
+        ):
+            if official_game_pk not in game_pks:
+                game_pks.append(official_game_pk)
     rows = []
     for game_pk in game_pks:
         try:
@@ -191,6 +222,32 @@ def fetch_matchup_pitch_events(batter_id, pitcher_id, game_logs, feed_loader=Non
             statsapi_feed_to_matchup_pitch_events(payload, batter_id, pitcher_id)
         )
     return _dedupe_pitch_events(rows)
+
+
+def _team_key(value):
+    return "".join(character for character in str(value or "").casefold() if character.isalnum())
+
+
+def _official_game_pks_for_log(log, schedule_payload):
+    """Resolve a synthetic Retrosheet game row to MLB game IDs for its date/teams."""
+    expected_teams = {
+        _team_key(log.get("batting_team") or log.get("team")),
+        _team_key(log.get("pitching_team") or log.get("opponent")),
+    }
+    if "" in expected_teams or len(expected_teams) != 2:
+        return []
+    matches = []
+    for date_block in (schedule_payload or {}).get("dates") or []:
+        for game in date_block.get("games") or []:
+            teams = game.get("teams") or {}
+            actual_teams = {
+                _team_key(((teams.get("away") or {}).get("team") or {}).get("name")),
+                _team_key(((teams.get("home") or {}).get("team") or {}).get("name")),
+            }
+            game_pk = safe_int(game.get("gamePk"), default=None)
+            if actual_teams == expected_teams and game_pk is not None:
+                matches.append(game_pk)
+    return matches
 
 
 def _is_barrel(row):

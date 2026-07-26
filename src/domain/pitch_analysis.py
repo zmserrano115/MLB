@@ -487,6 +487,7 @@ def calculate_pitch_type_summaries(rows: Iterable[Mapping]):
             "xwOBA": _avg(estimated_woba),
             "xBA": _avg(estimated_ba),
             "K%": safe_divide(strikeouts, max(1, ab + walks), scale=100),
+            "at_bats": ab,
             "balls_in_play": balls_in_play,
             "sample_size": sample_size_label(pitch_count),
         }

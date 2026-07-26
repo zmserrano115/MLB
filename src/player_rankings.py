@@ -6,6 +6,7 @@ import pandas as pd
 
 MIN_RANKING_PA = 80
 WOBA_SCALE = 1.15
+DEFAULT_LEAGUE_RUNS_PER_PA = 0.12
 WOBA_WEIGHTS = {
     "BB": 0.69,
     "HBP": 0.72,
@@ -54,13 +55,17 @@ def add_wrc_plus(frame: pd.DataFrame, min_pa: int = MIN_RANKING_PA) -> pd.DataFr
     league_denominator = float(denominator.sum())
     league_pa = float(pa.sum())
     league_runs = float(numbers("R").sum())
-    if league_denominator <= 0 or league_pa <= 0 or league_runs <= 0:
+    if league_denominator <= 0 or league_pa <= 0:
         result["wRC+"] = pd.Series(pd.NA, index=result.index, dtype="Float64")
         return result
 
     woba = numerator.div(denominator.where(denominator > 0))
     league_woba = float(numerator.sum()) / league_denominator
-    league_runs_per_pa = league_runs / league_pa
+    league_runs_per_pa = (
+        league_runs / league_pa
+        if league_runs > 0
+        else DEFAULT_LEAGUE_RUNS_PER_PA
+    )
     runs_above_average_per_pa = (woba - league_woba) / WOBA_SCALE
     wrc_plus = (
         (runs_above_average_per_pa + league_runs_per_pa)

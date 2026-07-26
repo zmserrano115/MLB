@@ -156,6 +156,46 @@ class PitchDataTests(unittest.TestCase):
         )
         self.assertEqual(len(fetched), 1)
 
+    def test_fetch_resolves_retrosheet_game_to_official_game_pk(self):
+        requested_game_pks = []
+        payload = {
+            "gamePk": 777,
+            "gameData": {"datetime": {"officialDate": "2025-07-27"}},
+            "liveData": {"plays": {"allPlays": []}},
+        }
+        schedule = {
+            "dates": [
+                {
+                    "games": [
+                        {
+                            "gamePk": 777,
+                            "teams": {
+                                "away": {"team": {"name": "New York Mets"}},
+                                "home": {"team": {"name": "San Francisco Giants"}},
+                            },
+                        }
+                    ]
+                }
+            ]
+        }
+
+        fetch_matchup_pitch_events(
+            10,
+            20,
+            [
+                {
+                    "game_pk": -123,
+                    "game_date": "2025-07-27",
+                    "team": "New York Mets",
+                    "opponent": "San Francisco Giants",
+                }
+            ],
+            feed_loader=lambda game_pk: requested_game_pks.append(game_pk) or payload,
+            schedule_loader=lambda game_date: schedule,
+        )
+
+        self.assertEqual(requested_game_pks, [777])
+
 
 if __name__ == "__main__":
     unittest.main()

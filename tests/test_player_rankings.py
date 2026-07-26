@@ -33,6 +33,6 @@ def test_wrc_plus_ranks_valid_samples_and_leaves_small_samples_missing():
     assert pd.isna(ranked.loc[2, "wRC+"])
 
 
-def test_wrc_plus_is_missing_when_league_run_baseline_is_unavailable():
+def test_wrc_plus_uses_neutral_run_environment_when_runs_are_unavailable():
     result = add_wrc_plus(pd.DataFrame([hitter("No Runs", 100, 90, 30, 5, 1, 4, 8, 1, 1, 0)]))
-    assert result["wRC+"].isna().all()
+    assert result.loc[0, "wRC+"] == 100

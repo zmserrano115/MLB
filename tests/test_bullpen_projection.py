@@ -71,7 +71,16 @@ class BullpenProjectionTests(unittest.TestCase):
         stats = pd.DataFrame(
             [
                 {"player_id": 1, "G": 10, "GS": 10},
-                {"player_id": 2, "G": 30, "GS": 0, "SV": 12},
+                {
+                    "player_id": 2,
+                    "G": 30,
+                    "GS": 0,
+                    "SV": 12,
+                    "ERA": 2.75,
+                    "WHIP": 1.08,
+                    "K%": 28.4,
+                    "IP": 31.2,
+                },
                 {"player_id": 3, "G": 15, "GS": 0},
             ]
         )
@@ -87,6 +96,10 @@ class BullpenProjectionTests(unittest.TestCase):
         self.assertIn("Injured", names)
         self.assertNotIn("Starter", names)
         injured = next(row for row in projected if row["Player"] == "Injured")
+        closer = next(row for row in projected if row["Player"] == "Closer")
+        self.assertEqual(closer["ERA"], 2.75)
+        self.assertEqual(closer["WHIP"], 1.08)
+        self.assertEqual(closer["K%"], 28.4)
         self.assertTrue(injured["excluded_from_composite"])
         self.assertEqual(injured["availability_label"], "Unavailable")
 

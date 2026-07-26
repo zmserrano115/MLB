@@ -26,6 +26,7 @@ from src.pitch_analysis import (
 from src.pitch_data import fetch_matchup_pitch_events, save_pitch_events
 
 NO_HISTORY_GRADES = {"no history", "no pitcher id", "no data"}
+DEFAULT_PITCH_TYPE_SCAFFOLD = ("FF", "SI", "FC", "SL", "CU", "CH", "FS", "ST")
 
 
 def clean_player_id(value):
@@ -58,7 +59,7 @@ def player_search_options(df):
         if player_id is None or not name:
             continue
         team = row.get("Team") or row.get("team_name") or ""
-        label = f"{name} - {team}" if team else str(name)
+        label = f"{name}, {team}" if team else str(name)
         options[label] = player_id
     return dict(sorted(options.items(), key=lambda item: item[0].casefold()))
 
@@ -74,7 +75,7 @@ def game_options(schedule_df):
             continue
         label = row.get("game") or f"{row.get('away_team')} @ {row.get('home_team')}"
         status = row.get("game_status") or row.get("status") or ""
-        display = f"{label} - {status}" if status else str(label)
+        display = f"{label}, {status}" if status else str(label)
         options[display] = game_pk
     return options
 
@@ -88,6 +89,31 @@ def game_context(schedule_df, game_pk=None):
         if not matches.empty:
             return matches.iloc[0].to_dict()
     return {}
+
+
+def scheduled_game_pks_for_player(schedule_df, player_row: Mapping | None = None):
+    """Return today's games that contain the selected player's team or probable start."""
+    frame = pd.DataFrame(schedule_df)
+    if frame.empty or not player_row:
+        return []
+    player_id = clean_player_id(player_row.get("player_id"))
+    team_id = clean_player_id(player_row.get("team_id"))
+    game_pks = []
+    for _, row in frame.iterrows():
+        row_game_pk = clean_player_id(row.get("game_pk"))
+        if row_game_pk is None:
+            continue
+        team_match = team_id is not None and team_id in {
+            clean_player_id(row.get("away_team_id")),
+            clean_player_id(row.get("home_team_id")),
+        }
+        probable_match = player_id is not None and player_id in {
+            clean_player_id(row.get("away_probable_pitcher_id")),
+            clean_player_id(row.get("home_probable_pitcher_id")),
+        }
+        if (team_match or probable_match) and row_game_pk not in game_pks:
+            game_pks.append(row_game_pk)
+    return game_pks
 
 
 def opponent_context_for_batter(game_row: Mapping, batter_row: Mapping | None = None):
@@ -149,7 +175,13 @@ def _call_database_list(function_name, *args, **kwargs):
     return loader(*args, **kwargs)
 
 
-def specific_pitcher_research(batter_id, pitcher_id, season):
+def specific_pitcher_research(
+    batter_id,
+    pitcher_id,
+    season,
+    *,
+    backfill_missing=False,
+):
     batter_id = clean_player_id(batter_id)
     pitcher_id = clean_player_id(pitcher_id)
     if batter_id is None or pitcher_id is None:
@@ -160,43 +192,77 @@ def specific_pitcher_research(batter_id, pitcher_id, season):
             "plate_appearances": [],
             "pitch_type_rows": [],
             "comparison_rows": [],
+            "missing_pitch_game_logs": [],
         }
 
     direct_stats = direct_stats_for_pair(batter_id, pitcher_id)
     game_logs = database.get_batter_vs_pitcher_game_logs_from_db(batter_id, pitcher_id)
-    season_game_logs = [
-        row
-        for row in game_logs
-        if clean_player_id(row.get("season")) == int(season)
-    ]
     pitch_events = _call_database_list(
         "get_pitch_level_events_for_matchup",
         batter_id,
         pitcher_id,
-        season,
+        None,
     )
     pitch_source = "Stored Statcast"
-    if not pitch_events and season_game_logs:
-        pitch_events = fetch_matchup_pitch_events(
+    stored_game_pks = {
+        clean_player_id(row.get("game_pk"))
+        for row in pitch_events
+        if clean_player_id(row.get("game_pk")) is not None
+    }
+    stored_pa_by_game = {}
+    for row in pitch_events:
+        game_pk = clean_player_id(row.get("game_pk"))
+        at_bat_number = clean_player_id(row.get("at_bat_number"))
+        if game_pk is not None and at_bat_number is not None:
+            stored_pa_by_game.setdefault(game_pk, set()).add(at_bat_number)
+    missing_game_logs = [
+        row
+        for row in game_logs
+        if _game_log_needs_pitch_backfill(row, stored_pa_by_game)
+    ]
+    if missing_game_logs and backfill_missing:
+        fetched_events = backfill_matchup_pitch_history(
             batter_id,
             pitcher_id,
-            season_game_logs,
+            missing_game_logs,
         )
-        if pitch_events:
-            pitch_source = "MLB StatsAPI game feeds"
-            save_pitch_events(pitch_events)
+        if fetched_events:
+            pitch_events = _merge_pitch_events(pitch_events, fetched_events)
+            pitch_source = (
+                "Stored Statcast + MLB StatsAPI game feeds"
+                if stored_game_pks
+                else "MLB StatsAPI game feeds"
+            )
     plate_appearances = plate_appearance_logs_from_pitches(pitch_events)
-    direct_pitch_types = database.get_bvp_pitch_type_stats_from_db(
+    cached_plate_appearances = _call_database_list(
+        "get_plate_appearance_sequences_for_matchup",
         batter_id,
         pitcher_id,
-        season,
     )
-    if not direct_pitch_types and pitch_events:
-        direct_pitch_types = calculate_pitch_type_summaries(pitch_events)
+    plate_appearances = _merge_plate_appearances(
+        plate_appearances,
+        cached_plate_appearances,
+    )
+    direct_pitch_types = calculate_pitch_type_summaries(pitch_events)
+    if not direct_pitch_types:
+        direct_pitch_types = _call_database_list(
+            "get_bvp_pitch_type_stats_from_db",
+            batter_id,
+            pitcher_id,
+            None,
+        )
     pitcher_pitch_mix = database.get_pitcher_pitch_type_stats_from_db(
         pitcher_id,
         season,
     )
+    if not pitcher_pitch_mix:
+        for fallback_season in range(int(season) - 1, max(int(season) - 4, 2014), -1):
+            pitcher_pitch_mix = database.get_pitcher_pitch_type_stats_from_db(
+                pitcher_id,
+                fallback_season,
+            )
+            if pitcher_pitch_mix:
+                break
     summary = direct_bvp_summary(direct_stats, game_logs)
     if not direct_stats.get("_has_direct_history"):
         summary["data_date_range"] = None
@@ -208,11 +274,73 @@ def specific_pitcher_research(batter_id, pitcher_id, season):
         "plate_appearances": plate_appearances,
         "pitch_type_rows": direct_pitch_types,
         "pitch_source": pitch_source if pitch_events else None,
+        "missing_pitch_game_logs": (
+            [] if backfill_missing else missing_game_logs
+        ),
         "comparison_rows": exact_pitch_comparison_rows(
             direct_pitch_types,
             pitcher_pitch_mix,
         ),
     }
+
+
+def backfill_matchup_pitch_history(batter_id, pitcher_id, game_logs):
+    fetched_events = fetch_matchup_pitch_events(
+        batter_id,
+        pitcher_id,
+        game_logs,
+    )
+    if fetched_events:
+        save_pitch_events(fetched_events)
+    return fetched_events
+
+
+def _game_log_needs_pitch_backfill(game_log, stored_pa_by_game):
+    game_pk = clean_player_id(game_log.get("game_pk"))
+    if game_pk is None:
+        return False
+    stored_count = len(stored_pa_by_game.get(game_pk, set()))
+    expected_count = safe_int(game_log.get("PA"))
+    if expected_count > 0:
+        return stored_count < expected_count
+    return stored_count == 0
+
+
+def _merge_pitch_events(*event_groups):
+    merged = {}
+    for row in (row for group in event_groups for row in (group or [])):
+        key = (
+            clean_player_id(row.get("game_pk")),
+            clean_player_id(row.get("at_bat_number")),
+            clean_player_id(row.get("pitch_number")),
+        )
+        merged[key] = dict(row)
+    return list(merged.values())
+
+
+def _merge_plate_appearances(primary, fallback):
+    merged = {}
+    for row in fallback or []:
+        key = (
+            clean_player_id(row.get("game_pk")),
+            clean_player_id(row.get("at_bat_number")),
+        )
+        merged[key] = dict(row)
+    for row in primary or []:
+        key = (
+            clean_player_id(row.get("game_pk")),
+            clean_player_id(row.get("at_bat_number")),
+        )
+        merged[key] = dict(row)
+    return sorted(
+        merged.values(),
+        key=lambda row: (
+            str(row.get("game_date") or ""),
+            safe_int(row.get("game_pk")),
+            safe_int(row.get("at_bat_number")),
+        ),
+        reverse=True,
+    )
 
 
 def exact_pitch_comparison_rows(direct_pitch_types, pitcher_pitch_mix, batter_pitch_types=None):
@@ -228,9 +356,14 @@ def exact_pitch_comparison_rows(direct_pitch_types, pitcher_pitch_mix, batter_pi
         normalize_pitch_code(row.get("pitch_code") or row.get("pitch_type")): dict(row)
         for row in (batter_pitch_types or [])
     }
-    # A direct matchup chart must never be populated from the pitcher's overall
-    # mix. Overall rows are lookup context only after a direct pitch type exists.
-    codes = sorted(direct_by_code)
+    # The pitcher's repertoire provides the chart scaffold. Direct-result cells
+    # remain empty until this exact pair has actually seen that pitch.
+    available_codes = set(direct_by_code) | set(pitcher_by_code)
+    codes = (
+        sorted(available_codes)
+        if available_codes
+        else list(DEFAULT_PITCH_TYPE_SCAFFOLD)
+    )
     rows = []
     for code in codes:
         direct = direct_by_code.get(code, {})
@@ -257,6 +390,7 @@ def exact_pitch_comparison_rows(direct_pitch_types, pitcher_pitch_mix, batter_pi
                 "Batter Pitch SLG": batter.get("SLG"),
                 "Batter Pitch K%": batter.get("K%"),
                 "Sample": direct.get("sample_size"),
+                "At Bats": direct.get("at_bats"),
                 "Balls in Play": direct.get("balls_in_play"),
             }
         )

@@ -3407,7 +3407,7 @@ st.markdown(
 
     .profile-stat-grid {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
         border: 1px solid var(--line);
         background: #ffffff;
         margin-bottom: 12px;
@@ -3427,6 +3427,41 @@ st.markdown(
         margin-top: 4px;
         color: #06172b;
         font-size: 20px;
+    }
+
+    [class*="st-key-profile_hvp_action"] {
+        width: min(100%, 310px);
+        margin: 0 0 12px;
+    }
+
+    [class*="st-key-profile_hvp_action"] .stButton > button,
+    [class*="st-key-matchup_dialog_actions"] .stButton > button {
+        min-height: 38px;
+        border: 1px solid #173f67;
+        background: #ffffff;
+        color: #173f67;
+        font-family: var(--font-display) !important;
+        font-size: 15px;
+        font-weight: 400;
+        letter-spacing: 0.045em;
+        text-transform: uppercase;
+    }
+
+    [class*="st-key-profile_hvp_action"] .stButton > button {
+        border-left: 4px solid #245f96;
+    }
+
+    [class*="st-key-profile_hvp_action"] .stButton > button:hover,
+    [class*="st-key-profile_hvp_action"] .stButton > button:focus-visible,
+    [class*="st-key-matchup_dialog_actions"] .stButton > button:hover,
+    [class*="st-key-matchup_dialog_actions"] .stButton > button:focus-visible {
+        border-color: #173f67;
+        background: #173f67;
+        color: #ffffff;
+    }
+
+    [class*="st-key-matchup_dialog_actions"] {
+        margin: 0 0 10px;
     }
 
     .home-placeholder {
@@ -7673,7 +7708,7 @@ def LiveFieldView(live_feed, animate_contact_key=None):
             f'cx="{hit_x:.1f}" cy="{hit_y:.1f}" r="4.5">'
             f"<title>{escape(description)}</title></circle>"
         )
-        footer_label = f"{result_label} - {batter_name}"
+        footer_label = f"{result_label}, {batter_name}"
         hit_meta = []
         distance = pd.to_numeric(hit_data.get("distance"), errors="coerce")
         launch_speed = pd.to_numeric(
@@ -7916,8 +7951,7 @@ def ContactHeadToHeadStats(live_feed):
     return (
         f'<div class="contact-h2h-card" style="--away-color:{away_color};--home-color:{home_color}">'
         '<div class="contact-h2h-header">'
-        '<strong>Head-to-Head</strong>'
-        '<span>Live team batting comparison</span></div>'
+        '<strong>Head to Head</strong></div>'
         '<div class="contact-battle-head">'
         f'<div class="contact-battle-team">{team_logo_img_html(away_team, alt=away_team)}'
         f"<span>{escape(away_team)}</span></div>"
@@ -8027,8 +8061,8 @@ def LiveMomentumGraph(live_feed):
         ]
         run_text = f"+{runs} run{'s' if runs != 1 else ''}" if runs else "No runs"
         tooltip_lines = [
-            svg_tooltip_line(f"{inning_text} - {team_name}", 24),
-            svg_tooltip_line(f"{result_label} - {run_text}", 24),
+            svg_tooltip_line(f"{inning_text}, {team_name}", 24),
+            svg_tooltip_line(f"{result_label}, {run_text}", 24),
         ]
         hover_targets.append(
             {
@@ -8098,8 +8132,7 @@ def LiveMomentumGraph(live_feed):
         )
     return (
         '<div class="momentum-card">'
-        '<div class="contact-h2h-header"><strong>Momentum</strong>'
-        '<span>Hover line shifts for play context</span></div>'
+        '<div class="contact-h2h-header"><strong>Momentum</strong></div>'
         '<div class="momentum-layout">'
         '<div class="momentum-logo-rail">'
         f"{team_logo_img_html(away_team, alt=away_team)}"
@@ -10167,7 +10200,6 @@ def render_live_game_section(schedule_df, game_pk, batters_df=None):
                 <div class="live-game-section compact">
                     <div class="live-game-section-heading">
                         <div class="live-game-section-title">
-                            <span>Game Center</span>
                             <strong>{escape(heading)}</strong>
                             <em>{escape(status)}</em>
                         </div>
@@ -10210,8 +10242,19 @@ def render_selected_game_boxscore(schedule_df, batters_df=None):
     return True
 
 
-@st.fragment
+@st.fragment(run_every="20s")
 def render_games_tab(schedule_df, filtered_schedule_df, selected_game, selected_date, batters_df=None):
+    try:
+        current_live_schedule = load_schedule(selected_date)
+    except Exception:
+        current_live_schedule = pd.DataFrame()
+    if not current_live_schedule.empty:
+        schedule_df = merge_live_schedule_columns(
+            schedule_df,
+            current_live_schedule,
+        )
+        filtered_schedule_df = filter_by_game(schedule_df, selected_game)
+
     if render_selected_game_boxscore(schedule_df, batters_df=batters_df):
         return
 
@@ -11662,16 +11705,10 @@ def render_player_stats_tab(batter_stats_df, pitcher_stats_df, season):
     st.markdown(
         """
         <div class="section-shell">
-            <div class="section-title">Season Player Leaders · wRC+ Hitter Ranking</div>
+            <div class="section-title">Season Player Leaders</div>
         </div>
         """,
         unsafe_allow_html=True,
-    )
-    st.html(
-        '<div class="research-table-note">'
-        "Click a player name to open their full profile. "
-        "Click a column heading to sort the leaderboard."
-        "</div>"
     )
     stats_group = render_box_tabs(
         "player-stats-tabs",
@@ -11883,7 +11920,7 @@ def enrich_roster_with_rankings(roster_df, player_directory, season_value):
 def profile_stat_columns(group):
     if group == "pitching":
         return ["IP", "GS", "K", "ERA", "WHIP", "K/9"]
-    return ["PA", "H", "HR", "RBI", "AVG", "OPS"]
+    return ["wRC+", "PA", "H", "HR", "RBI", "AVG", "OPS"]
 
 
 def profile_game_log_columns(group, game_log_df):
@@ -12088,16 +12125,17 @@ def render_player_profile(profile, player_directory, default_season):
         if group == "batting"
         else "Open Advanced HVP as Pitcher"
     )
-    if st.button(
-        hvp_button_label,
-        key=f"player_profile_hvp_{player_id}_{group}",
-        use_container_width=False,
-    ):
-        open_advanced_hvp(
-            batter_id=player_id if group == "batting" else None,
-            pitcher_id=player_id if group == "pitching" else None,
-            game_pk=return_state.get("game_pk"),
-        )
+    with st.container(key="profile_hvp_action"):
+        if st.button(
+            hvp_button_label,
+            key=f"player_profile_hvp_{player_id}_{group}",
+            use_container_width=True,
+        ):
+            open_advanced_hvp(
+                batter_id=player_id if group == "batting" else None,
+                pitcher_id=player_id if group == "pitching" else None,
+                game_pk=return_state.get("game_pk"),
+            )
 
     stat_items = []
     for column in profile_stat_columns(group):
@@ -12225,9 +12263,9 @@ def render_player_profile(profile, player_directory, default_season):
         game_log_df,
         value_column=chart_column,
         title=(
-            "Strikeouts - Last 5 Games"
+            "Strikeouts, Last 5 Games"
             if group == "pitching"
-            else "Total Bases - Last 5 Games"
+            else "Total Bases, Last 5 Games"
         ),
         subtitle=player_name,
         scale_floor=10 if group == "pitching" else 4,
@@ -12961,6 +12999,20 @@ def render_matchup_log_dialog(table_key, selected_log):
         display_bvp_game_log(selected_log)
 
 
+def open_matchup_player_profile(player_id, player_name, group, team=""):
+    selected_date = st.session_state.get("selected_game_date", app_today)
+    season = getattr(selected_date, "year", app_today.year)
+    payload = player_profile_payload(
+        player_id,
+        player_name,
+        team,
+        group,
+        season,
+    )
+    if payload:
+        navigate_to_player_profile(payload, "Matchups")
+
+
 def display_bvp_game_log(selected_row):
     batter_name = selected_row.get("batter")
     pitcher_name = selected_row.get("opposing_pitcher")
@@ -12982,14 +13034,30 @@ def display_bvp_game_log(selected_row):
         st.warning("Player ID was not found for this row.")
         return
 
-    if st.button(
-        "Open Advanced HVP Research",
-        key=f"open_hvp_from_log_{int(batter_id)}_{int(pitcher_id)}",
-    ):
-        open_advanced_hvp(
-            batter_id=int(batter_id),
-            pitcher_id=int(pitcher_id),
-        )
+    with st.container(key="matchup_dialog_actions"):
+        stats_col, hvp_col = st.columns(2, gap="small")
+        with stats_col:
+            if st.button(
+                "View Batter Stats",
+                key=f"open_batter_stats_from_log_{int(batter_id)}_{int(pitcher_id)}",
+                use_container_width=True,
+            ):
+                open_matchup_player_profile(
+                    int(batter_id),
+                    batter_name,
+                    "batting",
+                    selected_row.get("team", ""),
+                )
+        with hvp_col:
+            if st.button(
+                "Open Advanced HVP",
+                key=f"open_hvp_from_log_{int(batter_id)}_{int(pitcher_id)}",
+                use_container_width=True,
+            ):
+                open_advanced_hvp(
+                    batter_id=int(batter_id),
+                    pitcher_id=int(pitcher_id),
+                )
 
     with st.spinner("Loading career batter-vs-pitcher game log..."):
         game_log_df = get_batter_vs_pitcher_game_log(
@@ -13042,7 +13110,7 @@ def display_bvp_game_log(selected_row):
     chart_html = build_recent_bar_chart_html(
         game_log_df,
         value_column="TB",
-        title="Total Bases - Last 5 Meetings",
+        title="Total Bases, Last 5 Meetings",
         subtitle=f"{batter_name} vs {pitcher_name}",
         scale_floor=4,
         accent="#245f96",
@@ -13070,6 +13138,19 @@ def display_pitcher_vs_team_game_log(selected_row):
     if is_missing_value(pitcher_id):
         st.warning("Pitcher ID was not found for this row.")
         return
+
+    with st.container(key="matchup_dialog_actions"):
+        if st.button(
+            "View Pitcher Stats",
+            key=f"open_pitcher_stats_from_log_{int(pitcher_id)}",
+            use_container_width=True,
+        ):
+            open_matchup_player_profile(
+                int(pitcher_id),
+                pitcher_name,
+                "pitching",
+                selected_row.get("pitcher_team", ""),
+            )
 
     with st.spinner("Loading pitcher-vs-team career game log..."):
         game_log_df = get_pitcher_vs_team_game_log(
@@ -13112,7 +13193,7 @@ def display_pitcher_vs_team_game_log(selected_row):
     chart_html = build_recent_bar_chart_html(
         game_log_df,
         value_column="SO",
-        title="Strikeouts - Last 5 Appearances",
+        title="Strikeouts, Last 5 Appearances",
         subtitle=f"{pitcher_name} vs {opponent_team}",
         scale_floor=10,
         accent="#173f67",
@@ -14353,7 +14434,7 @@ def render_matchup_filter_fragment(
             batters_df=batters_df,
             pitchers_df=pitchers_df,
             season=season,
-            selected_date=st.session_state.selected_game_date,
+            selected_date=st.session_state.get("selected_game_date", app_today),
             database_cache_key=database.db_cache_key(),
             active_roster_loader=load_active_team_rosters,
             analysis_mode=(
@@ -14594,8 +14675,17 @@ if st.session_state.get(UPDATE_NOTICE_SESSION_KEY):
     render_update_notice_dialog()
 
 
+def reset_selected_game_filter():
+    st.session_state.selected_game = "All Games"
+    st.session_state.selected_boxscore_game_pk = None
+    st.query_params.pop("game_pk", None)
+    st.query_params.pop("game_tab", None)
+    st.query_params.pop("play_index", None)
+
+
 def shift_selected_date(days):
     st.session_state.selected_game_date += timedelta(days=days)
+    reset_selected_game_filter()
 
 
 view_options = [
@@ -14704,7 +14794,7 @@ if active_view in {"Games", "Weather", "Streaks"}:
     st.markdown(
         f"""
         <div class="section-shell aligned-page-title">
-            <div class="section-title">{page_title} <span class="title-date">{format_display_date(selected_date)}</span></div>
+            <div class="section-title">{page_title}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -14783,6 +14873,7 @@ if needs_schedule and active_view != "Weather":
                     "Game Date",
                     key="selected_game_date",
                     label_visibility="collapsed",
+                    on_change=reset_selected_game_filter,
                 )
             with next_column:
                 st.button(
@@ -14797,7 +14888,7 @@ if needs_schedule and active_view != "Weather":
 season = selected_date.year
 
 
-@st.cache_data(show_spinner=False, ttl=30)
+@st.cache_data(show_spinner=False, ttl=15)
 def load_schedule(game_date):
     return get_daily_schedule(str(game_date))
 

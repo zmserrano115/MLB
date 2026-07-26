@@ -469,6 +469,21 @@ def _projection_row(
     player_id = _clean_id(roster_row.get("player_id"))
     expected_bf = ROLE_EXPECTED_BF.get(role, (2, 5))
     throws = _pitcher_hand(roster_row) or _pitcher_hand(stats_row)
+    season_stats = {
+        key: stats_row.get(key)
+        for key in (
+            "G",
+            "GS",
+            "IP",
+            "ERA",
+            "WHIP",
+            "K%",
+            "BB%",
+            "K/9",
+            "BB/9",
+            "SV",
+        )
+    }
     return {
         "player_id": player_id,
         "Player": _player_name(roster_row)
@@ -483,6 +498,7 @@ def _projection_row(
         "projection_timestamp": projection_timestamp,
         "excluded_from_composite": bool(excluded),
         "exclusion_reason": exclusion_reason,
+        **season_stats,
         **workload,
         **availability,
     }
