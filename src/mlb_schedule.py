@@ -1,16 +1,71 @@
 # src/mlb_schedule.py
 
-import requests
-import pandas as pd
 from functools import lru_cache
 from pathlib import Path
 
-from src.api_client import get_json
+import pandas as pd
+import requests
 
+from src.api_client import get_json
 
 SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule"
 PEOPLE_URL = "https://statsapi.mlb.com/api/v1/people"
 SCHEDULE_CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "precomputed"
+
+
+def schedule_display_state(row):
+    """Return the schedule bucket used by the Games page."""
+    def status_text(value):
+        if value is None:
+            return ""
+        try:
+            if pd.isna(value):
+                return ""
+        except (TypeError, ValueError):
+            pass
+        return str(value).strip().lower()
+
+    abstract_state = status_text(row.get("abstract_game_state"))
+    detailed_state = status_text(row.get("game_status"))
+
+    if abstract_state == "live" or "in progress" in detailed_state:
+        return "live"
+
+    final_markers = ("final", "game over", "completed early", "forfeit")
+    if abstract_state == "final" or any(
+        marker in detailed_state for marker in final_markers
+    ):
+        return "final"
+
+    return "upcoming"
+
+
+def sort_schedule_for_display(schedule):
+    """Order games as live, upcoming, then final while preserving time order."""
+    if schedule is None or schedule.empty:
+        return pd.DataFrame() if schedule is None else schedule.copy()
+
+    ordered = schedule.copy()
+    ordered["_schedule_display_state"] = ordered.apply(
+        schedule_display_state,
+        axis=1,
+    )
+    ordered["_schedule_display_priority"] = ordered[
+        "_schedule_display_state"
+    ].map({"live": 0, "upcoming": 1, "final": 2})
+    ordered["_schedule_display_time"] = pd.to_datetime(
+        ordered.get("game_time_utc"),
+        errors="coerce",
+        utc=True,
+    )
+    ordered = ordered.sort_values(
+        ["_schedule_display_priority", "_schedule_display_time"],
+        kind="stable",
+        na_position="last",
+    )
+    return ordered.drop(
+        columns=["_schedule_display_priority", "_schedule_display_time"]
+    )
 
 
 def schedule_cache_path(game_date):

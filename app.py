@@ -13,7 +13,11 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-from src.mlb_schedule import get_daily_schedule
+from src.mlb_schedule import (
+    get_daily_schedule,
+    schedule_display_state,
+    sort_schedule_for_display,
+)
 from src import weather as weather_service
 from src.advanced_bvp_data import (
     batch_batter_pitch_type_profiles,
@@ -4627,18 +4631,24 @@ def game_status_text(row):
 
 def schedule_status_html(row):
     status = game_status_text(row)
+    display_state = schedule_display_state(row)
     abstract_state = row_text(row, "abstract_game_state").lower()
     game_time_utc = row_text(row, "game_time_utc")
+    if display_state == "final" and not status.lower().startswith("final"):
+        status = "Final"
     is_scheduled = (
         abstract_state in {"", "preview"}
         and status.lower() in {"scheduled", "pre-game", "pregame"}
         and game_time_utc
     )
     if not is_scheduled:
-        return f'<span class="score-status">{escape(status)}</span>'
+        return (
+            f'<span class="score-status status-{display_state}">'
+            f"{escape(status)}</span>"
+        )
 
     return (
-        '<time class="score-status local-game-time" '
+        '<time class="score-status status-upcoming local-game-time" '
         f'datetime="{escape(game_time_utc, quote=True)}" '
         f'data-game-time-utc="{escape(game_time_utc, quote=True)}">'
         f"{escape(status)}</time>"
@@ -4646,6 +4656,9 @@ def schedule_status_html(row):
 
 
 def schedule_situation_html(row):
+    if schedule_display_state(row) != "live":
+        return ""
+
     outs = int(safe_value(row.get("outs"), 0))
     base_html = []
     for base, key in (
@@ -6385,61 +6398,83 @@ def render_live_schedule_table(df):
         st.info("No games are available for this selection.")
         return
 
+    schedule = sort_schedule_for_display(df).reset_index(drop=True)
     rows = []
-    for row_index, row in df.reset_index(drop=True).iterrows():
-        game_pk = row.get("game_pk")
-        if is_missing_value(game_pk):
+    visible_group_count = 0
+    group_labels = {
+        "live": "Live",
+        "upcoming": "Upcoming",
+        "final": "Final",
+    }
+    for display_state in ("live", "upcoming", "final"):
+        group = schedule[
+            schedule["_schedule_display_state"].eq(display_state)
+        ]
+        valid_group = group[group["game_pk"].notna()]
+        if valid_group.empty:
             continue
 
-        away_team = row_text(row, "away_team")
-        home_team = row_text(row, "home_team")
-        away_logo = team_logo_img_html(
-            away_team,
-            alt=away_team,
-            class_name="schedule-team-logo",
-        )
-        home_logo = team_logo_img_html(
-            home_team,
-            alt=home_team,
-            class_name="schedule-team-logo",
-        )
-        away_code = display_team_code(row, "away")
-        home_code = display_team_code(row, "home")
-        game_payload = json.dumps(
-            {"game_pk": int(game_pk)},
-            separators=(",", ":"),
-        )
-        game_href = f"?view=Games&game_pk={int(game_pk)}"
-        situation_html = schedule_situation_html(row)
+        visible_group_count += 1
         rows.append(
             f"""
-            <div class="schedule-weather-row clean-schedule-row">
-                <div>
-                    <a class="schedule-game-button" target="_top"
-                       href="{escape(game_href, quote=True)}"
-                       data-research-event="{escape(game_payload, quote=True)}">
-                        <span class="schedule-game-main">
-                            <span class="overview-score">
-                                {away_logo}
-                                <span class="overview-team">{escape(away_code)}</span>
-                                <span class="score-number">{escape(score_value(row.get("away_score")))}</span>
-                                <span class="schedule-at">@</span>
-                                {home_logo}
-                                <span class="overview-team">{escape(home_code)}</span>
-                                <span class="score-number">{escape(score_value(row.get("home_score")))}</span>
-                            </span>
-                            {situation_html}
-                        </span>
-                        {schedule_status_html(row)}
-                    </a>
-                </div>
-                {pitcher_pair_html(row)}
-                {venue_html(row)}
-                <div>{compact_weather_html(row)}</div>
-                <div>{compact_wind_html(row)}</div>
+            <div class="schedule-status-group schedule-status-group-{display_state}">
+                <span class="schedule-status-marker" aria-hidden="true"></span>
+                <strong>{group_labels[display_state]}</strong>
+                <small>{len(valid_group)}</small>
             </div>
             """
         )
+        for _, row in valid_group.iterrows():
+            game_pk = row.get("game_pk")
+            away_team = row_text(row, "away_team")
+            home_team = row_text(row, "home_team")
+            away_logo = team_logo_img_html(
+                away_team,
+                alt=away_team,
+                class_name="schedule-team-logo",
+            )
+            home_logo = team_logo_img_html(
+                home_team,
+                alt=home_team,
+                class_name="schedule-team-logo",
+            )
+            away_code = display_team_code(row, "away")
+            home_code = display_team_code(row, "home")
+            game_payload = json.dumps(
+                {"game_pk": int(game_pk)},
+                separators=(",", ":"),
+            )
+            game_href = f"?view=Games&game_pk={int(game_pk)}"
+            situation_html = schedule_situation_html(row)
+            rows.append(
+                f"""
+                <div class="schedule-weather-row clean-schedule-row schedule-state-{display_state}">
+                    <div>
+                        <a class="schedule-game-button" target="_top"
+                           href="{escape(game_href, quote=True)}"
+                           data-research-event="{escape(game_payload, quote=True)}">
+                            <span class="schedule-game-main">
+                                <span class="overview-score">
+                                    {away_logo}
+                                    <span class="overview-team">{escape(away_code)}</span>
+                                    <span class="score-number">{escape(score_value(row.get("away_score")))}</span>
+                                    <span class="schedule-at">@</span>
+                                    {home_logo}
+                                    <span class="overview-team">{escape(home_code)}</span>
+                                    <span class="score-number">{escape(score_value(row.get("home_score")))}</span>
+                                </span>
+                                {situation_html}
+                            </span>
+                            {schedule_status_html(row)}
+                        </a>
+                    </div>
+                    {pitcher_pair_html(row)}
+                    {venue_html(row)}
+                    <div>{compact_weather_html(row)}</div>
+                    <div>{compact_wind_html(row)}</div>
+                </div>
+                """
+            )
 
     table_event = RESEARCH_TABLE_COMPONENT(
         table_html=f"""
@@ -6481,6 +6516,48 @@ def render_live_schedule_table(df):
             .schedule-weather-row:last-child {{
                 border-bottom: 0;
             }}
+            .schedule-status-group {{
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                min-height: 34px;
+                padding: 7px 15px;
+                border-bottom: 1px solid #d8dee6;
+                background: #f8fafc;
+                color: #24364a;
+                font-size: 12px;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+            }}
+            .schedule-status-group small {{
+                display: inline-grid;
+                min-width: 21px;
+                min-height: 18px;
+                place-items: center;
+                border: 1px solid #cbd4df;
+                color: #526171;
+                font-size: 10px;
+                font-weight: 800;
+            }}
+            .schedule-status-marker {{
+                width: 8px;
+                height: 8px;
+                background: #68778a;
+            }}
+            .schedule-status-group-live .schedule-status-marker {{
+                background: #1f7a4d;
+            }}
+            .schedule-status-group-upcoming .schedule-status-marker {{
+                background: #245f96;
+            }}
+            .schedule-state-live {{
+                border-left: 3px solid #1f7a4d;
+                background: #fbfefc;
+            }}
+            .schedule-state-final {{
+                border-left: 3px solid #8994a3;
+                background: #f4f6f8;
+            }}
             .schedule-game-button {{
                 width: 100%;
                 margin: 0;
@@ -6495,6 +6572,7 @@ def render_live_schedule_table(df):
                 gap: 10px;
                 text-align: left;
                 text-decoration: none;
+                touch-action: manipulation;
             }}
             .schedule-game-main {{
                 display: grid;
@@ -6613,6 +6691,33 @@ def render_live_schedule_table(df):
                 letter-spacing: 0.04em;
                 white-space: nowrap;
             }}
+            .status-live {{
+                border-color: #78b593;
+                background: #edf8f1;
+                color: #17613c;
+            }}
+            .status-upcoming {{
+                border-color: #afc7dd;
+                background: #f3f7fb;
+                color: #174f82;
+            }}
+            .status-final {{
+                border-color: #9ca6b3;
+                background: #e8ebef;
+                color: #3f4956;
+                font-weight: 850;
+            }}
+            .schedule-state-final .schedule-game-button {{
+                border-color: #c8ced6;
+                background: #eef1f4;
+            }}
+            .schedule-state-final .overview-team,
+            .schedule-state-final .schedule-pitchers,
+            .schedule-state-final .schedule-venue,
+            .schedule-state-final .schedule-weather-chip,
+            .schedule-state-final .schedule-wind-chip {{
+                color: #596574;
+            }}
             .schedule-at {{
                 color: #7b8794;
                 font-weight: 800;
@@ -6686,13 +6791,146 @@ def render_live_schedule_table(df):
                 }}
             }}
             @media (max-width: 680px) {{
-                .schedule-weather-head,
+                .schedule-weather-table {{
+                    display: grid;
+                    gap: 10px;
+                    border: 0;
+                    background: transparent;
+                }}
+                .schedule-weather-head {{
+                    display: none;
+                }}
+                .schedule-status-group {{
+                    min-height: 30px;
+                    margin-top: 4px;
+                    padding: 5px 2px;
+                    border: 0;
+                    background: transparent;
+                }}
                 .schedule-weather-row {{
-                    grid-template-columns: minmax(0, 1fr);
+                    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                    grid-template-areas:
+                        "game game"
+                        "pitchers venue"
+                        "weather wind";
+                    gap: 0;
+                    min-height: 0;
+                    padding: 0;
+                    border: 1px solid #d8dee6;
+                    background: #ffffff;
+                    overflow: hidden;
+                }}
+                .schedule-weather-row > div {{
+                    box-sizing: border-box;
+                    min-width: 0;
+                    padding: 9px 11px;
+                    border-top: 1px solid #e2e7ed;
+                }}
+                .schedule-weather-row > div:first-child {{
+                    grid-area: game;
+                    padding: 0;
+                    border-top: 0;
+                }}
+                .schedule-weather-row > div:nth-child(2) {{
+                    grid-area: pitchers;
+                    border-right: 1px solid #e2e7ed;
+                }}
+                .schedule-weather-row > div:nth-child(3) {{
+                    display: block;
+                    grid-area: venue;
+                }}
+                .schedule-weather-row > div:nth-child(4) {{
+                    grid-area: weather;
+                    border-right: 1px solid #e2e7ed;
+                }}
+                .schedule-weather-row > div:nth-child(5) {{
+                    grid-area: wind;
+                }}
+                .schedule-game-button {{
+                    min-height: 70px;
+                    padding: 10px 11px;
+                    border: 0;
+                    background: #f8fafc;
+                }}
+                .overview-score {{
+                    grid-template-columns: 24px 30px 24px 10px 24px 30px 24px;
+                    gap: 3px;
+                }}
+                .schedule-team-logo {{
+                    width: 24px;
+                    height: 24px;
+                }}
+                .overview-team {{
+                    font-size: 13px;
+                }}
+                .score-number {{
+                    min-width: 20px;
+                    padding: 0;
+                    font-size: 16px;
+                }}
+                .score-status {{
+                    flex: 0 0 auto;
+                }}
+                .schedule-pitchers::before,
+                .schedule-venue::before,
+                .schedule-weather-row > div:nth-child(4)::before,
+                .schedule-weather-row > div:nth-child(5)::before {{
+                    display: block;
+                    margin-bottom: 4px;
+                    color: #6a7686;
+                    font-size: 9px;
+                    font-weight: 800;
+                    letter-spacing: 0.06em;
+                    text-transform: uppercase;
+                }}
+                .schedule-pitchers::before {{
+                    content: "Pitchers";
+                }}
+                .schedule-venue::before {{
+                    content: "Ballpark";
+                }}
+                .schedule-weather-row > div:nth-child(4)::before {{
+                    content: "Weather";
+                }}
+                .schedule-weather-row > div:nth-child(5)::before {{
+                    content: "Wind";
+                }}
+                .schedule-pitchers,
+                .schedule-venue,
+                .schedule-weather-chip,
+                .schedule-wind-chip {{
+                    font-size: 11px;
+                }}
+                .schedule-pitchers span,
+                .schedule-venue span {{
+                    font-size: 10px;
+                }}
+                .schedule-wind-arrow {{
+                    width: 19px;
+                    height: 19px;
+                }}
+                .schedule-state-live {{
+                    border-left: 3px solid #1f7a4d;
+                }}
+                .schedule-state-final {{
+                    border-left: 3px solid #8994a3;
+                }}
+            }}
+            @media (max-width: 390px) {{
+                .schedule-game-button {{
+                    align-items: flex-start;
+                    flex-direction: column;
                     gap: 7px;
                 }}
-                .schedule-weather-head > div:not(:first-child) {{
-                    display: none;
+                .schedule-weather-row {{
+                    grid-template-areas:
+                        "game game"
+                        "pitchers pitchers"
+                        "venue venue"
+                        "weather wind";
+                }}
+                .schedule-weather-row > div:nth-child(2) {{
+                    border-right: 0;
                 }}
             }}
         </style>
@@ -6707,7 +6945,10 @@ def render_live_schedule_table(df):
             {''.join(rows)}
         </div>
         """,
-        table_height=max(150, 42 + (len(rows) * 79)),
+        table_height=max(
+            150,
+            42 + (len(schedule) * 79) + (visible_group_count * 35),
+        ),
         key="live-schedule-table",
         default=None,
     )
@@ -10258,21 +10499,13 @@ def render_games_tab(schedule_df, filtered_schedule_df, selected_game, selected_
     if render_selected_game_boxscore(schedule_df, batters_df=batters_df):
         return
 
-    selected_game_display = selected_game if selected_game != "All Games" else "Full slate"
-    live_game_count = (
-        filtered_schedule_df.get("abstract_game_state", pd.Series(dtype=str))
-        .astype(str)
-        .str.lower()
-        .eq("live")
-        .sum()
+    display_states = filtered_schedule_df.apply(
+        schedule_display_state,
+        axis=1,
     )
-    final_game_count = (
-        filtered_schedule_df.get("game_status", pd.Series(dtype=str))
-        .astype(str)
-        .str.lower()
-        .str.contains("final", na=False)
-        .sum()
-    )
+    live_game_count = display_states.eq("live").sum()
+    upcoming_game_count = display_states.eq("upcoming").sum()
+    final_game_count = display_states.eq("final").sum()
 
     st.markdown(
         f"""
@@ -10286,12 +10519,12 @@ def render_games_tab(schedule_df, filtered_schedule_df, selected_game, selected_
                 <div class="slate-value">{int(live_game_count)}</div>
             </div>
             <div class="slate-item">
-                <div class="metric-label">Final</div>
-                <div class="slate-value">{int(final_game_count)}</div>
+                <div class="metric-label">Upcoming</div>
+                <div class="slate-value">{int(upcoming_game_count)}</div>
             </div>
             <div class="slate-item">
-                <div class="metric-label">Current View</div>
-                <div class="slate-value">{selected_game_display}</div>
+                <div class="metric-label">Final</div>
+                <div class="slate-value">{int(final_game_count)}</div>
             </div>
         </div>
         """,

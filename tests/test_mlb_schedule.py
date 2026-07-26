@@ -1,15 +1,96 @@
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import requests
 
-from src.mlb_schedule import get_daily_schedule, write_cached_schedule
+from src.mlb_schedule import (
+    get_daily_schedule,
+    schedule_display_state,
+    sort_schedule_for_display,
+    write_cached_schedule,
+)
 
 
 class ScheduleTests(unittest.TestCase):
+    def test_schedule_display_state_recognizes_live_and_finished_games(self):
+        self.assertEqual(
+            schedule_display_state(
+                {
+                    "abstract_game_state": "Live",
+                    "game_status": "Manager Challenge",
+                }
+            ),
+            "live",
+        )
+        self.assertEqual(
+            schedule_display_state(
+                {
+                    "abstract_game_state": "",
+                    "game_status": "Game Over",
+                }
+            ),
+            "final",
+        )
+        self.assertEqual(
+            schedule_display_state(
+                {
+                    "abstract_game_state": "Preview",
+                    "game_status": "Scheduled",
+                }
+            ),
+            "upcoming",
+        )
+        self.assertEqual(
+            schedule_display_state(
+                {
+                    "abstract_game_state": pd.NA,
+                    "game_status": pd.NA,
+                }
+            ),
+            "upcoming",
+        )
+
+    def test_schedule_display_order_is_live_upcoming_then_final(self):
+        schedule = pd.DataFrame(
+            [
+                {
+                    "game_pk": 4,
+                    "game_status": "Final",
+                    "abstract_game_state": "Final",
+                    "game_time_utc": "2026-07-26T17:00:00Z",
+                },
+                {
+                    "game_pk": 3,
+                    "game_status": "Scheduled",
+                    "abstract_game_state": "Preview",
+                    "game_time_utc": "2026-07-26T23:00:00Z",
+                },
+                {
+                    "game_pk": 1,
+                    "game_status": "In Progress",
+                    "abstract_game_state": "Live",
+                    "game_time_utc": "2026-07-26T19:00:00Z",
+                },
+                {
+                    "game_pk": 2,
+                    "game_status": "Scheduled",
+                    "abstract_game_state": "Preview",
+                    "game_time_utc": "2026-07-26T21:00:00Z",
+                },
+            ]
+        )
+
+        ordered = sort_schedule_for_display(schedule)
+
+        self.assertEqual(ordered["game_pk"].tolist(), [1, 2, 3, 4])
+        self.assertEqual(
+            ordered["_schedule_display_state"].tolist(),
+            ["live", "upcoming", "upcoming", "final"],
+        )
+
     @patch("src.mlb_schedule.get_json")
     def test_probable_pitcher_hands_use_one_bulk_people_request(self, mock_get_json):
         schedule_payload = {
