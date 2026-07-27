@@ -846,6 +846,29 @@
     }
 
     function wireInteractions() {
+      function scrollAppToTop() {
+        try {
+          const parentWindow = window.parent;
+          const parentDocument = window.parent.document;
+          const scroll = () => {
+            [
+              parentDocument.scrollingElement,
+              parentDocument.querySelector('[data-testid="stAppViewContainer"]'),
+              parentDocument.querySelector('[data-testid="stMain"]'),
+              parentDocument.querySelector("section.main"),
+            ].forEach((element) => {
+              if (element) element.scrollTop = 0;
+            });
+            parentWindow.scrollTo(0, 0);
+          };
+          [0, 75, 200, 500, 1000, 1600].forEach((delay) => {
+            parentWindow.setTimeout(scroll, delay);
+          });
+        } catch (error) {
+          // The Streamlit event still works if the host prevents frame access.
+        }
+      }
+
       root.querySelectorAll(".research-sort-button").forEach((button) => {
         button.addEventListener("click", () => {
           const columnIndex = Number(button.dataset.columnIndex);
@@ -858,7 +881,11 @@
       });
 
       root.querySelectorAll("[data-research-event]").forEach((button) => {
-        button.addEventListener("click", () => {
+        button.addEventListener("click", (event) => {
+          if (button.matches("a.schedule-game-button")) {
+            event.preventDefault();
+            scrollAppToTop();
+          }
           const payload = JSON.parse(button.dataset.researchEvent);
           if (payload.view || payload.state_key) {
             button.closest(".app-tabs")?.querySelectorAll(".app-tab").forEach((tab) => {

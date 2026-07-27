@@ -24,4 +24,8 @@ def test_research_table_component_supports_in_place_interactions():
     assert "data-game-time-utc" in source
     assert "Intl.DateTimeFormat(undefined" in source
     assert "localizeGameTimes();" in source
+    assert 'button.matches("a.schedule-game-button")' in source
+    assert "event.preventDefault();" in source
+    assert "scrollAppToTop();" in source
+    assert "parentWindow.setTimeout(scroll, delay);" in source
     assert "window.location" not in source
