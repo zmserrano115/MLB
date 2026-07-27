@@ -418,6 +418,10 @@ st.markdown(
         display: none;
     }
 
+    [class*="st-key-app_header_nav_scroll"] {
+        display: none;
+    }
+
     [class*="st-key-app_header_nav_mount"] [data-testid="stColumn"] {
         display: flex;
         align-items: center;
@@ -3911,6 +3915,38 @@ st.markdown(
             justify-content: flex-start;
         }
 
+        [class*="st-key-app_header_nav_scroll"] {
+            position: fixed;
+            top: 8px;
+            right: 4px;
+            z-index: 999999;
+            display: block;
+            width: 42px !important;
+            height: 42px !important;
+            min-height: 42px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }
+
+        [class*="st-key-app_header_nav_scroll"] [data-testid="stVerticalBlock"],
+        [class*="st-key-app_header_nav_scroll"] [data-testid="stElementContainer"],
+        [class*="st-key-app_header_nav_scroll"] [data-testid="stIFrame"] {
+            width: 42px !important;
+            height: 42px !important;
+            min-height: 42px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            gap: 0 !important;
+        }
+
+        [class*="st-key-app_header_nav_scroll"] iframe {
+            display: block;
+            width: 42px !important;
+            height: 42px !important;
+            border: 0 !important;
+        }
+
         [class*="st-key-app_header_nav_mount"] [data-testid="stHorizontalBlock"] {
             overflow-x: auto;
             scrollbar-width: none;
@@ -4756,6 +4792,123 @@ def select_dashboard_view(view):
         st.query_params.pop("return_game_pk", None)
 
 
+def render_header_tab_scroll_control():
+    with st.container(key="app_header_nav_scroll"):
+        components.html(
+            """
+            <style>
+                html, body {
+                    width: 42px;
+                    height: 42px;
+                    margin: 0;
+                    overflow: hidden;
+                    background: transparent;
+                }
+
+                #header-tab-scroll {
+                    display: grid;
+                    width: 42px;
+                    height: 42px;
+                    margin: 0;
+                    padding: 0;
+                    place-items: center;
+                    border: 1px solid rgba(255, 255, 255, 0.18);
+                    border-bottom: 2px solid rgba(255, 255, 255, 0.82);
+                    border-radius: 0;
+                    background: rgba(255, 255, 255, 0.09);
+                    color: #ffffff;
+                    cursor: pointer;
+                    touch-action: manipulation;
+                }
+
+                #header-tab-scroll:hover,
+                #header-tab-scroll:focus-visible {
+                    border-color: rgba(255, 255, 255, 0.38);
+                    background: rgba(255, 255, 255, 0.16);
+                    outline: none;
+                }
+
+                #header-tab-scroll[hidden] {
+                    display: none;
+                }
+
+                #header-tab-scroll svg {
+                    width: 18px;
+                    height: 18px;
+                    fill: none;
+                    stroke: currentColor;
+                    stroke-linecap: square;
+                    stroke-linejoin: miter;
+                    stroke-width: 2;
+                    transition: transform 160ms ease;
+                }
+
+                #header-tab-scroll.is-back svg {
+                    transform: rotate(180deg);
+                }
+            </style>
+            <button id="header-tab-scroll" type="button"
+                    aria-label="Show more navigation tabs"
+                    title="More tabs">
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M7 4l6 6-6 6"></path>
+                </svg>
+            </button>
+            <script>
+                const button = document.getElementById("header-tab-scroll");
+                const parentDocument = window.parent.document;
+                const nav = parentDocument.querySelector(
+                    '[class*="st-key-app_header_nav_mount"] '
+                    + '[data-testid="stHorizontalBlock"]'
+                );
+
+                function updateButton() {
+                    if (!nav) {
+                        button.hidden = true;
+                        return;
+                    }
+                    const maxScroll = Math.max(0, nav.scrollWidth - nav.clientWidth);
+                    const hasMoreTabs = maxScroll > 4;
+                    const atEnd = hasMoreTabs && nav.scrollLeft >= maxScroll - 4;
+                    button.hidden = !hasMoreTabs;
+                    button.classList.toggle("is-back", atEnd);
+                    button.setAttribute(
+                        "aria-label",
+                        atEnd
+                            ? "Return to the first navigation tabs"
+                            : "Show more navigation tabs"
+                    );
+                    button.title = atEnd ? "First tabs" : "More tabs";
+                }
+
+                button.addEventListener("click", () => {
+                    if (!nav) return;
+                    const maxScroll = Math.max(0, nav.scrollWidth - nav.clientWidth);
+                    const atEnd = nav.scrollLeft >= maxScroll - 4;
+                    if (atEnd) {
+                        nav.scrollTo({ left: 0, behavior: "smooth" });
+                    } else {
+                        nav.scrollBy({
+                            left: Math.max(140, nav.clientWidth * 0.82),
+                            behavior: "smooth",
+                        });
+                    }
+                    window.setTimeout(updateButton, 350);
+                });
+
+                if (nav) {
+                    nav.addEventListener("scroll", updateButton, { passive: true });
+                    window.addEventListener("resize", updateButton);
+                    window.setTimeout(updateButton, 250);
+                }
+                updateButton();
+            </script>
+            """,
+            height=42,
+            scrolling=False,
+        )
+
+
 def render_view_tabs(view_options):
     active_view = st.session_state.get("active_view", view_options[0])
     if active_view not in view_options:
@@ -4780,6 +4933,7 @@ def render_view_tabs(view_options):
                         args=(option,),
                         use_container_width=True,
                     )
+    render_header_tab_scroll_control()
     return active_view
 
 
