@@ -419,7 +419,35 @@ st.markdown(
     }
 
     [class*="st-key-app_header_nav_scroll"] {
-        display: none;
+        position: fixed;
+        top: 8px;
+        right: 94px;
+        z-index: 999999;
+        display: block;
+        width: 42px !important;
+        height: 42px !important;
+        min-height: 42px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
+    [class*="st-key-app_header_nav_scroll"] [data-testid="stVerticalBlock"],
+    [class*="st-key-app_header_nav_scroll"] [data-testid="stElementContainer"],
+    [class*="st-key-app_header_nav_scroll"] [data-testid="stIFrame"] {
+        width: 42px !important;
+        height: 42px !important;
+        min-height: 42px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        gap: 0 !important;
+    }
+
+    [class*="st-key-app_header_nav_scroll"] iframe {
+        display: block;
+        width: 42px !important;
+        height: 42px !important;
+        border: 0 !important;
     }
 
     [class*="st-key-app_header_nav_mount"] [data-testid="stColumn"] {
@@ -3916,35 +3944,7 @@ st.markdown(
         }
 
         [class*="st-key-app_header_nav_scroll"] {
-            position: fixed;
-            top: 8px;
             right: 4px;
-            z-index: 999999;
-            display: block;
-            width: 42px !important;
-            height: 42px !important;
-            min-height: 42px !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: hidden !important;
-        }
-
-        [class*="st-key-app_header_nav_scroll"] [data-testid="stVerticalBlock"],
-        [class*="st-key-app_header_nav_scroll"] [data-testid="stElementContainer"],
-        [class*="st-key-app_header_nav_scroll"] [data-testid="stIFrame"] {
-            width: 42px !important;
-            height: 42px !important;
-            min-height: 42px !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            gap: 0 !important;
-        }
-
-        [class*="st-key-app_header_nav_scroll"] iframe {
-            display: block;
-            width: 42px !important;
-            height: 42px !important;
-            border: 0 !important;
         }
 
         [class*="st-key-app_header_nav_mount"] [data-testid="stHorizontalBlock"] {
@@ -4847,7 +4847,7 @@ def render_header_tab_scroll_control():
                     transform: rotate(180deg);
                 }
             </style>
-            <button id="header-tab-scroll" type="button"
+            <button id="header-tab-scroll" type="button" hidden
                     aria-label="Show more navigation tabs"
                     title="More tabs">
                 <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -4857,6 +4857,9 @@ def render_header_tab_scroll_control():
             <script>
                 const button = document.getElementById("header-tab-scroll");
                 const parentDocument = window.parent.document;
+                const hostContainer = window.frameElement?.closest(
+                    '[class*="st-key-app_header_nav_scroll"]'
+                );
                 const nav = parentDocument.querySelector(
                     '[class*="st-key-app_header_nav_mount"] '
                     + '[data-testid="stHorizontalBlock"]'
@@ -4865,12 +4868,24 @@ def render_header_tab_scroll_control():
                 function updateButton() {
                     if (!nav) {
                         button.hidden = true;
+                        if (hostContainer) {
+                            hostContainer.style.visibility = "hidden";
+                            hostContainer.style.pointerEvents = "none";
+                        }
                         return;
                     }
                     const maxScroll = Math.max(0, nav.scrollWidth - nav.clientWidth);
                     const hasMoreTabs = maxScroll > 4;
                     const atEnd = hasMoreTabs && nav.scrollLeft >= maxScroll - 4;
                     button.hidden = !hasMoreTabs;
+                    if (hostContainer) {
+                        hostContainer.style.visibility = hasMoreTabs
+                            ? "visible"
+                            : "hidden";
+                        hostContainer.style.pointerEvents = hasMoreTabs
+                            ? "auto"
+                            : "none";
+                    }
                     button.classList.toggle("is-back", atEnd);
                     button.setAttribute(
                         "aria-label",

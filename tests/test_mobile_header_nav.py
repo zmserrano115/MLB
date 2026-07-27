@@ -9,6 +9,8 @@ def test_mobile_header_has_tab_scroll_control():
     assert 'key="app_header_nav_scroll"' in source
     assert 'id="header-tab-scroll"' in source
     assert "Show more navigation tabs" in source
+    assert "const hasMoreTabs = maxScroll > 4;" in source
+    assert 'hostContainer.style.visibility = hasMoreTabs' in source
     assert "nav.scrollBy({" in source
     assert 'nav.scrollTo({ left: 0, behavior: "smooth" });' in source
     assert "render_header_tab_scroll_control()" in source
